@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='5.0.1';
+const VERSION='5.0.2';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -65,19 +65,42 @@ function applyPreset(name){if(!state.photo)return;resetSliderUI();state.photo.fi
  if(name==='auto'||name==='professional'){add('brightness',new F.Brightness({brightness:.04}));add('contrast',new F.Contrast({contrast:.12}));add('saturation',new F.Saturation({saturation:.16}));add('sharpness',new F.Convolute({matrix:[0,-.15,0,-.15,1.6,-.15,0,-.15,0]}))}
  state.photo.applyFilters();state.canvas.requestRenderAll();snapshot();toast(name==='bw'?'Blanco y negro aplicado':'Ajuste aplicado')
 }
-function executeCommand(raw){const t=normalize(raw);if(!t)return toast('Escribe una instrucción.');
- if(/blanco|negro|grayscale|escala de grises|\bbw\b/.test(t))return applyPreset('bw');
- if(/profesional|mejorar|enhance|automatic/.test(t))return applyPreset('professional');
- if(/retrato|portrait/.test(t))return applyPreset('portrait');
- if(/vibrante|mas color|saturacion/.test(t))return applyPreset('vivid');
- if(/mas brillo|brillante|aclara/.test(t)){const v=Math.min(100,Number($('brightness').value)+20);$('brightness').value=v;applySlider('brightness',v,true);return toast('Brillo aumentado')}
- if(/menos brillo|oscurece/.test(t)){const v=Math.max(-100,Number($('brightness').value)-20);$('brightness').value=v;applySlider('brightness',v,true);return toast('Brillo reducido')}
+function executeCommand(raw){
+ const t=normalize(raw);
+ if(!t)return toast('Escribe una instrucción.');
+
+ // Nombres internos usados por los botones. Se ejecutan directamente y nunca
+ // dependen del intérprete de lenguaje natural.
+ const direct={
+   professional:()=>applyPreset('professional'),
+   profesional:()=>applyPreset('professional'),
+   auto:()=>applyPreset('professional'),
+   enhance:()=>applyPreset('professional'),
+   portrait:()=>applyPreset('portrait'),
+   retrato:()=>applyPreset('portrait'),
+   vivid:()=>applyPreset('vivid'),
+   vibrante:()=>applyPreset('vivid'),
+   bw:()=>applyPreset('bw'),
+   grayscale:()=>applyPreset('bw')
+ };
+ if(direct[t])return direct[t]();
+
+ if(/blanco y negro|escala de grises|sin color|monocrom|grayscale|black and white|\bb&w\b|\bbw\b/.test(t))return applyPreset('bw');
+ if(/hazla profesional|foto profesional|mejora(r)?|mejor calidad|enhance|auto(matic[oa]?)?/.test(t))return applyPreset('professional');
+ if(/retrato|portrait|suaviza.*cara|mejora.*rostro/.test(t))return applyPreset('portrait');
+ if(/vibrante|mas color|sube.*color|saturacion|colores vivos|vivid/.test(t))return applyPreset('vivid');
+ if(/mas brillo|sube.*brillo|brillante|aclara|mas luz/.test(t)){const v=Math.min(100,Number($('brightness').value)+20);$('brightness').value=v;applySlider('brightness',v,true);return toast('Brillo aumentado')}
+ if(/menos brillo|baja.*brillo|oscurece|menos luz/.test(t)){const v=Math.max(-100,Number($('brightness').value)-20);$('brightness').value=v;applySlider('brightness',v,true);return toast('Brillo reducido')}
+ if(/mas contraste|sube.*contraste/.test(t)){const v=Math.min(100,Number($('contrast').value)+20);$('contrast').value=v;applySlider('contrast',v,true);return toast('Contraste aumentado')}
+ if(/menos contraste|baja.*contraste/.test(t)){const v=Math.max(-100,Number($('contrast').value)-20);$('contrast').value=v;applySlider('contrast',v,true);return toast('Contraste reducido')}
+ if(/mas nitidez|enfoca|sharpen/.test(t)){const v=Math.min(100,Number($('sharpness').value)+20);$('sharpness').value=v;applySlider('sharpness',v,true);return toast('Nitidez aumentada')}
+ if(/desenfoca|blur/.test(t)){const v=Math.min(20,Number($('blur').value)+5);$('blur').value=v;applySlider('blur',v,true);return toast('Desenfoque aplicado')}
  if(/cuadrad|1:1|recort/.test(t))return openCrop(1);
  if(/gira.*derecha|rotate right/.test(t))return rotate(90);
  if(/gira.*izquierda|rotate left/.test(t))return rotate(-90);
- if(/espejo|mirror/.test(t))return flip();
- if(/ropa|cabello|pelo|cara|cuerpo|fondo|face swap|outfit/.test(t))return toast('Esa función necesita conectar el motor de IA generativa.');
- toast('Todavía no reconozco esa instrucción. Prueba “blanco y negro” o “hazla profesional”.')
+ if(/espejo|mirror|voltea/.test(t))return flip();
+ if(/ropa|cabello|pelo|peinado|cara|rostro|cuerpo|fondo|face swap|outfit/.test(t))return toast('Esa función necesita conectar el motor de IA generativa.');
+ toast('No entendí esa instrucción todavía. Prueba “hazla profesional”, “más brillo” o “blanco y negro”.')
 }
 function rotate(deg){if(!state.photo)return;state.photo.rotate((state.photo.angle||0)+deg);fitPhoto();state.canvas.requestRenderAll();snapshot()}
 function flip(){if(!state.photo)return;state.photo.set('flipX',!state.photo.flipX);state.canvas.requestRenderAll();snapshot()}
@@ -100,7 +123,7 @@ function init(){
  state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));
  $('file-input').addEventListener('change',e=>loadFile(e.target.files[0]));$('camera-input').addEventListener('change',e=>loadFile(e.target.files[0]));
  sliders.forEach(id=>{$(id).addEventListener('input',e=>applySlider(id,e.target.value,false));$(id).addEventListener('change',()=>snapshot())});
- document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>executeCommand(b.dataset.command));
+ document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>{const command=b.dataset.command;const presetMap={professional:'professional',portrait:'portrait',vivid:'vivid',bw:'bw'};if(presetMap[command])applyPreset(presetMap[command]);else executeCommand(command)});
  $('command-btn').onclick=()=>executeCommand($('command-input').value);$('command-input').addEventListener('keydown',e=>{if(e.key==='Enter')executeCommand(e.target.value)});
  $('rotate-left').onclick=()=>rotate(-90);$('rotate-right').onclick=()=>rotate(90);$('flip-x').onclick=flip;$('crop-btn').onclick=()=>openCrop(NaN);$('add-text').onclick=addText;$('add-sticker').onclick=addSticker;
  $('undo-btn').onclick=undo;$('redo-btn').onclick=redo;$('download-btn').onclick=download;$('reset-btn').onclick=reset;
