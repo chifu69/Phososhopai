@@ -1,10 +1,1 @@
-{
-  "name":"PHOTO IA",
-  "short_name":"PHOTO IA",
-  "description":"Editor de fotos privado, fácil y potente.",
-  "start_url":"./",
-  "display":"standalone",
-  "background_color":"#edf1f4",
-  "theme_color":"#101820",
-  "icons":[]
-}
+{"name":"PHOTO IA 4.0","short_name":"PHOTO IA","start_url":"./?v=400","display":"standalone","background_color":"#101820","theme_color":"#101820","icons":[]}

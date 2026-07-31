@@ -7,123 +7,53 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="PHOTO IA" />
-  <meta name="description" content="PHOTO IA: editor privado, sencillo y potente." />
+  <meta name="description" content="PHOTO IA 4.0: editor privado con OpenCV.js, Fabric.js y Cropper.js." />
   <link rel="manifest" href="manifest.webmanifest" />
-  <link rel="stylesheet" href="styles.css?v=3.0.0" />
-  <title>PHOTO IA 3.0</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" />
+  <link rel="stylesheet" href="styles.css?v=4.0.0" />
+  <title>PHOTO IA 4.0</title>
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <div class="brand">
-        <div class="robot" aria-hidden="true"><span class="antenna"></span><span class="head"></span><span class="body"></span></div>
-        <div><h1>PHOTO IA 🤖</h1><p>Photoshop privado en modo fácil</p></div>
-      </div>
-      <div class="top-actions">
-        <button id="undo-btn" class="icon-btn" type="button" disabled aria-label="Deshacer">↶</button>
-        <button id="redo-btn" class="icon-btn" type="button" disabled aria-label="Rehacer">↷</button>
-        <button id="theme-btn" class="icon-btn" type="button" aria-label="Cambiar tema">☾</button>
-      </div>
+      <div class="brand"><div class="robot" aria-hidden="true"><span class="antenna"></span><span class="head"></span><span class="body"></span></div><div><h1>PHOTO IA 🤖</h1><p>Editor privado profesional en modo fácil</p></div></div>
+      <div class="top-actions"><button id="undo-btn" class="icon-btn" disabled>↶</button><button id="redo-btn" class="icon-btn" disabled>↷</button><button id="theme-btn" class="icon-btn">☾</button></div>
     </header>
 
     <main>
       <section class="command-panel panel">
-        <div><p class="eyebrow">PHOTO IA ASSISTANT</p><h2>¿Qué quieres hacer con esta foto?</h2></div>
-        <div class="command-row">
-          <input id="command-input" type="text" placeholder="Ej.: hazla profesional, blanco y negro, más brillante..." disabled />
-          <button id="command-btn" class="primary" type="button" disabled>Hacerlo</button>
-        </div>
-        <div class="chips">
-          <button data-command="professional" disabled>✨ Profesional</button>
-          <button data-command="portrait" disabled>🙂 Retrato</button>
-          <button data-command="vivid" disabled>🌈 Más color</button>
-          <button data-command="bw" disabled>◐ Blanco y negro</button>
-        </div>
+        <div class="command-heading"><div><p class="eyebrow">PHOTO IA BRAIN</p><h2>¿Qué quieres hacer con esta foto?</h2></div><span id="engine-badge" class="engine-badge loading">Cargando motor…</span></div>
+        <div class="command-row"><input id="command-input" type="text" placeholder="Ej.: blanco y negro, más brillante, recorta cuadrado..." disabled /><button id="command-btn" class="primary" disabled>Hacerlo</button></div>
+        <div class="chips"><button data-command="professional" disabled>✨ Profesional</button><button data-command="portrait" disabled>🙂 Retrato</button><button data-command="vivid" disabled>🌈 Más color</button><button data-command="bw" disabled>◐ Blanco y negro</button></div>
       </section>
 
       <section class="workspace panel">
-        <div class="canvas-toolbar">
-          <div><p class="eyebrow">MODO FÁCIL</p><h2 id="project-title">Nueva edición</h2></div>
-          <button id="compare-btn" class="secondary" type="button" disabled>Antes / Después</button>
-        </div>
-        <div id="drop-zone" class="drop-zone">
-          <canvas id="editor-canvas" aria-label="Lienzo de edición"></canvas>
-          <div id="empty-state" class="empty-state">
-            <div class="camera-mark">📷</div><h3>Abre una foto</h3><p>La edición local ocurre en tu dispositivo.</p>
-            <div class="open-actions">
-              <label class="primary file-label">Elegir foto<input id="file-input" type="file" accept="image/*" hidden /></label>
-              <label class="secondary file-label">Usar cámara<input id="camera-input" type="file" accept="image/*" capture="environment" hidden /></label>
-            </div>
-          </div>
-        </div>
-        <div class="status-row"><span id="image-info">Sin imagen</span><span>🔒 Local</span></div>
+        <div class="canvas-toolbar"><div><p class="eyebrow">LIENZO PROFESIONAL</p><h2 id="project-title">Nueva edición</h2></div><button id="compare-btn" class="secondary" disabled>Antes / Después</button></div>
+        <div id="drop-zone" class="drop-zone"><canvas id="editor-canvas"></canvas><div id="empty-state" class="empty-state"><div class="camera-mark">📷</div><h3>Abre una foto</h3><p>La edición ocurre en tu dispositivo.</p><div class="open-actions"><label class="primary file-label">Elegir foto<input id="file-input" type="file" accept="image/*" hidden /></label><label class="secondary file-label">Usar cámara<input id="camera-input" type="file" accept="image/*" capture="environment" hidden /></label></div></div></div>
+        <div class="status-row"><span id="image-info">Sin imagen</span><span id="privacy-status">🔒 Local</span></div>
       </section>
 
-      <section class="studio-panel panel">
-        <div class="section-heading"><div><p class="eyebrow">ESTUDIOS</p><h2>Todo en lenguaje sencillo</h2></div></div>
-        <div class="studio-grid">
-          <button class="studio-card local" data-studio="magic" disabled><span>✨</span><strong>One Click Magic</strong><small>Mejora automática</small></button>
-          <button class="studio-card" data-studio="outfit" disabled><span>👕</span><strong>Outfit Studio</strong><small>Cambiar ropa</small></button>
-          <button class="studio-card" data-studio="hair" disabled><span>💇</span><strong>Hair Studio</strong><small>Pelo y color</small></button>
-          <button class="studio-card" data-studio="face" disabled><span>😀</span><strong>Face Studio</strong><small>Rostro y expresión</small></button>
-          <button class="studio-card" data-studio="swap" disabled><span>🔄</span><strong>Fun Swap</strong><small>Cara o cuerpo</small></button>
-          <button class="studio-card" data-studio="background" disabled><span>🌄</span><strong>Background</strong><small>Fondo y desenfoque</small></button>
-          <button class="studio-card local" data-studio="design" disabled><span>🔤</span><strong>Text & Design</strong><small>Texto y stickers</small></button>
-          <button class="studio-card" data-studio="repair" disabled><span>🪄</span><strong>Magic Repair</strong><small>Borrar y restaurar</small></button>
-        </div>
-        <p class="ai-note"><b>Local</b> funciona ahora mismo. Las transformaciones generativas quedan preparadas para conectar un motor de IA en la siguiente etapa.</p>
-      </section>
+      <section class="quick-actions panel"><div class="section-heading"><div><p class="eyebrow">UN TOQUE</p><h2>Mejoras OpenCV</h2></div><button id="reset-btn" class="text-btn" disabled>Restablecer</button></div><div class="action-grid"><button class="action-card" data-preset="auto" disabled><span>✨</span><strong>Mejorar</strong><small>CLAHE + color</small></button><button class="action-card" data-preset="portrait" disabled><span>🙂</span><strong>Retrato</strong><small>Suave y natural</small></button><button class="action-card" data-preset="vivid" disabled><span>🌈</span><strong>Vibrante</strong><small>Más impacto</small></button><button class="action-card" data-preset="bw" disabled><span>◐</span><strong>Blanco y negro</strong><small>Escala de grises</small></button></div></section>
 
-      <section class="quick-actions panel">
-        <div class="section-heading"><div><p class="eyebrow">UN TOQUE</p><h2>Mejoras rápidas</h2></div><button id="reset-btn" class="text-btn" type="button" disabled>Restablecer</button></div>
-        <div class="action-grid">
-          <button class="action-card" data-preset="auto" disabled><span>✨</span><strong>Mejorar</strong><small>Color y luz</small></button>
-          <button class="action-card" data-preset="portrait" disabled><span>🙂</span><strong>Retrato</strong><small>Suave y natural</small></button>
-          <button class="action-card" data-preset="vivid" disabled><span>🌈</span><strong>Vibrante</strong><small>Más impacto</small></button>
-          <button class="action-card" data-preset="bw" disabled><span>◐</span><strong>Blanco y negro</strong><small>Clásico</small></button>
-        </div>
-      </section>
+      <section class="studio-panel panel"><div class="section-heading"><div><p class="eyebrow">ESTUDIOS</p><h2>Herramientas profesionales</h2></div></div><div class="studio-grid"><button class="studio-card local" data-studio="design" disabled><span>🔤</span><strong>Texto y capas</strong><small>Fabric.js</small></button><button class="studio-card local" data-studio="crop" disabled><span>✂️</span><strong>Recorte Pro</strong><small>Cropper.js</small></button><button class="studio-card local" data-studio="repair" disabled><span>🪄</span><strong>Reparar</strong><small>OpenCV</small></button><button class="studio-card" data-studio="background" disabled><span>🌄</span><strong>Background</strong><small>Próximo motor IA</small></button><button class="studio-card" data-studio="outfit" disabled><span>👕</span><strong>Outfit Studio</strong><small>Próximo motor IA</small></button><button class="studio-card" data-studio="hair" disabled><span>💇</span><strong>Hair Studio</strong><small>Próximo motor IA</small></button></div></section>
 
-      <section class="tools panel">
-        <div class="section-heading"><div><p class="eyebrow">AJUSTES</p><h2>Control sencillo</h2></div></div>
-        <div class="slider-list">
-          <label>Brillo <output id="brightness-out">0</output><input id="brightness" type="range" min="-100" max="100" value="0" disabled /></label>
-          <label>Contraste <output id="contrast-out">0</output><input id="contrast" type="range" min="-100" max="100" value="0" disabled /></label>
-          <label>Saturación <output id="saturation-out">0</output><input id="saturation" type="range" min="-100" max="100" value="0" disabled /></label>
-          <label>Temperatura <output id="temperature-out">0</output><input id="temperature" type="range" min="-100" max="100" value="0" disabled /></label>
-          <label>Nitidez <output id="sharpness-out">0</output><input id="sharpness" type="range" min="0" max="100" value="0" disabled /></label>
-          <label>Desenfoque <output id="blur-out">0</output><input id="blur" type="range" min="0" max="20" value="0" disabled /></label>
-        </div>
-      </section>
+      <section class="tools panel"><div class="section-heading"><div><p class="eyebrow">AJUSTES</p><h2>Procesamiento en tiempo real</h2></div></div><div class="slider-list"><label>Brillo <output id="brightness-out">0</output><input id="brightness" type="range" min="-100" max="100" value="0" disabled /></label><label>Contraste <output id="contrast-out">0</output><input id="contrast" type="range" min="-100" max="100" value="0" disabled /></label><label>Saturación <output id="saturation-out">0</output><input id="saturation" type="range" min="-100" max="100" value="0" disabled /></label><label>Temperatura <output id="temperature-out">0</output><input id="temperature" type="range" min="-100" max="100" value="0" disabled /></label><label>Nitidez <output id="sharpness-out">0</output><input id="sharpness" type="range" min="0" max="100" value="0" disabled /></label><label>Desenfoque <output id="blur-out">0</output><input id="blur" type="range" min="0" max="20" value="0" disabled /></label></div></section>
 
-      <section class="transform panel">
-        <div class="section-heading"><div><p class="eyebrow">TRANSFORMAR</p><h2>Encuadre</h2></div></div>
-        <div class="button-row">
-          <button id="rotate-left" class="secondary" disabled>↶ 90°</button><button id="rotate-right" class="secondary" disabled>↷ 90°</button>
-          <button id="flip-x" class="secondary" disabled>⇆ Espejo</button><button id="crop-square" class="secondary" disabled>□ Cuadrado</button>
-        </div>
-      </section>
+      <section class="transform panel"><div class="section-heading"><div><p class="eyebrow">TRANSFORMAR</p><h2>Encuadre</h2></div></div><div class="button-row"><button id="rotate-left" class="secondary" disabled>↶ 90°</button><button id="rotate-right" class="secondary" disabled>↷ 90°</button><button id="flip-x" class="secondary" disabled>⇆ Espejo</button><button id="crop-square" class="secondary" disabled>□ Cuadrado</button></div></section>
 
-      <section class="export panel">
-        <div class="section-heading"><div><p class="eyebrow">GUARDAR</p><h2>Exportar fotografía</h2></div></div>
-        <div class="export-grid"><label>Formato<select id="format"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></label><label>Calidad<input id="quality" type="range" min="60" max="100" value="92" /></label></div>
-        <button id="download-btn" class="primary wide" type="button" disabled>Guardar imagen</button>
-      </section>
+      <section class="export panel"><div class="section-heading"><div><p class="eyebrow">GUARDAR</p><h2>Exportar fotografía</h2></div></div><div class="export-grid"><label>Formato<select id="format"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></label><label>Calidad<input id="quality" type="range" min="60" max="100" value="92" /></label></div><button id="download-btn" class="primary wide" disabled>Guardar imagen</button></section>
     </main>
-    <footer>PHOTO IA 3.0 • Motor de edición local • <strong id="app-version">3.0.0</strong></footer>
+    <footer>PHOTO IA • OpenCV.js + Fabric.js + Cropper.js • <strong id="app-version">4.0.0</strong></footer>
   </div>
 
-  <div id="studio-sheet" class="sheet" hidden>
-    <button id="sheet-backdrop" class="sheet-backdrop" aria-label="Cerrar"></button>
-    <section class="sheet-card" role="dialog" aria-modal="true">
-      <div class="sheet-handle"></div>
-      <div class="sheet-heading"><div><p id="sheet-eyebrow" class="eyebrow">STUDIO</p><h2 id="sheet-title">Studio</h2></div><button id="sheet-close" class="icon-btn">×</button></div>
-      <p id="sheet-description" class="sheet-description"></p>
-      <div id="sheet-content" class="sheet-content"></div>
-    </section>
-  </div>
-  <div id="processing" class="processing" hidden><span></span> Procesando foto…</div>
-  <div id="toast" class="toast" role="status"></div>
-  <script src="app.js?v=3.0.0"></script>
+  <div id="studio-sheet" class="sheet" hidden><button id="sheet-backdrop" class="sheet-backdrop"></button><section class="sheet-card" role="dialog" aria-modal="true"><div class="sheet-handle"></div><div class="sheet-heading"><div><p id="sheet-eyebrow" class="eyebrow">STUDIO</p><h2 id="sheet-title">Studio</h2></div><button id="sheet-close" class="icon-btn">×</button></div><p id="sheet-description" class="sheet-description"></p><div id="sheet-content" class="sheet-content"></div></section></div>
+
+  <div id="crop-modal" class="crop-modal" hidden><div class="crop-card"><div class="sheet-heading"><h2>Recorte profesional</h2><button id="crop-close" class="icon-btn">×</button></div><div class="crop-stage"><img id="crop-image" alt="Imagen para recortar" /></div><div class="crop-ratios"><button data-ratio="NaN">Libre</button><button data-ratio="1">1:1</button><button data-ratio="0.8">4:5</button><button data-ratio="1.7777778">16:9</button></div><button id="crop-apply" class="primary wide">Aplicar recorte</button></div></div>
+
+  <div id="processing" class="processing" hidden><span></span> Procesando con OpenCV…</div><div id="toast" class="toast" role="status"></div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+  <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
+  <script src="app.js?v=4.0.0"></script>
 </body>
 </html>
