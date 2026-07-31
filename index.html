@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#101820" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="PHOTO IA" />
+  <meta name="description" content="Editor de fotos privado, sencillo y potente." />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css?v=1.0.0" />
+  <title>PHOTO IA</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="robot" aria-hidden="true">
+          <span class="antenna"></span><span class="head"><i></i><i></i></span><span class="body"></span>
+        </div>
+        <div><h1>PHOTO IA 🤖</h1><p>Tu editor privado</p></div>
+      </div>
+      <div class="top-actions">
+        <button id="undo-btn" class="icon-btn" type="button" disabled aria-label="Deshacer">↶</button>
+        <button id="redo-btn" class="icon-btn" type="button" disabled aria-label="Rehacer">↷</button>
+        <button id="theme-btn" class="icon-btn" type="button" aria-label="Cambiar tema">☾</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="workspace panel">
+        <div class="canvas-toolbar">
+          <div>
+            <p class="eyebrow">MODO FÁCIL</p>
+            <h2 id="project-title">Nueva edición</h2>
+          </div>
+          <button id="compare-btn" class="secondary" type="button" disabled>Antes / Después</button>
+        </div>
+
+        <div id="drop-zone" class="drop-zone">
+          <canvas id="editor-canvas" aria-label="Lienzo de edición"></canvas>
+          <div id="empty-state" class="empty-state">
+            <div class="camera-mark">📷</div>
+            <h3>Abre una foto</h3>
+            <p>La edición básica ocurre en tu dispositivo.</p>
+            <div class="open-actions">
+              <label class="primary file-label">Elegir foto<input id="file-input" type="file" accept="image/*" hidden /></label>
+              <label class="secondary file-label">Usar cámara<input id="camera-input" type="file" accept="image/*" capture="environment" hidden /></label>
+            </div>
+          </div>
+        </div>
+
+        <div class="status-row">
+          <span id="image-info">Sin imagen</span>
+          <span id="privacy-status">🔒 Local</span>
+        </div>
+      </section>
+
+      <section class="quick-actions panel">
+        <div class="section-heading"><div><p class="eyebrow">UN TOQUE</p><h2>Mejoras rápidas</h2></div><button id="reset-btn" class="text-btn" type="button" disabled>Restablecer</button></div>
+        <div class="action-grid">
+          <button class="action-card" data-preset="auto" disabled><span>✨</span><strong>Mejorar</strong><small>Color y luz</small></button>
+          <button class="action-card" data-preset="portrait" disabled><span>🙂</span><strong>Retrato</strong><small>Suave y natural</small></button>
+          <button class="action-card" data-preset="vivid" disabled><span>🌈</span><strong>Vibrante</strong><small>Más impacto</small></button>
+          <button class="action-card" data-preset="bw" disabled><span>◐</span><strong>Blanco y negro</strong><small>Clásico</small></button>
+        </div>
+      </section>
+
+      <section class="tools panel">
+        <div class="section-heading"><div><p class="eyebrow">AJUSTES</p><h2>Control sencillo</h2></div></div>
+        <div class="slider-list">
+          <label>Brillo <output id="brightness-out">0</output><input id="brightness" type="range" min="-100" max="100" value="0" disabled /></label>
+          <label>Contraste <output id="contrast-out">0</output><input id="contrast" type="range" min="-100" max="100" value="0" disabled /></label>
+          <label>Saturación <output id="saturation-out">0</output><input id="saturation" type="range" min="-100" max="100" value="0" disabled /></label>
+          <label>Temperatura <output id="temperature-out">0</output><input id="temperature" type="range" min="-100" max="100" value="0" disabled /></label>
+          <label>Nitidez <output id="sharpness-out">0</output><input id="sharpness" type="range" min="0" max="100" value="0" disabled /></label>
+          <label>Desenfoque <output id="blur-out">0</output><input id="blur" type="range" min="0" max="20" value="0" disabled /></label>
+        </div>
+      </section>
+
+      <section class="transform panel">
+        <div class="section-heading"><div><p class="eyebrow">TRANSFORMAR</p><h2>Encuadre</h2></div></div>
+        <div class="button-row">
+          <button id="rotate-left" class="secondary" disabled>↶ 90°</button>
+          <button id="rotate-right" class="secondary" disabled>↷ 90°</button>
+          <button id="flip-x" class="secondary" disabled>⇆ Espejo</button>
+          <button id="crop-square" class="secondary" disabled>□ Cuadrado</button>
+        </div>
+      </section>
+
+      <section class="export panel">
+        <div class="section-heading"><div><p class="eyebrow">GUARDAR</p><h2>Exportar fotografía</h2></div></div>
+        <div class="export-grid">
+          <label>Formato<select id="format"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></label>
+          <label>Calidad<input id="quality" type="range" min="60" max="100" value="92" /></label>
+        </div>
+        <button id="download-btn" class="primary wide" type="button" disabled>Guardar imagen</button>
+      </section>
+    </main>
+
+    <footer>PHOTO IA 1.0 • Editor local</footer>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js?v=1.0.0"></script>
+</body>
+</html>

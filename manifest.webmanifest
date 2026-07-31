@@ -1,0 +1,10 @@
+{
+  "name":"PHOTO IA",
+  "short_name":"PHOTO IA",
+  "description":"Editor de fotos privado, fácil y potente.",
+  "start_url":"./",
+  "display":"standalone",
+  "background_color":"#edf1f4",
+  "theme_color":"#101820",
+  "icons":[]
+}
