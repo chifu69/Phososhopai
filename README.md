@@ -1,17 +1,17 @@
-# PHOTO IA 1.0
+# PHOTO IA 2.0
 
-Editor de fotos privado y local en formato PWA.
+Editor de fotos personal y privado, optimizado para teléfonos.
 
-## Incluye
-- Abrir imagen o usar cámara
-- Mejoras rápidas
+## Funciona ahora
+- Abrir foto o cámara
+- One Click Magic
+- Presets profesional, retrato, vibrante y blanco y negro
 - Brillo, contraste, saturación, temperatura, nitidez y desenfoque
 - Rotar, espejo y recorte cuadrado
-- Deshacer y rehacer
-- Comparación antes/después
+- Deshacer, rehacer y comparación antes/después
+- Comandos sencillos escritos en español
 - Exportación JPG, PNG y WebP
-- Tema claro/oscuro
-- Funcionamiento offline después de la primera carga
+- PWA y funcionamiento offline
 
-## Uso
-Sirve la carpeta con un servidor web local o súbela a un hosting HTTPS. En iPhone, abre en Safari y usa “Agregar a pantalla de inicio”.
+## Arquitectura preparada
+Incluye las pantallas y flujos para Outfit Studio, Hair Studio, Face Studio, Fun Swap, Background Studio y Magic Repair. Estas transformaciones necesitan conectar posteriormente un motor de IA generativa; no se simulan ni se envían fotos a un servidor en esta versión.
