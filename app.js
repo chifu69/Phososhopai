@@ -20,13 +20,38 @@ function snapshot(){return {filters:values(),rotation,flipX,squareCrop}}
 function applySnapshot(s){sliders.forEach(id=>{$(id).value=s.filters[id];$(id+'-out').value=s.filters[id]});rotation=s.rotation;flipX=s.flipX;squareCrop=s.squareCrop;render()}
 function commit(){history=history.slice(0,historyIndex+1);history.push(JSON.parse(JSON.stringify(snapshot())));historyIndex=history.length-1;setEnabled(true)}
 function loadFile(file){if(!file||!file.type.startsWith('image/'))return toast('Selecciona una imagen válida.');const reader=new FileReader();reader.onload=e=>{const img=new Image();img.onload=()=>{sourceImage=img;rotation=0;flipX=false;squareCrop=false;sliders.forEach(id=>{$(id).value=0;$(id+'-out').value=0});history=[];historyIndex=-1;commit();$('empty-state').hidden=true;canvas.style.display='block';$('project-title').textContent=file.name||'Foto';$('image-info').textContent=`${img.naturalWidth} × ${img.naturalHeight}`;render();toast('Foto abierta');};img.src=e.target.result};reader.readAsDataURL(file)}
-function dimensions(){let w=sourceImage.naturalWidth,h=sourceImage.naturalHeight;if(squareCrop){const s=Math.min(w,h);w=h=s}if(Math.abs(rotation)%180===90)[w,h]=[h,w];const max=1800,scale=Math.min(1,max/Math.max(w,h));return{w:Math.round(w*scale),h:Math.round(h*scale)}}
-function render(useOriginal=false){if(!sourceImage)return;cancelAnimationFrame(renderTimer);renderTimer=requestAnimationFrame(()=>{const d=dimensions();canvas.width=d.w;canvas.height=d.h;ctx.save();ctx.clearRect(0,0,d.w,d.h);ctx.translate(d.w/2,d.h/2);ctx.rotate(rotation*Math.PI/180);ctx.scale(flipX?-1:1,1);let sw=sourceImage.naturalWidth,sh=sourceImage.naturalHeight,sx=0,sy=0;if(squareCrop){const s=Math.min(sw,sh);sx=(sw-s)/2;sy=(sh-s)/2;sw=sh=s}const rotated=Math.abs(rotation)%180===90,dw=rotated?d.h:d.w,dh=rotated?d.w:d.h,f=useOriginal?{brightness:0,contrast:0,saturation:0,temperature:0,sharpness:0,blur:0}:values();ctx.filter=f.blur?`blur(${f.blur}px)`:'none';ctx.drawImage(sourceImage,sx,sy,sw,sh,-dw/2,-dh/2,dw,dh);ctx.restore();ctx.filter='none';if(!useOriginal)applyColorAdjustments(f);if(!useOriginal&&f.sharpness)applySharpen(f.sharpness/100)})}
+function dimensions(){let w=sourceImage.naturalWidth,h=sourceImage.naturalHeight;if(squareCrop){const s=Math.min(w,h);w=h=s}if(Math.abs(rotation)%180===90)[w,h]=[h,w];const max=1100,scale=Math.min(1,max/Math.max(w,h));return{w:Math.round(w*scale),h:Math.round(h*scale)}}
+function render(useOriginal=false){
+  if(!sourceImage)return;
+  cancelAnimationFrame(renderTimer);
+  renderTimer=requestAnimationFrame(()=>{
+    try{
+      const d=dimensions();
+      canvas.width=d.w;canvas.height=d.h;
+      ctx.save();ctx.clearRect(0,0,d.w,d.h);
+      ctx.translate(d.w/2,d.h/2);ctx.rotate(rotation*Math.PI/180);ctx.scale(flipX?-1:1,1);
+      let sw=sourceImage.naturalWidth,sh=sourceImage.naturalHeight,sx=0,sy=0;
+      if(squareCrop){const size=Math.min(sw,sh);sx=(sw-size)/2;sy=(sh-size)/2;sw=sh=size}
+      const rotated=Math.abs(rotation)%180===90,dw=rotated?d.h:d.w,dh=rotated?d.w:d.h;
+      const f=useOriginal?{brightness:0,contrast:0,saturation:0,temperature:0,sharpness:0,blur:0}:values();
+      ctx.filter=f.blur?`blur(${Math.min(12,f.blur)}px)`:'none';
+      ctx.drawImage(sourceImage,sx,sy,sw,sh,-dw/2,-dh/2,dw,dh);
+      ctx.restore();ctx.filter='none';
+      if(!useOriginal)applyColorAdjustments(f);
+      // Sharpening is expensive on phones. Run only at low strength and smaller previews.
+      if(!useOriginal&&f.sharpness>0&&canvas.width*canvas.height<=900000)applySharpen(Math.min(f.sharpness,35)/100);
+    }catch(error){
+      console.error(error);
+      toast('La foto es demasiado grande para este ajuste. Intenta otra vez.');
+    }
+  })
+}
 function applyColorAdjustments(f){
   if(!f.brightness&&!f.contrast&&!f.saturation&&!f.temperature)return;
   const im=ctx.getImageData(0,0,canvas.width,canvas.height),a=im.data;
   const brightness=f.brightness*2.55;
-  const contrast=(259*(f.contrast+255))/(255*(259-f.contrast));
+  const contrastValue=Math.max(-100,Math.min(100,f.contrast));
+  const contrast=(259*(contrastValue+255))/(255*(259-contrastValue));
   const saturation=Math.max(0,(100+f.saturation)/100);
   const temp=f.temperature*.65;
   for(let i=0;i<a.length;i+=4){
@@ -35,9 +60,14 @@ function applyColorAdjustments(f){
     g=contrast*(g-128)+128+brightness;
     b=contrast*(b-128)+128+brightness;
     const gray=.2126*r+.7152*g+.0722*b;
-    r=gray+(r-gray)*saturation+temp;
-    g=gray+(g-gray)*saturation;
-    b=gray+(b-gray)*saturation-temp;
+    if(f.saturation<=-100){
+      r=g=b=gray;
+    }else{
+      r=gray+(r-gray)*saturation;
+      g=gray+(g-gray)*saturation;
+      b=gray+(b-gray)*saturation;
+    }
+    r+=temp;b-=temp;
     a[i]=Math.max(0,Math.min(255,r));
     a[i+1]=Math.max(0,Math.min(255,g));
     a[i+2]=Math.max(0,Math.min(255,b));
@@ -45,7 +75,7 @@ function applyColorAdjustments(f){
   ctx.putImageData(im,0,0);
 }
 function applySharpen(strength){const im=ctx.getImageData(0,0,canvas.width,canvas.height),src=im.data,out=new Uint8ClampedArray(src),w=canvas.width,h=canvas.height,s=Math.min(.8,strength*.8);for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;for(let c=0;c<3;c++){const center=src[i+c]*5-src[i-4+c]-src[i+4+c]-src[i-w*4+c]-src[i+w*4+c];out[i+c]=src[i+c]*(1-s)+center*s}}im.data.set(out);ctx.putImageData(im,0,0)}
-function preset(name){const p={auto:[10,12,10,4,18,0],professional:[10,14,12,3,20,0],portrait:[8,-2,-5,5,8,1],vivid:[6,18,28,3,14,0],bw:[5,15,-100,0,12,0]}[name]||[0,0,0,0,0,0];sliders.forEach((id,i)=>{$(id).value=p[i];$(id+'-out').value=p[i]});commit();render();toast(name==='bw'?'Blanco y negro aplicado':'Ajuste aplicado')}
+function preset(name){const p={auto:[10,12,10,4,18,0],professional:[10,14,12,3,20,0],portrait:[8,-2,-5,5,8,1],vivid:[6,18,28,3,14,0],bw:[0,10,-100,0,0,0]}[name]||[0,0,0,0,0,0];sliders.forEach((id,i)=>{$(id).value=p[i];$(id+'-out').value=p[i]});commit();render();toast(name==='bw'?'Blanco y negro aplicado':'Ajuste aplicado')}
 function executeCommand(raw){const q=raw.toLowerCase().trim();if(!q)return toast('Escribe lo que quieres hacer.');if(/profesional|mejorar|autom[aá]tic/.test(q))return preset('professional');if(/retrato|piel|cara/.test(q))return preset('portrait');if(/vibrante|m[aá]s color|satur/.test(q))return preset('vivid');if(/blanco|negro|monocrom/.test(q))return preset('bw');if(/brillante|aclar/.test(q)){sliders.forEach(id=>{});$('brightness').value=25;$('brightness-out').value=25;commit();render();return toast('Foto aclarada')};if(/oscura|bajar brillo/.test(q)){$('brightness').value=-20;$('brightness-out').value=-20;commit();render();return toast('Brillo reducido')};if(/desenfoc/.test(q)){$('blur').value=6;$('blur-out').value=6;commit();render();return toast('Desenfoque aplicado')};if(/ropa|pelo|cabello|cuerpo|face swap|cara en|fondo|borrar/.test(q))return toast('Esa transformación usará el módulo de IA generativa. La interfaz ya está preparada.');toast('Todavía no reconozco esa instrucción. Prueba “hazla profesional”.')}
 function openStudio(key){const data=studioData[key];if(!data)return;$('sheet-title').textContent=data.title;$('sheet-description').textContent=data.desc;$('sheet-content').innerHTML='';data.options.forEach(([icon,title,sub,type,action])=>{const b=document.createElement('button');b.className='sheet-option';b.innerHTML=`<span>${icon}</span><div><strong>${title}</strong><small>${sub}</small></div><em class="badge">${type==='local'?'LOCAL':type==='next'?'PRÓXIMO':'IA'}</em>`;b.onclick=()=>{if(type==='local'){if(action==='blur'){$('blur').value=6;$('blur-out').value=6;commit();render();toast('Desenfoque aplicado')}else preset(action);closeSheet()}else toast(type==='next'?'Se añadirá como herramienta local en la próxima actualización.':'Esta opción necesita conectar el motor de IA generativa.')};$('sheet-content').appendChild(b)});$('studio-sheet').hidden=false}
 function closeSheet(){$('studio-sheet').hidden=true}

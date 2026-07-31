@@ -15,3 +15,9 @@ Editor de fotos personal y privado, optimizado para teléfonos.
 
 ## Arquitectura preparada
 Incluye las pantallas y flujos para Outfit Studio, Hair Studio, Face Studio, Fun Swap, Background Studio y Magic Repair. Estas transformaciones necesitan conectar posteriormente un motor de IA generativa; no se simulan ni se envían fotos a un servidor en esta versión.
+
+
+## 2.0.2
+- Corrige congelamiento en iPhone al aplicar blanco y negro.
+- Reduce la resolución de vista previa para mantener la app fluida.
+- Blanco y negro ya no ejecuta el filtro de nitidez pesado.
