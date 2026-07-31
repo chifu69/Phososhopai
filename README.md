@@ -1,13 +1,15 @@
-# PHOTO IA 4.0
+# PHOTO IA 5.0
 
-Editor PWA privado con una base profesional:
+Arquitectura reconstruida para evitar el lienzo vacío:
 
-- OpenCV.js para procesamiento de imagen local (CLAHE, color, blur, nitidez y escala de grises).
-- Fabric.js para texto, capas y objetos editables.
-- Cropper.js para recorte libre y relaciones de aspecto.
-- Fallback de Canvas API cuando OpenCV no termina de cargar.
+- Fabric.js controla el lienzo visible y las capas.
+- La cámara y la galería cargan primero la foto con `Image.decode()` y luego la convierten a un lienzo seguro antes de entregarla a Fabric.
+- OpenCV.js se carga como motor opcional; la app no espera a OpenCV para mostrar la fotografía.
+- Cropper.js se usa únicamente dentro del modal de recorte.
+- Los ajustes principales funcionan con filtros Fabric en tiempo real.
 
-## Publicación
-Sube **el contenido de esta carpeta** a la raíz de tu repositorio de GitHub Pages y reemplaza los archivos anteriores. Abajo debe aparecer la versión **4.0.0**.
+## Publicar en GitHub Pages
 
-La primera vez requiere conexión para descargar las bibliotecas externas. Después el Service Worker intenta conservarlas en caché. Las herramientas generativas (ropa, cabello, face swap y fondos generados) todavía requieren conectar un modelo o servicio de IA; la app no simula esas funciones.
+Sube el contenido de esta carpeta directamente a la raíz del repositorio. Reemplaza los archivos anteriores. Cuando GitHub termine de publicar, abre el sitio con `?v=500` al final de la dirección.
+
+La parte inferior debe mostrar `5.0.0`.
