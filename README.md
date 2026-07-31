@@ -12,4 +12,4 @@ Arquitectura reconstruida para evitar el lienzo vacío:
 
 Sube el contenido de esta carpeta directamente a la raíz del repositorio. Reemplaza los archivos anteriores. Cuando GitHub termine de publicar, abre el sitio con `?v=500` al final de la dirección.
 
-La parte inferior debe mostrar `5.0.0`.
+La parte inferior debe mostrar `5.0.1`.

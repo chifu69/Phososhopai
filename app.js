@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='5.0.0';
+const VERSION='5.0.1';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -93,6 +93,9 @@ function closeCrop(){state.cropper?.destroy();state.cropper=null;$('crop-modal')
 async function applyCrop(){if(!state.cropper)return;processing(true,'Aplicando recorte…');const c=state.cropper.getCroppedCanvas({maxWidth:1800,maxHeight:1800,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});const data=c.toDataURL('image/jpeg',.94);closeCrop();await setMainImage(data,$('project-title').textContent);state.originalDataUrl=data;processing(false);toast('Recorte aplicado')}
 
 function init(){
+ $('crop-modal').hidden=true;
+ $('processing').hidden=true;
+ document.body.classList.remove('modal-open');
  if(!window.fabric){toast('No se pudo cargar Fabric.js. Revisa la conexión.');return}
  state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));
  $('file-input').addEventListener('change',e=>loadFile(e.target.files[0]));$('camera-input').addEventListener('change',e=>loadFile(e.target.files[0]));
