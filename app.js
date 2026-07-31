@@ -1,10 +1,10 @@
 (() => {
 'use strict';
-const VERSION='5.0.2';
+const VERSION='6.1.0';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
-const state={canvas:null,photo:null,originalDataUrl:'',history:[],future:[],cropper:null,compare:false,loading:false,cvReady:false};
+const state={canvas:null,photo:null,originalDataUrl:'',history:[],future:[],cropper:null,compare:false,loading:false,cvReady:false,layerSeq:0};
 
 function toast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2200)}
 function processing(on,label='Procesando…'){state.loading=on;$('processing').hidden=!on;$('processing').querySelector('b').textContent=label}
@@ -12,9 +12,9 @@ function setEnabled(enabled){document.querySelectorAll('[data-command],[data-pre
 function normalize(text){return String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()}
 function fitCanvas(){const wrap=$('canvas-wrap');const w=Math.max(280,wrap.clientWidth);const h=Math.max(360,Math.min(window.innerHeight*.62,650));state.canvas.setDimensions({width:w,height:h});if(state.photo) fitPhoto();state.canvas.requestRenderAll()}
 function fitPhoto(){const p=state.photo;if(!p)return;const pad=20;const scale=Math.min((state.canvas.width-pad*2)/p.width,(state.canvas.height-pad*2)/p.height);p.scale(scale);p.set({left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center'});p.setCoords()}
-function snapshot(){if(!state.photo)return;state.history.push(state.canvas.toJSON(['photoRole']));if(state.history.length>30)state.history.shift();state.future=[];updateHistoryButtons()}
+function snapshot(){if(!state.photo)return;state.history.push(state.canvas.toJSON(['photoRole','layerId','layerName','layerType']));if(state.history.length>30)state.history.shift();state.future=[];updateHistoryButtons();renderLayers()}
 function updateHistoryButtons(){$('undo-btn').disabled=state.history.length<2;$('redo-btn').disabled=!state.future.length}
-function restoreJSON(json){state.canvas.loadFromJSON(json,()=>{state.photo=state.canvas.getObjects().find(o=>o.photoRole==='main')||null;state.canvas.requestRenderAll();updateHistoryButtons()})}
+function restoreJSON(json){state.canvas.loadFromJSON(json,()=>{state.photo=state.canvas.getObjects().find(o=>o.photoRole==='main')||null;state.canvas.requestRenderAll();updateHistoryButtons();renderLayers()})}
 function undo(){if(state.history.length<2)return;state.future.push(state.history.pop());restoreJSON(state.history[state.history.length-1])}
 function redo(){if(!state.future.length)return;const next=state.future.pop();state.history.push(next);restoreJSON(next)}
 
@@ -42,7 +42,7 @@ async function loadFile(file){
 function fabricImageFromURL(url){return new Promise((resolve,reject)=>fabric.Image.fromURL(url,img=>img?resolve(img):reject(new Error('Fabric no cargó la imagen')),{crossOrigin:'anonymous'}))}
 async function setMainImage(dataUrl,name='image.jpg'){
  const img=await fabricImageFromURL(dataUrl);
- state.canvas.clear();img.photoRole='main';img.set({selectable:false,evented:false,objectCaching:false});state.photo=img;state.canvas.add(img);state.canvas.sendToBack(img);fitPhoto();state.canvas.requestRenderAll();
+ state.canvas.clear();img.photoRole='main';img.layerId='layer-photo';img.layerName='Fotografía';img.layerType='photo';img.set({selectable:false,evented:false,objectCaching:false});state.photo=img;state.canvas.add(img);state.canvas.sendToBack(img);fitPhoto();state.canvas.requestRenderAll();
  $('empty-state').hidden=true;$('project-title').textContent=name;$('image-info').textContent=`${img.width} × ${img.height}px`;setEnabled(true);resetSliderUI();state.history=[];state.future=[];snapshot();
 }
 function resetSliderUI(){sliders.forEach(id=>{$(id).value=0;$(`${id}-out`).textContent='0'})}
@@ -102,10 +102,66 @@ function executeCommand(raw){
  if(/ropa|cabello|pelo|peinado|cara|rostro|cuerpo|fondo|face swap|outfit/.test(t))return toast('Esa función necesita conectar el motor de IA generativa.');
  toast('No entendí esa instrucción todavía. Prueba “hazla profesional”, “más brillo” o “blanco y negro”.')
 }
+function nextLayerId(){state.layerSeq+=1;return `layer-${Date.now()}-${state.layerSeq}`}
+function objectLabel(obj){
+ if(obj.layerName)return obj.layerName;
+ if(obj.photoRole==='main')return 'Fotografía';
+ if(obj.type==='i-text'||obj.type==='text')return 'Texto';
+ if(obj.type==='image')return 'Imagen';
+ return 'Capa';
+}
+function objectTypeLabel(obj){
+ if(obj.photoRole==='main')return 'Fondo';
+ if(obj.layerType==='sticker')return 'Sticker';
+ if(obj.type==='i-text'||obj.type==='text')return 'Texto editable';
+ if(obj.type==='image')return 'Imagen';
+ return obj.type||'Objeto';
+}
+function layerIcon(obj){
+ if(obj.photoRole==='main')return '🖼️';
+ if(obj.layerType==='sticker')return '⭐';
+ if(obj.type==='i-text'||obj.type==='text')return '🔤';
+ if(obj.type==='image')return '📷';
+ return '◆';
+}
+function selectedLayer(){return state.canvas?.getActiveObject()||null}
+function layerControlsEnabled(){
+ const obj=selectedLayer();
+ const usable=!!obj&&obj.photoRole!=='main';
+ ['layer-up','layer-down','layer-duplicate','layer-delete'].forEach(id=>$(id).disabled=!usable);
+}
+function renderLayers(){
+ const list=$('layers-list');if(!list||!state.canvas)return;
+ const objects=[...state.canvas.getObjects()].reverse();
+ $('layer-count').textContent=`${objects.length} ${objects.length===1?'capa':'capas'}`;
+ if(!objects.length){list.innerHTML='<p class="layers-empty">Abre una foto para comenzar.</p>';layerControlsEnabled();return}
+ const active=selectedLayer();list.innerHTML='';
+ objects.forEach(obj=>{
+   if(!obj.layerId)obj.layerId=nextLayerId();
+   const row=document.createElement('div');row.className='layer-row';
+   if(active===obj)row.classList.add('active');if(obj.selectable===false&&obj.photoRole!=='main')row.classList.add('locked');if(obj.visible===false)row.classList.add('hidden-layer');
+   row.dataset.layerId=obj.layerId;
+   const eye=document.createElement('button');eye.type='button';eye.title=obj.visible===false?'Mostrar capa':'Ocultar capa';eye.textContent=obj.visible===false?'🙈':'👁';
+   eye.onclick=e=>{e.stopPropagation();obj.visible=obj.visible===false;state.canvas.requestRenderAll();snapshot()};
+   const lock=document.createElement('button');lock.type='button';lock.title=obj.selectable===false?'Desbloquear capa':'Bloquear capa';lock.textContent=obj.photoRole==='main'?'🔒':(obj.selectable===false?'🔒':'🔓');lock.disabled=obj.photoRole==='main';
+   lock.onclick=e=>{e.stopPropagation();const willLock=obj.selectable!==false;obj.set({selectable:!willLock,evented:!willLock});if(willLock)state.canvas.discardActiveObject();state.canvas.requestRenderAll();snapshot()};
+   const main=document.createElement('div');main.className='layer-main';main.innerHTML=`<strong>${escapeHTML(objectLabel(obj))}</strong><small>${escapeHTML(objectTypeLabel(obj))}</small>`;
+   main.onclick=()=>{if(obj.selectable===false)return toast(obj.photoRole==='main'?'La fotografía base permanece bloqueada.':'Desbloquea la capa para editarla.');state.canvas.setActiveObject(obj);state.canvas.requestRenderAll();renderLayers()};
+   main.ondblclick=()=>{if(obj.photoRole==='main')return;const name=prompt('Nombre de la capa:',objectLabel(obj));if(name&&name.trim()){obj.layerName=name.trim().slice(0,40);snapshot()}};
+   const thumb=document.createElement('div');thumb.className='layer-thumb';thumb.textContent=layerIcon(obj);
+   row.append(eye,lock,main,thumb);list.appendChild(row);
+ });
+ layerControlsEnabled();
+}
+function moveLayer(direction){const obj=selectedLayer();if(!obj||obj.photoRole==='main')return;direction>0?state.canvas.bringForward(obj):state.canvas.sendBackwards(obj);if(state.photo)state.canvas.sendToBack(state.photo);state.canvas.requestRenderAll();snapshot()}
+function duplicateLayer(){const obj=selectedLayer();if(!obj||obj.photoRole==='main')return;obj.clone(clone=>{clone.set({left:(obj.left||0)+18,top:(obj.top||0)+18});clone.layerId=nextLayerId();clone.layerName=`${objectLabel(obj)} copia`;clone.layerType=obj.layerType;state.canvas.add(clone);state.canvas.setActiveObject(clone);state.canvas.requestRenderAll();snapshot()})}
+function deleteLayer(){const obj=selectedLayer();if(!obj||obj.photoRole==='main')return;state.canvas.remove(obj);state.canvas.discardActiveObject();state.canvas.requestRenderAll();snapshot();toast('Capa eliminada')}
+function escapeHTML(value){return String(value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]))}
+
 function rotate(deg){if(!state.photo)return;state.photo.rotate((state.photo.angle||0)+deg);fitPhoto();state.canvas.requestRenderAll();snapshot()}
 function flip(){if(!state.photo)return;state.photo.set('flipX',!state.photo.flipX);state.canvas.requestRenderAll();snapshot()}
-function addText(){const text=new fabric.IText('Tu texto',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:42,fontWeight:'bold',fill:'#ffffff',stroke:'#111111',strokeWidth:1});state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
-function addSticker(){const text=new fabric.Text('⭐',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:72});state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
+function addText(){const text=new fabric.IText('Tu texto',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:42,fontWeight:'bold',fill:'#ffffff',stroke:'#111111',strokeWidth:1});text.layerId=nextLayerId();text.layerName='Texto';text.layerType='text';state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
+function addSticker(){const text=new fabric.Text('⭐',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:72});text.layerId=nextLayerId();text.layerName='Sticker';text.layerType='sticker';state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
 function exportDataUrl(){state.canvas.discardActiveObject();state.canvas.requestRenderAll();const format=$('format').value;const quality=Number($('quality').value)/100;return state.canvas.toDataURL({format:format.split('/')[1],quality,multiplier:2})}
 function download(){const url=exportDataUrl();const a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${$('format').value.split('/')[1].replace('jpeg','jpg')}`;a.click();toast('Imagen preparada para guardar')}
 function compare(showOriginal){if(!state.photo)return;if(showOriginal){state.photo.setSrc(state.originalDataUrl,()=>{fitPhoto();state.canvas.requestRenderAll()})}else restoreJSON(state.history[state.history.length-1])}
@@ -120,12 +176,12 @@ function init(){
  $('processing').hidden=true;
  document.body.classList.remove('modal-open');
  if(!window.fabric){toast('No se pudo cargar Fabric.js. Revisa la conexión.');return}
- state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));
+ state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));state.canvas.on('selection:created',renderLayers);state.canvas.on('selection:updated',renderLayers);state.canvas.on('selection:cleared',renderLayers);state.canvas.on('object:modified',()=>snapshot());
  $('file-input').addEventListener('change',e=>loadFile(e.target.files[0]));$('camera-input').addEventListener('change',e=>loadFile(e.target.files[0]));
  sliders.forEach(id=>{$(id).addEventListener('input',e=>applySlider(id,e.target.value,false));$(id).addEventListener('change',()=>snapshot())});
  document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>{const command=b.dataset.command;const presetMap={professional:'professional',portrait:'portrait',vivid:'vivid',bw:'bw'};if(presetMap[command])applyPreset(presetMap[command]);else executeCommand(command)});
  $('command-btn').onclick=()=>executeCommand($('command-input').value);$('command-input').addEventListener('keydown',e=>{if(e.key==='Enter')executeCommand(e.target.value)});
- $('rotate-left').onclick=()=>rotate(-90);$('rotate-right').onclick=()=>rotate(90);$('flip-x').onclick=flip;$('crop-btn').onclick=()=>openCrop(NaN);$('add-text').onclick=addText;$('add-sticker').onclick=addSticker;
+ $('rotate-left').onclick=()=>rotate(-90);$('rotate-right').onclick=()=>rotate(90);$('flip-x').onclick=flip;$('crop-btn').onclick=()=>openCrop(NaN);$('add-text').onclick=addText;$('add-sticker').onclick=addSticker;$('layer-up').onclick=()=>moveLayer(1);$('layer-down').onclick=()=>moveLayer(-1);$('layer-duplicate').onclick=duplicateLayer;$('layer-delete').onclick=deleteLayer;
  $('undo-btn').onclick=undo;$('redo-btn').onclick=redo;$('download-btn').onclick=download;$('reset-btn').onclick=reset;
  $('compare-btn').addEventListener('pointerdown',()=>compare(true));['pointerup','pointerleave','pointercancel'].forEach(ev=>$('compare-btn').addEventListener(ev,()=>compare(false)));
  $('crop-close').onclick=closeCrop;$('crop-apply').onclick=applyCrop;document.querySelectorAll('[data-ratio]').forEach(b=>b.onclick=()=>state.cropper?.setAspectRatio(Number(b.dataset.ratio)));

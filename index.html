@@ -10,8 +10,8 @@
   <meta name="description" content="PHOTO IA 5.0: editor privado con lienzo Fabric y procesamiento OpenCV opcional.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=5.0.2">
-  <title>PHOTO IA 5.0</title>
+  <link rel="stylesheet" href="styles.css?v=6.1.0">
+  <title>PHOTO IA 6.1</title>
 </head>
 <body>
 <div class="app-shell">
@@ -88,13 +88,29 @@
       </div>
     </section>
 
+
+    <section class="panel layers-panel">
+      <div class="section-heading">
+        <div><p class="eyebrow">CAPAS</p><h2>Organiza tu diseño</h2></div>
+        <span id="layer-count" class="engine-badge">0 capas</span>
+      </div>
+      <p class="layers-help">Toca una capa para seleccionarla. Puedes ocultarla, bloquearla, duplicarla, subirla o bajarla.</p>
+      <div id="layers-list" class="layers-list"><p class="layers-empty">Abre una foto para comenzar.</p></div>
+      <div class="layer-actions">
+        <button id="layer-up" class="secondary" disabled>⬆ Subir</button>
+        <button id="layer-down" class="secondary" disabled>⬇ Bajar</button>
+        <button id="layer-duplicate" class="secondary" disabled>⧉ Duplicar</button>
+        <button id="layer-delete" class="secondary danger" disabled>🗑 Eliminar</button>
+      </div>
+    </section>
+
     <section class="panel export">
       <div class="section-heading"><div><p class="eyebrow">GUARDAR</p><h2>Exportar fotografía</h2></div></div>
       <div class="export-grid"><label>Formato<select id="format"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></label><label>Calidad<input id="quality" type="range" min="60" max="100" value="92"></label></div>
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 5.0 • Fabric como lienzo • OpenCV opcional • <strong>5.0.2</strong></footer>
+  <footer>PHOTO IA 6.1 • Capas profesionales • Fabric + OpenCV opcional • <strong>6.1.0</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -105,7 +121,7 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=5.0.2"></script>
+<script src="app.js?v=6.1.0"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>
