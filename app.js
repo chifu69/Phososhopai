@@ -90,7 +90,7 @@ const commandIntents=[
   {id:'professional',patterns:[/\bprofessional\b/,/\bprofesional\b/,/\bmejorar\b/,/\bmejora automatica\b/,/\bauto enhance\b/,/\bhazla pro\b/,/\bcalidad profesional\b/]},
   {id:'portrait',patterns:[/\bportrait\b/,/\bretrato\b/,/\bpiel natural\b/,/\bsuaviza(?:r)? piel\b/,/\bmejorar rostro\b/]},
   {id:'vivid',patterns:[/\bvivid\b/,/\bvibrante\b/,/\bmas color\b/,/\bsube(?:r)? saturacion\b/,/\bcolor intenso\b/]},
-  {id:'bw',patterns:[/\bbw\b/,/\bb&w\b/,/\bblack and white\b/,/\bblanco y negro\b/,/\bescala de grises\b/,/\bmonocrom(?:o|atico)?\b/,/\bsin color\b/]},
+  {id:'bw',patterns:[/\bbw\b/,/\bb w\b/,/\bblack and white\b/,/\bblanco y negro\b/,/\bblanco negro\b/,/\bescala de grises\b/,/\bmonocrom(?:o|atico)?\b/,/\bsin color\b/,/\bgrayscale\b/]},
   {id:'brighten',patterns:[/\bmas brillo\b/,/\bmas brillante\b/,/\baclara(?:r)?\b/,/\bsube(?:r)? brillo\b/,/\bmore light\b/,/\bbrighten\b/]},
   {id:'darken',patterns:[/\bmenos brillo\b/,/\boscurece(?:r)?\b/,/\bbaja(?:r)? brillo\b/,/\bdarken\b/]},
   {id:'contrastUp',patterns:[/\bmas contraste\b/,/\bsube(?:r)? contraste\b/,/\bcontrast up\b/]},
@@ -179,6 +179,20 @@ function executeCommand(raw){
 }
 function openStudio(key){const data=studioData[key];if(!data)return;$('sheet-title').textContent=data.title;$('sheet-description').textContent=data.desc;$('sheet-content').innerHTML='';data.options.forEach(([icon,title,sub,type,action])=>{const b=document.createElement('button');b.className='sheet-option';b.innerHTML=`<span>${icon}</span><div><strong>${title}</strong><small>${sub}</small></div><em class="badge">${type==='local'?'LOCAL':type==='next'?'PRÓXIMO':'IA'}</em>`;b.onclick=()=>{if(type==='local'){if(action==='blur'){$('blur').value=6;$('blur-out').value=6;commit();render();toast('Desenfoque aplicado')}else preset(action);closeSheet()}else toast(type==='next'?'Se añadirá como herramienta local en la próxima actualización.':'Esta opción necesita conectar el motor de IA generativa.')};$('sheet-content').appendChild(b)});$('studio-sheet').hidden=false}
 function closeSheet(){$('studio-sheet').hidden=true}
-sliders.forEach(id=>{$(id).addEventListener('input',()=>{$(id+'-out').value=$(id).value;render()});$(id).addEventListener('change',commit)});document.querySelectorAll('button[data-preset]').forEach(b=>b.onclick=()=>preset(b.dataset.preset));document.querySelectorAll('button[data-command]').forEach(b=>b.onclick=()=>executeCommand(b.dataset.command));document.querySelectorAll('button[data-studio]').forEach(b=>b.onclick=()=>openStudio(b.dataset.studio));
+sliders.forEach(id=>{$(id).addEventListener('input',()=>{$(id+'-out').value=$(id).value;render()});$(id).addEventListener('change',commit)});document.querySelectorAll('button[data-preset]').forEach(b=>b.onclick=()=>preset(b.dataset.preset));document.querySelectorAll('button[data-command]').forEach(b=>b.onclick=()=>{const cmd=b.dataset.command; if(['professional','portrait','vivid','bw'].includes(cmd)) preset(cmd); else executeCommand(cmd)});document.querySelectorAll('button[data-studio]').forEach(b=>b.onclick=()=>openStudio(b.dataset.studio));
 $('command-btn').onclick=()=>executeCommand($('command-input').value);$('command-input').addEventListener('keydown',e=>{if(e.key==='Enter')executeCommand(e.target.value)});$('file-input').onchange=e=>loadFile(e.target.files[0]);$('camera-input').onchange=e=>loadFile(e.target.files[0]);$('rotate-left').onclick=()=>{rotation=(rotation-90)%360;commit();render()};$('rotate-right').onclick=()=>{rotation=(rotation+90)%360;commit();render()};$('flip-x').onclick=()=>{flipX=!flipX;commit();render()};$('crop-square').onclick=()=>{squareCrop=!squareCrop;commit();render();toast(squareCrop?'Recorte cuadrado':'Recorte original')};$('reset-btn').onclick=()=>{sliders.forEach(id=>{$(id).value=0;$(id+'-out').value=0});rotation=0;flipX=false;squareCrop=false;commit();render();toast('Foto restablecida')};$('undo-btn').onclick=()=>{if(historyIndex>0){historyIndex--;applySnapshot(history[historyIndex]);setEnabled(true)}};$('redo-btn').onclick=()=>{if(historyIndex<history.length-1){historyIndex++;applySnapshot(history[historyIndex]);setEnabled(true)}};$('compare-btn').addEventListener('pointerdown',()=>{compareDown=true;render(true)});['pointerup','pointerleave','pointercancel'].forEach(ev=>$('compare-btn').addEventListener(ev,()=>{if(compareDown){compareDown=false;render()}}));$('download-btn').onclick=()=>{render();setTimeout(()=>{const format=$('format').value,q=Number($('quality').value)/100,ext=format==='image/png'?'png':format==='image/webp'?'webp':'jpg',a=document.createElement('a');a.download=`photo-ia-${Date.now()}.${ext}`;a.href=canvas.toDataURL(format,q);a.click();toast('Imagen guardada')},80)};$('theme-btn').onclick=()=>{document.documentElement.classList.toggle('dark');localStorage.setItem('photoIATheme',document.documentElement.classList.contains('dark')?'dark':'light')};$('sheet-close').onclick=closeSheet;$('sheet-backdrop').onclick=closeSheet;
-if(localStorage.getItem('photoIATheme')==='dark')document.documentElement.classList.add('dark');setEnabled(false);if('serviceWorker'in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
+if(localStorage.getItem('photoIATheme')==='dark')document.documentElement.classList.add('dark');
+setEnabled(false);
+// Force old PHOTO IA caches to disappear after every update.
+window.addEventListener('load',async()=>{
+  try{
+    if('caches' in window){
+      const keys=await caches.keys();
+      await Promise.all(keys.filter(k=>k.startsWith('photo-ia-')&&k!=='photo-ia-2.1.1').map(k=>caches.delete(k)));
+    }
+    if('serviceWorker' in navigator){
+      const reg=await navigator.serviceWorker.register('sw.js?v=2.1.1',{updateViaCache:'none'});
+      await reg.update();
+    }
+  }catch(_){ }
+});

@@ -21,3 +21,10 @@ Incluye las pantallas y flujos para Outfit Studio, Hair Studio, Face Studio, Fun
 - Corrige congelamiento en iPhone al aplicar blanco y negro.
 - Reduce la resolución de vista previa para mantener la app fluida.
 - Blanco y negro ya no ejecuta el filtro de nitidez pesado.
+
+
+## 2.1.1
+- Los botones rápidos llaman directamente a su filtro, sin pasar por el intérprete.
+- Limpieza automática de cachés anteriores.
+- Service Worker configurado para no servir código viejo.
+- La versión 2.1.1 aparece visible en el pie de la app.
