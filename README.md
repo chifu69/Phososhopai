@@ -1,30 +1,16 @@
-# PHOTO IA 2.0
+# PHOTO IA 3.0
 
-Editor de fotos personal y privado, optimizado para teléfonos.
+Motor local de edición fotográfica para GitHub Pages.
 
 ## Funciona ahora
-- Abrir foto o cámara
-- One Click Magic
-- Presets profesional, retrato, vibrante y blanco y negro
-- Brillo, contraste, saturación, temperatura, nitidez y desenfoque
-- Rotar, espejo y recorte cuadrado
-- Deshacer, rehacer y comparación antes/después
-- Comandos sencillos escritos en español
-- Exportación JPG, PNG y WebP
-- PWA y funcionamiento offline
+- Brillo, contraste, saturación y temperatura en tiempo real.
+- Blanco y negro real mediante procesamiento de píxeles.
+- Nitidez y desenfoque optimizados para iPhone.
+- Presets Profesional, Retrato, Vibrante y Mejorar.
+- Rotar, espejo y recorte cuadrado.
+- Antes/después, deshacer, rehacer y exportar JPG/PNG/WebP.
+- Comandos sencillos en español e inglés.
 
-## Arquitectura preparada
-Incluye las pantallas y flujos para Outfit Studio, Hair Studio, Face Studio, Fun Swap, Background Studio y Magic Repair. Estas transformaciones necesitan conectar posteriormente un motor de IA generativa; no se simulan ni se envían fotos a un servidor en esta versión.
-
-
-## 2.0.2
-- Corrige congelamiento en iPhone al aplicar blanco y negro.
-- Reduce la resolución de vista previa para mantener la app fluida.
-- Blanco y negro ya no ejecuta el filtro de nitidez pesado.
-
-
-## 2.1.1
-- Los botones rápidos llaman directamente a su filtro, sin pasar por el intérprete.
-- Limpieza automática de cachés anteriores.
-- Service Worker configurado para no servir código viejo.
-- La versión 2.1.1 aparece visible en el pie de la app.
+## Publicación
+Sube todos los archivos de esta carpeta a la raíz del repositorio y reemplaza los anteriores.
+La versión visible al pie debe decir 3.0.0.
