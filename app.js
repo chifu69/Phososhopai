@@ -76,7 +76,107 @@ function applyColorAdjustments(f){
 }
 function applySharpen(strength){const im=ctx.getImageData(0,0,canvas.width,canvas.height),src=im.data,out=new Uint8ClampedArray(src),w=canvas.width,h=canvas.height,s=Math.min(.8,strength*.8);for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){const i=(y*w+x)*4;for(let c=0;c<3;c++){const center=src[i+c]*5-src[i-4+c]-src[i+4+c]-src[i-w*4+c]-src[i+w*4+c];out[i+c]=src[i+c]*(1-s)+center*s}}im.data.set(out);ctx.putImageData(im,0,0)}
 function preset(name){const p={auto:[10,12,10,4,18,0],professional:[10,14,12,3,20,0],portrait:[8,-2,-5,5,8,1],vivid:[6,18,28,3,14,0],bw:[0,10,-100,0,0,0]}[name]||[0,0,0,0,0,0];sliders.forEach((id,i)=>{$(id).value=p[i];$(id+'-out').value=p[i]});commit();render();toast(name==='bw'?'Blanco y negro aplicado':'Ajuste aplicado')}
-function executeCommand(raw){const q=raw.toLowerCase().trim();if(!q)return toast('Escribe lo que quieres hacer.');if(/profesional|mejorar|autom[aá]tic/.test(q))return preset('professional');if(/retrato|piel|cara/.test(q))return preset('portrait');if(/vibrante|m[aá]s color|satur/.test(q))return preset('vivid');if(/blanco|negro|monocrom/.test(q))return preset('bw');if(/brillante|aclar/.test(q)){sliders.forEach(id=>{});$('brightness').value=25;$('brightness-out').value=25;commit();render();return toast('Foto aclarada')};if(/oscura|bajar brillo/.test(q)){$('brightness').value=-20;$('brightness-out').value=-20;commit();render();return toast('Brillo reducido')};if(/desenfoc/.test(q)){$('blur').value=6;$('blur-out').value=6;commit();render();return toast('Desenfoque aplicado')};if(/ropa|pelo|cabello|cuerpo|face swap|cara en|fondo|borrar/.test(q))return toast('Esa transformación usará el módulo de IA generativa. La interfaz ya está preparada.');toast('Todavía no reconozco esa instrucción. Prueba “hazla profesional”.')}
+function normalizeCommand(text=''){
+  return String(text)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g,'')
+    .replace(/[^a-z0-9+\-\s]/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+
+const commandIntents=[
+  {id:'professional',patterns:[/\bprofessional\b/,/\bprofesional\b/,/\bmejorar\b/,/\bmejora automatica\b/,/\bauto enhance\b/,/\bhazla pro\b/,/\bcalidad profesional\b/]},
+  {id:'portrait',patterns:[/\bportrait\b/,/\bretrato\b/,/\bpiel natural\b/,/\bsuaviza(?:r)? piel\b/,/\bmejorar rostro\b/]},
+  {id:'vivid',patterns:[/\bvivid\b/,/\bvibrante\b/,/\bmas color\b/,/\bsube(?:r)? saturacion\b/,/\bcolor intenso\b/]},
+  {id:'bw',patterns:[/\bbw\b/,/\bb&w\b/,/\bblack and white\b/,/\bblanco y negro\b/,/\bescala de grises\b/,/\bmonocrom(?:o|atico)?\b/,/\bsin color\b/]},
+  {id:'brighten',patterns:[/\bmas brillo\b/,/\bmas brillante\b/,/\baclara(?:r)?\b/,/\bsube(?:r)? brillo\b/,/\bmore light\b/,/\bbrighten\b/]},
+  {id:'darken',patterns:[/\bmenos brillo\b/,/\boscurece(?:r)?\b/,/\bbaja(?:r)? brillo\b/,/\bdarken\b/]},
+  {id:'contrastUp',patterns:[/\bmas contraste\b/,/\bsube(?:r)? contraste\b/,/\bcontrast up\b/]},
+  {id:'contrastDown',patterns:[/\bmenos contraste\b/,/\bbaja(?:r)? contraste\b/,/\bcontrast down\b/]},
+  {id:'warm',patterns:[/\bmas calida\b/,/\bcalentar color\b/,/\btono calido\b/,/\bwarm\b/]},
+  {id:'cool',patterns:[/\bmas fria\b/,/\benfriar color\b/,/\btono frio\b/,/\bcool\b/]},
+  {id:'blur',patterns:[/\bdesenfoca(?:r)?\b/,/\bdesenfoque\b/,/\bblur\b/]},
+  {id:'sharpen',patterns:[/\bmas nitida\b/,/\bnitidez\b/,/\benfoca(?:r)?\b/,/\bsharpen\b/]},
+  {id:'reset',patterns:[/\brestablece(?:r)?\b/,/\boriginal\b/,/\bquita(?:r)? filtros\b/,/\breset\b/]},
+  {id:'rotateLeft',patterns:[/\bgira(?:r)? izquierda\b/,/\brotar izquierda\b/,/\brotate left\b/]},
+  {id:'rotateRight',patterns:[/\bgira(?:r)? derecha\b/,/\brotar derecha\b/,/\brotate right\b/]},
+  {id:'flip',patterns:[/\bespejo\b/,/\bvoltea(?:r)? horizontal\b/,/\bflip\b/]},
+  {id:'square',patterns:[/\brecorte cuadrado\b/,/\bhazla cuadrada\b/,/\bsquare crop\b/]},
+  {id:'aiOutfit',patterns:[/\bcambia(?:r)? ropa\b/,/\bpon(?:er)? (?:un|una) (?:traje|camisa|vestido|uniforme|chaqueta)\b/,/\boutfit\b/]},
+  {id:'aiHair',patterns:[/\bcambia(?:r)? (?:el )?(?:pelo|cabello|peinado)\b/,/\bpon(?:er)? (?:el )?cabello\b/,/\bhair\b/]},
+  {id:'aiSwap',patterns:[/\bface swap\b/,/\bbody swap\b/,/\bintercambia(?:r)? (?:caras|cuerpos|cabezas)\b/,/\bmi cabeza\b/,/\bmi cara en\b/]},
+  {id:'aiBackground',patterns:[/\bquita(?:r)? (?:el )?fondo\b/,/\bcambia(?:r)? (?:el )?fondo\b/,/\bfondo transparente\b/,/\bremove background\b/]},
+  {id:'aiErase',patterns:[/\bborra(?:r)? (?:objeto|persona|algo)\b/,/\belimina(?:r)? (?:objeto|persona|algo)\b/,/\bmagic eraser\b/]}
+];
+
+function setSlider(id,value){
+  const input=$(id),output=$(id+'-out');
+  if(!input)return;
+  const min=Number(input.min),max=Number(input.max);
+  const safe=Math.max(min,Math.min(max,Number(value)));
+  input.value=safe;
+  if(output)output.value=safe;
+}
+function changeSlider(id,delta){setSlider(id,Number($(id).value)+delta)}
+function resetLocalEdits(){
+  sliders.forEach(id=>setSlider(id,0));
+  rotation=0;flipX=false;squareCrop=false;
+  commit();render();toast('Foto restablecida');
+}
+function runIntent(id){
+  switch(id){
+    case 'professional': preset('professional'); return true;
+    case 'portrait': preset('portrait'); return true;
+    case 'vivid': preset('vivid'); return true;
+    case 'bw': preset('bw'); return true;
+    case 'brighten': changeSlider('brightness',25); break;
+    case 'darken': changeSlider('brightness',-20); break;
+    case 'contrastUp': changeSlider('contrast',18); break;
+    case 'contrastDown': changeSlider('contrast',-18); break;
+    case 'warm': changeSlider('temperature',20); break;
+    case 'cool': changeSlider('temperature',-20); break;
+    case 'blur': changeSlider('blur',5); break;
+    case 'sharpen': changeSlider('sharpness',22); break;
+    case 'reset': resetLocalEdits(); return true;
+    case 'rotateLeft': rotation=(rotation-90)%360; break;
+    case 'rotateRight': rotation=(rotation+90)%360; break;
+    case 'flip': flipX=!flipX; break;
+    case 'square': squareCrop=!squareCrop; break;
+    case 'aiOutfit': toast('Outfit Studio está listo; falta conectar el motor generativo para cambiar ropa.'); return true;
+    case 'aiHair': toast('Hair Studio está listo; falta conectar el motor generativo para cambiar cabello.'); return true;
+    case 'aiSwap': toast('Fun Swap está listo; falta conectar el motor generativo para intercambiar caras o cuerpos.'); return true;
+    case 'aiBackground': toast('Background Studio está listo; quitar o reemplazar fondo requiere el módulo de IA.'); return true;
+    case 'aiErase': toast('Magic Eraser está listo; el borrado inteligente requiere el módulo de IA.'); return true;
+    default:return false;
+  }
+  commit();render();
+  const messages={brighten:'Foto aclarada',darken:'Brillo reducido',contrastUp:'Contraste aumentado',contrastDown:'Contraste reducido',warm:'Tono más cálido',cool:'Tono más frío',blur:'Desenfoque aplicado',sharpen:'Nitidez aplicada',rotateLeft:'Foto girada',rotateRight:'Foto girada',flip:'Espejo aplicado',square:squareCrop?'Recorte cuadrado':'Recorte original'};
+  toast(messages[id]||'Ajuste aplicado');
+  return true;
+}
+function detectIntents(q){
+  const direct={professional:'professional',portrait:'portrait',vivid:'vivid',bw:'bw',auto:'professional'};
+  if(direct[q])return [direct[q]];
+  return commandIntents.filter(intent=>intent.patterns.some(pattern=>pattern.test(q))).map(intent=>intent.id);
+}
+function executeCommand(raw){
+  if(!sourceImage)return toast('Primero abre una foto.');
+  const q=normalizeCommand(raw);
+  if(!q)return toast('Escribe lo que quieres hacer.');
+  const intents=detectIntents(q);
+  if(!intents.length){
+    toast('No entendí esa instrucción. Prueba “blanco y negro”, “más brillo” o “hazla profesional”.');
+    return;
+  }
+  // Run one preset at a time; allow multiple simple adjustments in a sentence.
+  const presetIntent=intents.find(id=>['professional','portrait','vivid','bw'].includes(id));
+  if(presetIntent)return runIntent(presetIntent);
+  const aiIntent=intents.find(id=>id.startsWith('ai'));
+  if(aiIntent)return runIntent(aiIntent);
+  intents.slice(0,4).forEach(runIntent);
+}
 function openStudio(key){const data=studioData[key];if(!data)return;$('sheet-title').textContent=data.title;$('sheet-description').textContent=data.desc;$('sheet-content').innerHTML='';data.options.forEach(([icon,title,sub,type,action])=>{const b=document.createElement('button');b.className='sheet-option';b.innerHTML=`<span>${icon}</span><div><strong>${title}</strong><small>${sub}</small></div><em class="badge">${type==='local'?'LOCAL':type==='next'?'PRÓXIMO':'IA'}</em>`;b.onclick=()=>{if(type==='local'){if(action==='blur'){$('blur').value=6;$('blur-out').value=6;commit();render();toast('Desenfoque aplicado')}else preset(action);closeSheet()}else toast(type==='next'?'Se añadirá como herramienta local en la próxima actualización.':'Esta opción necesita conectar el motor de IA generativa.')};$('sheet-content').appendChild(b)});$('studio-sheet').hidden=false}
 function closeSheet(){$('studio-sheet').hidden=true}
 sliders.forEach(id=>{$(id).addEventListener('input',()=>{$(id+'-out').value=$(id).value;render()});$(id).addEventListener('change',commit)});document.querySelectorAll('button[data-preset]').forEach(b=>b.onclick=()=>preset(b.dataset.preset));document.querySelectorAll('button[data-command]').forEach(b=>b.onclick=()=>executeCommand(b.dataset.command));document.querySelectorAll('button[data-studio]').forEach(b=>b.onclick=()=>openStudio(b.dataset.studio));
