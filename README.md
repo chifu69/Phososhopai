@@ -7,3 +7,8 @@ Ejemplos:
 - `Selecciona el círculo y luego hazlo más grande`
 - `Guarda macro oferta: cuadro rojo sin relleno; texto “Oferta” amarillo arriba`
 - `Aplica macro oferta`
+
+
+## 7.1.1 Color Engine
+- Recognizes masculine, feminine, singular, plural, and English color words.
+- Applies detected colors consistently to arrows, lines, shapes, text, fill, and outline.

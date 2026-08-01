@@ -1,18 +1,21 @@
 (() => {
 'use strict';
-const VERSION='7.1.0';
+const VERSION='7.1.1';
 const MACRO_KEY='photoIAMacrosV1';
 const CONTEXT_KEY='photoIABrainContextV1';
 const $=id=>document.getElementById(id);
 const normalize=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
 const COLOR_WORDS={
- rojo:'#ef4444',red:'#ef4444',carmesi:'#dc143c',escarlata:'#ff2400',
- azul:'#2563eb',blue:'#2563eb',celeste:'#38bdf8',cyan:'#06b6d4',turquesa:'#14b8a6',
- verde:'#22c55e',green:'#22c55e',lima:'#84cc16',amarillo:'#eab308',yellow:'#eab308',
- naranja:'#f97316',orange:'#f97316',morado:'#9333ea',violeta:'#7c3aed',purple:'#9333ea',
- rosa:'#ec4899',rosado:'#ec4899',pink:'#ec4899',negro:'#111111',black:'#111111',
- blanco:'#ffffff',white:'#ffffff',gris:'#6b7280',gray:'#6b7280',plateado:'#94a3b8',
- dorado:'#d4a017',oro:'#d4a017',gold:'#d4a017',cafe:'#8b5e3c',marron:'#8b5e3c',brown:'#8b5e3c',beige:'#d6c6a5'
+ rojo:'#ef4444',roja:'#ef4444',rojos:'#ef4444',rojas:'#ef4444',red:'#ef4444',carmesi:'#dc143c',escarlata:'#ff2400',
+ azul:'#2563eb',azules:'#2563eb',blue:'#2563eb',celeste:'#38bdf8',celestes:'#38bdf8',cyan:'#06b6d4',turquesa:'#14b8a6',turquesas:'#14b8a6',
+ verde:'#22c55e',verdes:'#22c55e',green:'#22c55e',lima:'#84cc16',amarillo:'#eab308',amarilla:'#eab308',amarillos:'#eab308',amarillas:'#eab308',yellow:'#eab308',
+ naranja:'#f97316',naranjas:'#f97316',orange:'#f97316',morado:'#9333ea',morada:'#9333ea',morados:'#9333ea',moradas:'#9333ea',violeta:'#7c3aed',violetas:'#7c3aed',purple:'#9333ea',
+ rosa:'#ec4899',rosado:'#ec4899',rosada:'#ec4899',rosados:'#ec4899',rosadas:'#ec4899',pink:'#ec4899',
+ negro:'#111111',negra:'#111111',negros:'#111111',negras:'#111111',black:'#111111',oscuro:'#111111',oscura:'#111111',
+ blanco:'#ffffff',blanca:'#ffffff',blancos:'#ffffff',blancas:'#ffffff',white:'#ffffff',
+ gris:'#6b7280',grises:'#6b7280',gray:'#6b7280',plateado:'#94a3b8',plateada:'#94a3b8',plateados:'#94a3b8',plateadas:'#94a3b8',
+ dorado:'#d4a017',dorada:'#d4a017',dorados:'#d4a017',doradas:'#d4a017',oro:'#d4a017',gold:'#d4a017',
+ cafe:'#8b5e3c',marron:'#8b5e3c',marrones:'#8b5e3c',brown:'#8b5e3c',beige:'#d6c6a5'
 };
 const registry=[];
 const register=plugin=>registry.push(plugin);
@@ -60,6 +63,10 @@ function parseColors(text){
   else if(stroke&&!fill)fill=all.find(c=>c.value!==stroke)?.value||stroke;
   if(transparent)fill='rgba(0,0,0,0)';return {fill:fill||'#ef4444',stroke:stroke||fill||'#ef4444',transparent};
 }
+function colorName(value){
+  const preferred=[['#111111','negro'],['#ffffff','blanco'],['#ef4444','rojo'],['#2563eb','azul'],['#22c55e','verde'],['#eab308','amarillo'],['#f97316','naranja'],['#9333ea','morado'],['#ec4899','rosa'],['#6b7280','gris'],['#d4a017','dorado'],['#8b5e3c','café']];
+  return preferred.find(([hex])=>hex===String(value).toLowerCase())?.[1]||value;
+}
 function parseNumber(text,words,def,min,max){for(const word of words){const m=text.match(new RegExp(`${word}\\s*(?:de\\s*)?(\\d+(?:\\.\\d+)?)`));if(m)return Math.max(min,Math.min(max,Number(m[1])));}return def;}
 function parseOpacity(text){const pct=text.match(/(?:opacidad|transparencia)\s*(?:de\s*)?(\d{1,3})\s*%?/);if(pct)return Math.max(.05,Math.min(1,Number(pct[1])/100));if(/semitransparente|medio transparente|mitad transparente/.test(text))return .5;if(/muy transparente/.test(text))return .25;if(/casi transparente/.test(text))return .15;return 1;}
 function parseSize(text,type){
@@ -79,7 +86,7 @@ function targetKind(text){if(/texto/.test(text))return 'texto';if(/sticker|emoji
 function objectColors(obj){
   const values=[];
   const push=v=>{if(typeof v==='string'&&v&&!/rgba\(0,\s*0,\s*0,\s*0\)|transparent/i.test(v))values.push(v.toLowerCase());};
-  push(obj.fill);push(obj.stroke);
+  push(obj.fill);push(obj.stroke);push(obj.photoColor);
   if(Array.isArray(obj._objects))obj._objects.forEach(child=>{push(child.fill);push(child.stroke);});
   return values;
 }
@@ -222,9 +229,9 @@ register({name:'sticker',score:t=>/sticker|emoji/.test(t)&&/agrega|anade|pon|cre
 }});
 register({name:'shape',score:t=>/cuadrado|cuadro|rectangulo|circulo|triangulo|flecha|linea/.test(t)?90:0,run(t){
   const c=api().state.canvas;let type=/circulo/.test(t)?'circle':/triangulo/.test(t)?'triangle':/flecha/.test(t)?'arrow':/linea/.test(t)?'line':/rectangulo/.test(t)?'rectangle':'square';const colors=parseColors(t),size=parseSize(t,type),opacity=parseOpacity(t),strokeWidth=parseNumber(t,['grosor','borde','contorno'],/muy grues|extra grues/.test(t)?14:/grues/.test(t)?8:/delgad/.test(t)?2:4,1,40),pos=parsePosition(t,c,size.w,size.h),common={...pos,originX:'center',originY:'center',fill:colors.fill,stroke:colors.stroke,strokeWidth,opacity};let obj,name;
-  if(type==='circle'){obj=new fabric.Circle({...common,radius:size.w/2});name='Círculo';}else if(type==='triangle'){obj=new fabric.Triangle({...common,width:size.w,height:size.h});name='Triángulo';}else if(type==='arrow'){const line=new fabric.Line([-size.w/2,0,size.w/2-28,0],{stroke:colors.stroke,strokeWidth,opacity});const head=new fabric.Triangle({left:size.w/2-12,top:0,width:Math.max(22,strokeWidth*3),height:Math.max(28,strokeWidth*4),angle:90,originX:'center',originY:'center',fill:colors.stroke,stroke:colors.stroke,opacity});obj=new fabric.Group([line,head],{...pos,originX:'center',originY:'center',opacity});name='Flecha';}
+  if(type==='circle'){obj=new fabric.Circle({...common,radius:size.w/2});name='Círculo';}else if(type==='triangle'){obj=new fabric.Triangle({...common,width:size.w,height:size.h});name='Triángulo';}else if(type==='arrow'){const line=new fabric.Line([-size.w/2,0,size.w/2-28,0],{stroke:colors.stroke,strokeWidth,opacity});const head=new fabric.Triangle({left:size.w/2-12,top:0,width:Math.max(22,strokeWidth*3),height:Math.max(28,strokeWidth*4),angle:90,originX:'center',originY:'center',fill:colors.stroke,stroke:colors.stroke,opacity});obj=new fabric.Group([line,head],{...pos,originX:'center',originY:'center',opacity});obj.photoColor=colors.stroke;obj.stroke=colors.stroke;obj.fill=colors.stroke;name='Flecha';}
   else if(type==='line'){obj=new fabric.Line([-size.w/2,0,size.w/2,0],{...pos,originX:'center',originY:'center',stroke:colors.stroke,strokeWidth,opacity,fill:null});name='Línea';}else{const square=type==='square';obj=new fabric.Rect({...common,width:size.w,height:square?size.w:size.h,rx:/redondead/.test(t)?parseNumber(t,['radio','esquinas'],22,0,100):0,ry:/redondead/.test(t)?parseNumber(t,['radio','esquinas'],22,0,100):0});name=square?'Cuadrado':'Rectángulo';}
-  if(/puntead/.test(t))obj.set('strokeDashArray',[4,8]);else if(/discontinu|rayad/.test(t))obj.set('strokeDashArray',[14,9]);if(/rotad|inclinado/.test(t)){const m=t.match(/(?:rotado|inclinado)\s*(\d+)?/);obj.set('angle',m?Number(m[1]||15):15);}obj.layerId=layerId();obj.layerName=name;obj.layerType='shape';addAndSelect(obj,'shape');say(`${name} agregado.`);
+  if(/puntead/.test(t))obj.set('strokeDashArray',[4,8]);else if(/discontinu|rayad/.test(t))obj.set('strokeDashArray',[14,9]);if(/rotad|inclinado/.test(t)){const m=t.match(/(?:rotado|inclinado)\s*(\d+)?/);obj.set('angle',m?Number(m[1]||15):15);}obj.layerId=layerId();obj.layerName=name;obj.layerType='shape';addAndSelect(obj,'shape');say(`${name} ${colorName(colors.stroke)} agregado.`);
 }});
 register({name:'layers',score:t=>/duplica|duplicar|elimina|borrar capa|trae al frente|manda atras|envia atras|bloquea|desbloquea/.test(t)?85:0,run(t){
   const c=api().state.canvas,o=findTarget(t);if(!o)return say('No encontré un objeto para esa acción.','warn');if(!activate(o)&&!/desbloquea/.test(t))return;
