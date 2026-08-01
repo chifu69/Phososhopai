@@ -1,13 +1,29 @@
 (() => {
 'use strict';
-const VERSION='7.3.0';
+const VERSION='7.3.3';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
-const state={canvas:null,photo:null,originalDataUrl:'',history:[],future:[],cropper:null,compare:false,loading:false,cvReady:false,layerSeq:0};
+const state={canvas:null,photo:null,originalDataUrl:'',history:[],future:[],cropper:null,compare:false,loading:false,cvReady:false,layerSeq:0,processingScrollY:0};
 
 function toast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2200)}
-function processing(on,label='Procesando…'){state.loading=on;$('processing').hidden=!on;$('processing').querySelector('b').textContent=label}
+function processing(on,label='Procesando…'){
+ state.loading=on;
+ const overlay=$('processing');
+ overlay.hidden=!on;
+ overlay.querySelector('b').textContent=label;
+ if(on){
+   if(!document.body.classList.contains('processing-lock')){
+     state.processingScrollY=window.scrollY||0;
+     document.body.style.top=`-${state.processingScrollY}px`;
+     document.body.classList.add('processing-lock');
+   }
+ }else if(document.body.classList.contains('processing-lock')){
+   document.body.classList.remove('processing-lock');
+   document.body.style.top='';
+   window.scrollTo(0,state.processingScrollY||0);
+ }
+}
 function setEnabled(enabled){document.querySelectorAll('[data-command],[data-preset],#command-input,#command-btn,#compare-btn,#reset-btn,#rotate-left,#rotate-right,#flip-x,#crop-btn,#add-text,#add-sticker,#download-btn,.slider-list input,#create-text,#draw-pencil,#draw-marker,#draw-off,#clear-drawing,[data-add-shape],[data-sticker],[data-text-preset],[data-canvas-mode]').forEach(el=>el.disabled=!enabled)}
 function normalize(text){return String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()}
 function fitCanvas(){const wrap=$('canvas-wrap');const w=Math.max(280,wrap.clientWidth);const h=Math.max(360,Math.min(window.innerHeight*.62,650));state.canvas.setDimensions({width:w,height:h});if(state.photo) fitPhoto();state.canvas.requestRenderAll()}

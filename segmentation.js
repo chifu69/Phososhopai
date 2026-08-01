@@ -1,14 +1,14 @@
 (() => {
 'use strict';
-const VERSION='1.1.0';
+const VERSION='1.2.0';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
 const MEDIAPIPE_ESM=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/+esm`;
 const MEDIAPIPE_WASM=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`;
-const PERSON_MODEL='https://storage.googleapis.com/mediapipe-assets/deeplabv3.tflite?generation=1661875711618421';
+const PERSON_MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
 const INTERACTIVE_MODEL='https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite';
-const PERSON_CLASS_ID=15;
+const PERSON_CLASS_ID=1;
 const LOAD_TIMEOUT=25000;
 const RUN_TIMEOUT=45000;
 const state={
@@ -54,7 +54,8 @@ function beginOperation(label){
   return operation;
 }
 function finishOperation(operation){
-  if(state.operation===operation)state.operation=null;
+  if(state.operation!==operation)return;
+  state.operation=null;
   state.loading=false; api()?.processing(false); updateUI();
 }
 function cancelCurrent(showMessage=true){
@@ -78,7 +79,7 @@ async function getWorkCanvas(operation){
   const photo=api()?.state?.photo;if(!photo)throw makeError('Abre una foto primero.');
   const img=await timeout(loadImage(api().state.originalDataUrl),8000,'La fotografía tardó demasiado en abrirse.',operation);
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
-  const max=isIOS?512:640;
+  const max=isIOS?384:512;
   const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
   const canvas=document.createElement('canvas');
   canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
@@ -101,6 +102,13 @@ async function loadModule(operation){
 }
 async function createWithFallback(factory,operation,label){
   setStatus(label,'loading');
+  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
+  // En iPhone/iPad el delegate GPU puede quedarse bloqueado dentro de WebGL.
+  // CPU es más estable y con los modelos reducidos termina en pocos segundos.
+  if(isIOS){
+    setStatus(`${label} Usando modo compatible con iPhone…`,'loading');
+    return timeout(factory('CPU'),LOAD_TIMEOUT,'No se pudo iniciar el modelo en modo compatible.',operation);
+  }
   try{
     return await timeout(factory('GPU'),LOAD_TIMEOUT,'El modelo tardó demasiado en iniciar.',operation);
   }catch(gpuErr){

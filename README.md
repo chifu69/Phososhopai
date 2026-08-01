@@ -1,20 +1,11 @@
-# PHOTO IA 7.3.2 — Segmentation Runtime Fix
+# PHOTO IA 7.3.3 — iPhone Segmentation Runtime Fix
 
-Esta versión corrige el bloqueo indefinido de **Separar persona** y **Selección inteligente** en navegadores móviles.
+Correcciones principales:
+- Cambia “Separar persona” al modelo SelfieSegmenter ligero y optimizado para móviles.
+- En iPhone/iPad usa CPU para evitar bloqueos del delegate WebGL/GPU.
+- Reduce la copia de trabajo en móviles para terminar la inferencia con menos memoria.
+- Bloquea completamente el desplazamiento de la página mientras aparece el proceso.
+- Evita que una operación cancelada cierre o altere una operación nueva.
+- Renueva la caché del service worker a 7.3.3.
 
-## Cambios principales
-
-- La inferencia de MediaPipe usa el resultado directo en lugar del callback que podía no ejecutarse en Safari/Chrome móvil.
-- El overlay se alcanza a dibujar antes de iniciar el análisis pesado.
-- Las máscaras usan sus dimensiones reales.
-- Tiempo máximo ampliado para teléfonos más lentos.
-- Caché del service worker renovada a 7.3.2.
-- El botón Cancelar queda como protección; el objetivo principal es que la función termine correctamente.
-
-## Prueba recomendada
-
-1. Instala/publica todos los archivos de esta carpeta.
-2. Cierra por completo la versión anterior.
-3. Vuelve a abrir y, si está instalada como app, recárgala dos veces para reemplazar la caché anterior.
-4. Abre una foto y prueba **Separar persona**.
-5. Prueba **Tocar objeto**, toca cerca del centro del objeto y luego **Quitar fondo**.
+Instalación: reemplaza todos los archivos, cierra la app instalada y vuelve a abrirla. Si conserva la versión anterior, elimina la app de inicio y agrégala de nuevo para limpiar el service worker.
