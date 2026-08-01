@@ -52,3 +52,5 @@ body[data-canvas-mode="move"] #canvas-wrap{cursor:default}
 .brain-macros[hidden]{display:none!important}.brain-macros>strong{flex:0 0 auto;font-size:.72rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
 .brain-macros>span{display:flex;flex:0 0 auto;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:var(--surface2)}
 .brain-macros button{border:0;background:transparent;color:var(--text);padding:7px 10px;font:inherit;font-size:.74rem;font-weight:800}.brain-macros .macro-delete{padding-left:6px;color:#d83b42;font-size:1rem}
+
+.brain-debug{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px;padding:10px 12px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);font-size:.78rem}.brain-debug strong{color:var(--text)}.brain-debug span{padding:4px 7px;background:var(--surface2);border-radius:99px}
