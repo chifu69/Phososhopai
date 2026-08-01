@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.4.3-debug';
+const VERSION='1.5.0-engine-replacement';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -14,10 +14,74 @@ const RUN_TIMEOUT=45000;
 const state={
   module:null,fileset:null,imageSegmenter:null,interactiveSegmenter:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
-  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null
+  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null
 };
 
-const DEBUG_KEY='photoia-segmentation-debug-v743';
+const DEBUG_KEY='photoia-segmentation-debug-v750';
+
+const TFJS_URL='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
+const BODYPIX_URL='https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js';
+function loadClassicScript(src,label){
+  return new Promise((resolve,reject)=>{
+    const existing=[...document.scripts].find(x=>x.src===src);
+    if(existing){if(existing.dataset.loaded==='1')return resolve();existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',()=>reject(makeError(`No se pudo cargar ${label}.`,'SCRIPT_LOAD')),{once:true});return;}
+    const el=document.createElement('script');el.src=src;el.async=true;el.crossOrigin='anonymous';
+    el.onload=()=>{el.dataset.loaded='1';logDebug(`${label}: script listo`);resolve();};
+    el.onerror=()=>reject(makeError(`No se pudo cargar ${label}.`,'SCRIPT_LOAD'));
+    document.head.appendChild(el);
+  });
+}
+async function ensureBodyPix(operation){
+  if(state.bodyPixNet)return state.bodyPixNet;
+  if(!state.bodyPixPromise){
+    state.bodyPixPromise=(async()=>{
+      setStatus('Cargando motor alternativo estable…','loading');
+      logDebug('BODYPIX: carga TensorFlow inicio',TFJS_URL);
+      await timeout(loadClassicScript(TFJS_URL,'TensorFlow.js'),LOAD_TIMEOUT,'TensorFlow.js tardó demasiado en cargar.',operation);
+      logDebug('BODYPIX: TensorFlow listo',{version:window.tf?.version?.tfjs});
+      if(window.tf?.setBackend){
+        try{await window.tf.setBackend('webgl');await window.tf.ready();logDebug('BODYPIX: backend listo',window.tf.getBackend());}
+        catch(err){logDebug('BODYPIX: WebGL falló, usando CPU',err);await window.tf.setBackend('cpu');await window.tf.ready();}
+      }
+      logDebug('BODYPIX: carga librería inicio',BODYPIX_URL);
+      await timeout(loadClassicScript(BODYPIX_URL,'BodyPix'),LOAD_TIMEOUT,'BodyPix tardó demasiado en cargar.',operation);
+      if(!window.bodyPix?.load)throw makeError('BodyPix no quedó disponible.','BODYPIX_MISSING');
+      setStatus('Preparando modelo de persona…','loading');
+      logDebug('BODYPIX: modelo inicio');
+      const net=await timeout(window.bodyPix.load({architecture:'MobileNetV1',outputStride:16,multiplier:0.50,quantBytes:2}),45000,'El modelo alternativo tardó demasiado en iniciar.',operation);
+      logDebug('BODYPIX: modelo listo');state.bodyPixNet=net;return net;
+    })().catch(err=>{state.bodyPixPromise=null;throw err;});
+  }
+  return state.bodyPixPromise;
+}
+function featherMask(mask,width,height){
+  const out=new Uint8Array(mask.length);
+  for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+    let sum=0,count=0;
+    for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+      const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<width&&yy<height){sum+=mask[yy*width+xx];count++;}
+    }
+    out[y*width+x]=Math.round(sum/count);
+  }
+  return out;
+}
+function magicWandMask(canvas,nx,ny){
+  const ctx=canvas.getContext('2d',{willReadFrequently:true});const {width:w,height:h}=canvas;
+  const rgba=ctx.getImageData(0,0,w,h).data;const sx=Math.max(0,Math.min(w-1,Math.round(nx*(w-1)))),sy=Math.max(0,Math.min(h-1,Math.round(ny*(h-1))));
+  const si=(sy*w+sx)*4,sr=rgba[si],sg=rgba[si+1],sb=rgba[si+2];
+  const mask=new Uint8Array(w*h),seen=new Uint8Array(w*h),queue=new Int32Array(w*h);let head=0,tail=0;queue[tail++]=sy*w+sx;seen[sy*w+sx]=1;
+  const seedThreshold=72,localThreshold=38;
+  while(head<tail){const idx=queue[head++],x=idx%w,y=(idx/w)|0,pi=idx*4,r=rgba[pi],g=rgba[pi+1],b=rgba[pi+2];mask[idx]=255;
+    const ns=[idx-1,idx+1,idx-w,idx+w];
+    for(const ni of ns){if(ni<0||ni>=w*h||seen[ni])continue;const nxp=ni%w,nyp=(ni/w)|0;if(Math.abs(nxp-x)+Math.abs(nyp-y)!==1)continue;seen[ni]=1;const qi=ni*4,rr=rgba[qi],gg=rgba[qi+1],bb=rgba[qi+2];
+      const ds=Math.hypot(rr-sr,gg-sg,bb-sb),dl=Math.hypot(rr-r,gg-g,bb-b);if(ds<=seedThreshold&&dl<=localThreshold)queue[tail++]=ni;
+    }
+  }
+  if(tail<80)throw makeError('La selección quedó muy pequeña. Toca más cerca del centro del objeto.');
+  if(tail>w*h*.92)throw makeError('Se seleccionó casi toda la foto. Toca una zona más definida del objeto.');
+  logDebug('MAGIC WAND: máscara lista',{selected:tail,total:w*h});return featherMask(mask,w,h);
+}
+
 const debug={entries:[],startedAt:Date.now()};
 try{const saved=JSON.parse(localStorage.getItem(DEBUG_KEY)||'null');if(saved?.entries?.length)debug.entries=saved.entries.slice(-250);}catch(_){ }
 function serialize(value){
@@ -273,23 +337,18 @@ function closeResult(result){
 }
 async function segmentPerson(){
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
-  const operation=beginOperation('Separando a la persona…');
-  setStatus('Preparando una copia optimizada de la foto…','loading');
-  let result;
+  const operation=beginOperation('Separando a la persona…');setStatus('Preparando una copia optimizada de la foto…','loading');
   try{
-    const work=await getWorkCanvas(operation);
-    const segmenter=await ensurePersonSegmenter(operation);
-    setStatus('Analizando píxel por píxel…','loading');
-    result=await runTask(()=>segmenter.segment(work),operation);
-    const maskObj=result.categoryMask;if(!maskObj)throw makeError('El modelo no devolvió una máscara.');
-    const values=maskObj.getAsUint8Array();const mask=new Uint8Array(values.length);let selected=0;
-    for(let i=0;i<values.length;i++){if(values[i]===PERSON_CLASS_ID){mask[i]=255;selected++;}}
+    const work=await getWorkCanvas(operation);const net=await ensureBodyPix(operation);
+    setStatus('Detectando a la persona…','loading');logDebug('BODYPIX: inferencia inicio',{width:work.width,height:work.height});
+    const result=await timeout(net.segmentPerson(work,{internalResolution:'medium',segmentationThreshold:0.68,maxDetections:5,scoreThreshold:0.2,nmsRadius:20}),RUN_TIMEOUT,'El análisis tardó demasiado.',operation);
+    logDebug('BODYPIX: inferencia lista',{width:result.width,height:result.height});
+    const mask=new Uint8Array(result.data.length);let selected=0;for(let i=0;i<result.data.length;i++){if(result.data[i]){mask[i]=255;selected++;}}
     if(selected<100)throw makeError('No encontré una persona claramente. Prueba “Tocar objeto”.');
-    await setMask(mask,maskObj.width||work.width,maskObj.height||work.height,'Persona');
+    await setMask(featherMask(mask,result.width,result.height),result.width,result.height,'Persona');
     setStatus('Persona segmentada. Ya puedes quitar el fondo.','ready');api().toast('Máscara de persona lista');
-  }catch(err){
-    const msg=friendlyError(err);logDebug('SEGMENTAR PERSONA: ERROR',err);console.error(err);setStatus(`${msg} Abre “Diagnóstico técnico” abajo.`, 'error');if(err?.code!=='CANCELLED')api().toast(msg);
-  }finally{closeResult(result);finishOperation(operation);}
+  }catch(err){const msg=friendlyError(err);logDebug('SEGMENTAR PERSONA: ERROR',err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
+  finally{finishOperation(operation);}
 }
 function canvasPointToNormalized(pointer){
   const photo=api().state.photo;const bounds=photo.getBoundingRect(true,true);
@@ -297,22 +356,13 @@ function canvasPointToNormalized(pointer){
   return {x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y)),inside:x>=0&&x<=1&&y>=0&&y<=1};
 }
 async function segmentAtPoint(x,y){
-  const operation=beginOperation('Creando selección inteligente…');
-  setStatus('Preparando una copia optimizada de la foto…','loading');
-  let result;
+  const operation=beginOperation('Creando selección inteligente…');setStatus('Analizando colores y bordes cercanos…','loading');
   try{
-    const work=await getWorkCanvas(operation);
-    const segmenter=await ensureInteractiveSegmenter(operation);
-    setStatus('Buscando los bordes del objeto…','loading');
-    result=await runTask(()=>segmenter.segment(work,{keypoint:{x,y}}),operation);
-    const maskObj=result.confidenceMasks?.[0];if(!maskObj)throw makeError('El modelo no devolvió una selección.');
-    const values=maskObj.getAsFloat32Array();const mask=new Uint8Array(values.length);let selected=0;
-    for(let i=0;i<values.length;i++){const v=values[i];if(v>=0.48){mask[i]=Math.min(255,Math.round(v*255));selected++;}}
-    if(selected<80)throw makeError('No pude separar ese objeto. Toca más cerca del centro.');
-    await setMask(mask,maskObj.width||work.width,maskObj.height||work.height,'Objeto');
-    setStatus('Objeto seleccionado con máscara.','ready');api().toast('Selección inteligente lista');
-  }catch(err){const msg=friendlyError(err);console.error(err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
-  finally{closeResult(result);finishOperation(operation);}
+    const work=await getWorkCanvas(operation);await letOverlayPaint();
+    const mask=magicWandMask(work,x,y);await setMask(mask,work.width,work.height,'Objeto');
+    setStatus('Objeto seleccionado. Si tomó demasiado o muy poco, toca otra zona.','ready');api().toast('Selección inteligente lista');
+  }catch(err){const msg=friendlyError(err);logDebug('SELECCIÓN INTELIGENTE: ERROR',err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
+  finally{finishOperation(operation);}
 }
 function beginTapMode(){if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');if(state.loading)return;state.tapMode=true;setStatus('Toca el objeto que quieres seleccionar.','ready');updateUI();api().toast('Ahora toca el objeto en la foto');}
 async function handleCanvasTap(opt){if(!state.tapMode||state.loading)return;const p=api().state.canvas.getPointer(opt.e);const norm=canvasPointToNormalized(p);if(!norm.inside){api().toast('Toca dentro de la fotografía.');return;}state.tapMode=false;updateUI();await segmentAtPoint(norm.x,norm.y);}

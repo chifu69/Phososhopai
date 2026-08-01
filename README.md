@@ -1,4 +1,4 @@
-# PHOTO IA 7.4 DEBUG — Diagnóstico de segmentación
+# PHOTO IA 7.5 — Diagnóstico de segmentación
 
 Esta compilación no intenta ocultar el fallo. Registra cada etapa del motor MediaPipe: descarga ESM, carga WASM, acceso a modelos, creación del segmentador e inferencia.
 
