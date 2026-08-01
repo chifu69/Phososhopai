@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 6.3.3: Texto Pro, dibujo, formas y capas editables.">
+  <meta name="description" content="PHOTO IA 6.3.4: Inspector de objetos, barra contextual y guías inteligentes.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=6.3.3">
-  <title>PHOTO IA 6.3.3</title>
+  <link rel="stylesheet" href="styles.css?v=6.3.4">
+  <title>PHOTO IA 6.3.4</title>
 </head>
 <body>
 <div class="app-shell">
@@ -55,6 +55,15 @@
       <p id="mode-help" class="mode-help">Modo Mover: toca un objeto para seleccionarlo, moverlo, rotarlo o cambiar su tamaño.</p>
       <div id="canvas-wrap" class="canvas-wrap">
         <canvas id="editor-canvas"></canvas>
+        <div id="guide-v" class="smart-guide guide-v" hidden></div>
+        <div id="guide-h" class="smart-guide guide-h" hidden></div>
+        <div id="object-toolbar" class="object-toolbar" hidden>
+          <button data-object-action="duplicate" type="button" title="Duplicar">⧉</button>
+          <button data-object-action="front" type="button" title="Traer al frente">⬆</button>
+          <button data-object-action="back" type="button" title="Enviar atrás">⬇</button>
+          <button data-object-action="lock" type="button" title="Bloquear">🔒</button>
+          <button data-object-action="delete" class="danger" type="button" title="Eliminar">🗑</button>
+        </div>
         <div id="empty-state" class="empty-state">
           <div class="camera-mark">📷</div><h3>Abre una foto</h3><p>La edición se procesa en tu dispositivo.</p>
           <div class="open-actions">
@@ -101,7 +110,7 @@
     <section class="panel creative-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CREATIVE STUDIO</p><h2>Texto, dibujo y formas</h2></div>
-        <span class="engine-badge">6.3.3</span>
+        <span class="engine-badge">6.3.4</span>
       </div>
       <div class="creative-tabs" role="tablist">
         <button class="creative-tab active" data-tool-tab="text">🔤 Texto</button>
@@ -188,6 +197,31 @@
       </div>
     </section>
 
+    <section id="object-inspector" class="panel object-inspector">
+      <div class="section-heading">
+        <div><p class="eyebrow">INSPECTOR</p><h2>Objeto seleccionado</h2></div>
+        <span id="inspector-type" class="engine-badge">Ninguno</span>
+      </div>
+      <p id="inspector-help" class="layers-help">Selecciona un texto, sticker, forma o trazo para editar sus propiedades.</p>
+      <div id="inspector-controls" class="inspector-controls" aria-disabled="true">
+        <label>Opacidad <output id="inspector-opacity-out">100%</output><input id="inspector-opacity" type="range" min="0" max="100" value="100" disabled></label>
+        <label>Rotación <output id="inspector-angle-out">0°</output><input id="inspector-angle" type="range" min="-180" max="180" value="0" disabled></label>
+        <div class="inspector-grid">
+          <label>Ancho<input id="inspector-width" type="number" min="1" step="1" disabled></label>
+          <label>Alto<input id="inspector-height" type="number" min="1" step="1" disabled></label>
+          <label>Posición X<input id="inspector-x" type="number" step="1" disabled></label>
+          <label>Posición Y<input id="inspector-y" type="number" step="1" disabled></label>
+        </div>
+        <div class="inspector-actions">
+          <button id="inspector-duplicate" class="secondary" disabled>⧉ Duplicar</button>
+          <button id="inspector-lock" class="secondary" disabled>🔒 Bloquear</button>
+          <button id="inspector-front" class="secondary" disabled>⬆ Frente</button>
+          <button id="inspector-back" class="secondary" disabled>⬇ Atrás</button>
+          <button id="inspector-delete" class="secondary danger" disabled>🗑 Eliminar</button>
+        </div>
+      </div>
+    </section>
+
     <section class="panel layers-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CAPAS</p><h2>Organiza tu diseño</h2></div>
@@ -209,7 +243,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 6.3.3 • Shape Studio • <strong>6.3.3</strong></footer>
+  <footer>PHOTO IA 6.3.4 • Shape Studio • <strong>6.3.4</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -220,8 +254,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=6.3.3"></script>
-<script src="creative-tools.js?v=6.3.3"></script>
+<script src="app.js?v=6.3.4"></script>
+<script src="creative-tools.js?v=6.3.4"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>

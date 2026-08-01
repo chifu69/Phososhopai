@@ -243,3 +243,85 @@ const onReady=()=>{
 };
 window.addEventListener('photoia-ready',onReady,{once:true});
 })();
+
+/* PHOTO IA 6.3.4 — contextual object inspector and smart guides */
+(() => {
+'use strict';
+const $=id=>document.getElementById(id);
+function boot(){
+  const api=window.PhotoIA;
+  const canvas=api?.state?.canvas;
+  if(!canvas)return;
+  const wrap=$('canvas-wrap'), toolbar=$('object-toolbar'), guideV=$('guide-v'), guideH=$('guide-h');
+  const fields=['inspector-opacity','inspector-angle','inspector-width','inspector-height','inspector-x','inspector-y'];
+  const buttons=['inspector-duplicate','inspector-lock','inspector-front','inspector-back','inspector-delete'];
+  let syncing=false, moving=false;
+  const active=()=>{const o=canvas.getActiveObject();return o&&o.photoRole!=='main'?o:null};
+  const label=o=>o?.layerName||({text:'Texto','i-text':'Texto',rect:'Rectángulo',circle:'Círculo',triangle:'Triángulo',line:'Línea',group:'Grupo',path:'Trazo'}[o?.type])||'Objeto';
+  const enable=on=>{fields.concat(buttons).forEach(id=>{const el=$(id);if(el)el.disabled=!on});$('object-inspector')?.classList.toggle('is-disabled',!on)};
+  function hideGuides(){guideV.hidden=true;guideH.hidden=true}
+  function placeToolbar(){
+    const o=active();
+    if(!o||o.userLocked){toolbar.hidden=true;return}
+    const canvasRect=canvas.upperCanvasEl.getBoundingClientRect(), wrapRect=wrap.getBoundingClientRect();
+    const box=o.getBoundingRect(true,true), sx=canvasRect.width/canvas.width, sy=canvasRect.height/canvas.height;
+    let left=canvasRect.left-wrapRect.left+(box.left+box.width/2)*sx;
+    let top=canvasRect.top-wrapRect.top+box.top*sy-10;
+    left=Math.max(112,Math.min(wrapRect.width-112,left));
+    top=Math.max(54,top);
+    toolbar.style.left=`${left}px`;toolbar.style.top=`${top}px`;toolbar.hidden=false;
+    const lock=toolbar.querySelector('[data-object-action="lock"]');if(lock)lock.textContent=o.userLocked?'🔓':'🔒';
+  }
+  function sync(){
+    const o=active();syncing=true;
+    enable(!!o);
+    $('inspector-type').textContent=o?label(o):'Ninguno';
+    $('inspector-help').textContent=o?'Edita tamaño, posición, rotación y orden. Las guías aparecen al centrar el objeto.':'Selecciona un texto, sticker, forma o trazo para editar sus propiedades.';
+    if(o){
+      const c=o.getCenterPoint();
+      $('inspector-opacity').value=Math.round((o.opacity??1)*100);$('inspector-opacity-out').textContent=$('inspector-opacity').value+'%';
+      $('inspector-angle').value=Math.round((((o.angle||0)+180)%360+360)%360-180);$('inspector-angle-out').textContent=$('inspector-angle').value+'°';
+      $('inspector-width').value=Math.max(1,Math.round(o.getScaledWidth()));$('inspector-height').value=Math.max(1,Math.round(o.getScaledHeight()));
+      $('inspector-x').value=Math.round(c.x);$('inspector-y').value=Math.round(c.y);
+      $('inspector-lock').textContent=o.userLocked?'🔓 Desbloquear':'🔒 Bloquear';
+    }
+    syncing=false;placeToolbar();
+  }
+  function commit(){if(active()){api.snapshot();api.renderLayers();sync()}}
+  function duplicate(){
+    const o=active();if(!o)return;
+    o.clone(clone=>{clone.set({left:(o.left||0)+18,top:(o.top||0)+18});clone.layerId=api.nextLayerId();clone.layerName=`${label(o)} copia`;clone.layerType=o.layerType;clone.userLocked=false;clone.set({selectable:true,evented:true});canvas.add(clone);canvas.setActiveObject(clone);canvas.requestRenderAll();commit()});
+  }
+  function del(){const o=active();if(!o)return;canvas.remove(o);canvas.discardActiveObject();canvas.requestRenderAll();api.snapshot();api.renderLayers();sync();api.toast('Objeto eliminado')}
+  function front(){const o=active();if(!o)return;canvas.bringToFront(o);canvas.requestRenderAll();commit()}
+  function back(){const o=active();if(!o)return;canvas.sendToBack(o);if(api.state.photo)canvas.sendToBack(api.state.photo);canvas.requestRenderAll();commit()}
+  function lock(){const o=active();if(!o)return;o.userLocked=true;o.set({selectable:false,evented:false});canvas.discardActiveObject();canvas.requestRenderAll();api.snapshot();api.renderLayers();sync();api.toast('Objeto bloqueado. Puedes desbloquearlo desde Capas.')}
+  function action(name){({duplicate,delete:del,front,back,lock}[name]||(()=>{}))()}
+  toolbar.querySelectorAll('[data-object-action]').forEach(b=>b.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();action(b.dataset.objectAction)}));
+  $('inspector-duplicate').onclick=duplicate;$('inspector-delete').onclick=del;$('inspector-front').onclick=front;$('inspector-back').onclick=back;$('inspector-lock').onclick=lock;
+  $('inspector-opacity').addEventListener('input',e=>{if(syncing)return;const o=active();if(!o)return;o.set('opacity',Number(e.target.value)/100);$('inspector-opacity-out').textContent=e.target.value+'%';canvas.requestRenderAll()});
+  $('inspector-angle').addEventListener('input',e=>{if(syncing)return;const o=active();if(!o)return;o.rotate(Number(e.target.value));o.setCoords();$('inspector-angle-out').textContent=e.target.value+'°';canvas.requestRenderAll();placeToolbar()});
+  function setSize(axis,value){const o=active(),v=Number(value);if(!o||!Number.isFinite(v)||v<=0)return;const base=axis==='x'?Math.max(1,o.width||1):Math.max(1,o.height||1);o.set(axis==='x'?'scaleX':'scaleY',v/base);o.setCoords();canvas.requestRenderAll();placeToolbar()}
+  $('inspector-width').addEventListener('change',e=>{setSize('x',e.target.value);commit()});$('inspector-height').addEventListener('change',e=>{setSize('y',e.target.value);commit()});
+  function setPosition(){const o=active();if(!o)return;const x=Number($('inspector-x').value),y=Number($('inspector-y').value);if(!Number.isFinite(x)||!Number.isFinite(y))return;o.setPositionByOrigin(new fabric.Point(x,y),'center','center');o.setCoords();canvas.requestRenderAll();commit()}
+  $('inspector-x').addEventListener('change',setPosition);$('inspector-y').addEventListener('change',setPosition);
+  ['inspector-opacity','inspector-angle'].forEach(id=>$(id).addEventListener('change',commit));
+
+  canvas.on('selection:created',sync);canvas.on('selection:updated',sync);canvas.on('selection:cleared',()=>{hideGuides();sync()});
+  canvas.on('object:scaling',()=>{sync();placeToolbar()});canvas.on('object:rotating',()=>{sync();placeToolbar()});
+  canvas.on('object:moving',e=>{
+    const o=e.target;if(!o||o.photoRole==='main')return;
+    moving=true;const center=o.getCenterPoint(), cx=canvas.width/2,cy=canvas.height/2,threshold=Math.max(6,10/(canvas.getZoom?.()||1));
+    let nx=center.x,ny=center.y,snapX=false,snapY=false;
+    if(Math.abs(center.x-cx)<=threshold){nx=cx;snapX=true}
+    if(Math.abs(center.y-cy)<=threshold){ny=cy;snapY=true}
+    if(snapX||snapY){o.setPositionByOrigin(new fabric.Point(nx,ny),'center','center');o.setCoords()}
+    guideV.hidden=!snapX;guideH.hidden=!snapY;sync();placeToolbar();
+  });
+  canvas.on('object:modified',()=>{moving=false;hideGuides();setTimeout(sync,0)});
+  canvas.on('mouse:up',()=>{if(moving){moving=false;hideGuides()}});
+  window.addEventListener('resize',()=>setTimeout(placeToolbar,80));
+  sync();
+}
+window.addEventListener('photoia-ready',boot,{once:true});
+})();

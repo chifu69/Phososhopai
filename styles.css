@@ -30,7 +30,15 @@ body[data-canvas-mode="draw"] #canvas-wrap,body[data-canvas-mode="erase"] #canva
 body[data-canvas-mode="move"] #canvas-wrap{cursor:default}
 @media(max-width:700px){.mode-toolbar{grid-template-columns:repeat(6,76px);margin-left:-4px;margin-right:-4px}.mode-tool{min-height:62px}.mode-tool span{font-size:1.3rem}}
 
-/* PHOTO IA 6.3.3 — Shape Studio */
+/* PHOTO IA 6.3.4 — Shape Studio */
 .shape-options{display:grid;gap:14px}.transparent-toggle{display:flex!important;align-items:center;gap:10px;padding:13px 15px;border:1px solid var(--line);border-radius:15px;background:var(--surface2);color:var(--text)!important}.transparent-toggle input{width:24px;height:24px;accent-color:var(--accent)}.shape-tool-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.control-disabled{opacity:.48}.control-disabled input,.control-disabled select{pointer-events:none}.shape-tool-grid select{margin-top:0}.shape-corner-control{transition:.18s}
 @media(max-width:720px){.shape-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:430px){.shape-tool-grid{grid-template-columns:1fr}.transparent-toggle{font-size:.92rem}}
+
+/* 6.3.4 — Object Inspector, contextual toolbar and smart guides */
+.canvas-wrap{position:relative;overflow:visible}
+.object-toolbar{position:absolute;z-index:25;display:flex;gap:6px;padding:6px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--surface) 94%,transparent);box-shadow:0 12px 30px rgba(0,0,0,.18);backdrop-filter:blur(12px);transform:translate(-50%,-100%);touch-action:manipulation}
+.object-toolbar[hidden]{display:none!important}.object-toolbar button{width:40px;height:38px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--text);font-size:1rem;font-weight:800}.object-toolbar button.danger{color:var(--danger)}
+.smart-guide{position:absolute;z-index:20;pointer-events:none;background:var(--accent);box-shadow:0 0 0 1px rgba(255,255,255,.75)}.smart-guide[hidden]{display:none!important}.guide-v{top:0;bottom:0;width:1px;left:50%}.guide-h{left:0;right:0;height:1px;top:50%}
+.object-inspector{padding:18px}.inspector-controls{display:grid;gap:14px}.inspector-controls>label{display:grid;grid-template-columns:1fr auto;gap:7px;font-weight:800;color:var(--muted)}.inspector-controls>label input{grid-column:1/-1}.inspector-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.inspector-grid label{font-size:.78rem;color:var(--muted);font-weight:800}.inspector-grid input{margin-top:6px;padding:12px}.inspector-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.inspector-actions .danger{grid-column:1/-1}.object-inspector.is-disabled{opacity:.72}
+@media(max-width:520px){.object-toolbar{gap:4px;padding:5px}.object-toolbar button{width:37px;height:36px}.inspector-grid{grid-template-columns:1fr 1fr}}

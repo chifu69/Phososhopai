@@ -1,13 +1,5 @@
-# PHOTO IA 6.3.3 — Shape Studio
+# PHOTO IA 6.3.4 — Object Inspector
 
-Actualización basada directamente en PHOTO IA 6.3.2.
+Incluye inspector contextual para objetos, barra flotante de acciones, controles de tamaño/posición/rotación/opacidad y guías inteligentes con ajuste al centro.
 
-## Nuevo
-- Opción **Sin relleno (transparente)** para rectángulos, círculos y triángulos.
-- Opacidad independiente para relleno y contorno.
-- Líneas sólidas, discontinuas y punteadas.
-- Esquinas redondeadas ajustables para rectángulos.
-- Las preferencias de formas se recuerdan en el dispositivo.
-- Los controles se sincronizan al seleccionar una forma existente.
-
-Sube todos los archivos directamente a la raíz de GitHub Pages.
+Sube todos los archivos de esta carpeta directamente a la raíz del repositorio de GitHub Pages.
