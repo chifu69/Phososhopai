@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 6.2: texto profesional, dibujo, formas y capas editables.">
+  <meta name="description" content="PHOTO IA 6.3.1: Texto Pro, dibujo, formas y capas editables.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=6.2.1">
-  <title>PHOTO IA 6.2.1</title>
+  <link rel="stylesheet" href="styles.css?v=6.3.1">
+  <title>PHOTO IA 6.3.1</title>
 </head>
 <body>
 <div class="app-shell">
@@ -92,7 +92,7 @@
     <section class="panel creative-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CREATIVE STUDIO</p><h2>Texto, dibujo y formas</h2></div>
-        <span class="engine-badge">6.2</span>
+        <span class="engine-badge">6.3.1</span>
       </div>
       <div class="creative-tabs" role="tablist">
         <button class="creative-tab active" data-tool-tab="text">🔤 Texto</button>
@@ -110,7 +110,21 @@
           <label>Contorno<input id="text-stroke" type="color" value="#111111"></label>
           <label>Grosor<input id="text-stroke-width" type="range" min="0" max="12" value="2"><output id="text-stroke-width-out">2</output></label>
           <label>Opacidad<input id="object-opacity" type="range" min="10" max="100" value="100"><output id="object-opacity-out">100%</output></label>
-          <label>Sombra<input id="text-shadow" type="checkbox"></label>
+          <label>Alineación<select id="text-align"><option value="left">Izquierda</option><option value="center" selected>Centro</option><option value="right">Derecha</option><option value="justify">Justificado</option></select></label>
+          <label>Espaciado<input id="text-spacing" type="range" min="-100" max="800" value="0"><output id="text-spacing-out">0</output></label>
+          <label>Interlineado<input id="text-line-height" type="range" min="0.8" max="2" step="0.05" value="1.16"><output id="text-line-height-out">1.16</output></label>
+          <label>Sombra<select id="text-shadow-style"><option value="none">Sin sombra</option><option value="soft">Suave</option><option value="strong">Fuerte</option><option value="glow">Resplandor</option></select></label>
+          <label>Color sombra<input id="text-shadow-color" type="color" value="#000000"></label>
+          <label>Fondo de texto<input id="text-background-enabled" type="checkbox"></label>
+          <label>Color de fondo<input id="text-background-color" type="color" value="#ff9f0a"></label>
+        </div>
+        <div class="text-style-row" aria-label="Estilo del texto">
+          <button id="text-bold" class="style-toggle active" type="button" aria-pressed="true">B</button>
+          <button id="text-italic" class="style-toggle" type="button" aria-pressed="false"><em>I</em></button>
+          <button id="text-underline" class="style-toggle" type="button" aria-pressed="false"><u>U</u></button>
+          <button data-text-preset="title" class="secondary" type="button" disabled>Título</button>
+          <button data-text-preset="caption" class="secondary" type="button" disabled>Subtítulo</button>
+          <button data-text-preset="meme" class="secondary" type="button" disabled>Meme</button>
         </div>
         <button id="create-text" class="primary wide" type="button" disabled>Agregar texto</button>
       </div>
@@ -179,7 +193,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 6.2.1 • Creative Studio profesional • <strong>6.2.1</strong></footer>
+  <footer>PHOTO IA 6.3.1 • Texto Pro • <strong>6.3.1</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -190,8 +204,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=6.2.1"></script>
-<script src="creative-tools.js?v=6.2.1"></script>
+<script src="app.js?v=6.3.1"></script>
+<script src="creative-tools.js?v=6.3.1"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>

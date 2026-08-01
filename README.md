@@ -1,12 +1,13 @@
-# PHOTO IA 6.2.1 — Flat Fix
+# PHOTO IA 6.3.1 — Text Pro
 
-Todos los archivos están en la raíz para evitar errores al subir carpetas desde el teléfono.
+Actualización basada directamente en PHOTO IA 6.2.1.
 
-Sube estos archivos directamente a la raíz de GitHub Pages y reemplaza los anteriores:
-- index.html
-- styles.css
-- app.js
-- creative-tools.js
-- sw.js
-- manifest.webmanifest
-- README.md
+## Nuevo
+- Negrita, cursiva y subrayado editables.
+- Alineación, espaciado entre letras e interlineado.
+- Sombras suaves, fuertes y resplandor con color configurable.
+- Fondo de texto opcional.
+- Presets funcionales para Título, Subtítulo y Meme.
+- Los controles se sincronizan al seleccionar una capa de texto.
+
+Sube todos los archivos directamente a la raíz de GitHub Pages.
