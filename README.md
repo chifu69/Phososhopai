@@ -1,9 +1,9 @@
-# PHOTO IA 6.4.1 — Photo Brain
+# PHOTO IA 7.0 — Photo Brain 2.0
 
-Motor modular de comandos naturales para filtros, texto, formas, capas y navegación hacia futuros módulos de IA.
+Incluye comandos encadenados, memoria del último objeto, selección por nombre de objeto y macros guardadas localmente.
 
-
-## Corrección 6.4.1
-- El Photo Brain inicia aunque `brain.js` cargue después del evento de la app.
-- El botón Hacerlo y Enter pasan siempre por Photo Brain.
-- Reconoce `cuadro` como sinónimo de `cuadrado`.
+Ejemplos:
+- `Cuadro rojo sin relleno, luego texto “Oferta” arriba`
+- `Selecciona el círculo y luego hazlo más grande`
+- `Guarda macro oferta: cuadro rojo sin relleno; texto “Oferta” amarillo arriba`
+- `Aplica macro oferta`
