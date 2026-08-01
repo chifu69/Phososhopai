@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.4.1-debug';
+const VERSION='1.4.2-debug';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -14,10 +14,12 @@ const RUN_TIMEOUT=45000;
 const state={
   module:null,fileset:null,imageSegmenter:null,interactiveSegmenter:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
-  tapMode:false,workCanvas:null,operation:null,operationId:0
+  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null
 };
 
+const DEBUG_KEY='photoia-segmentation-debug-v742';
 const debug={entries:[],startedAt:Date.now()};
+try{const saved=JSON.parse(localStorage.getItem(DEBUG_KEY)||'null');if(saved?.entries?.length)debug.entries=saved.entries.slice(-250);}catch(_){ }
 function serialize(value){
   if(value instanceof Error)return {name:value.name,message:value.message,stack:value.stack,code:value.code};
   if(value===undefined)return 'undefined';
@@ -26,6 +28,7 @@ function serialize(value){
 function logDebug(step,data){
   const entry={time:new Date().toISOString(),ms:Date.now()-debug.startedAt,step,data:serialize(data)};
   debug.entries.push(entry); if(debug.entries.length>250)debug.entries.shift();
+  try{localStorage.setItem(DEBUG_KEY,JSON.stringify({entries:debug.entries,savedAt:Date.now()}));}catch(_){ }
   console.log('[PHOTO IA DEBUG]',step,data??''); renderDebug();
   return entry;
 }
@@ -72,10 +75,26 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
+  results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
+  results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
   results.push(await probeUrl('Modelo persona',PERSON_MODEL));
   results.push(await probeUrl('Modelo interactivo',INTERACTIVE_MODEL));
   setStatus(results.every(Boolean)?'Todas las direcciones respondieron. Prueba Separar persona.':'Una o más descargas fallaron. Abre el diagnóstico.','error');
 }
+async function fetchModelBuffer(url,operation,label){
+  logDebug(`${label}: descarga binaria inicio`,url);
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),20000);
+  try{
+    const response=await fetch(url,{cache:'force-cache',signal:controller.signal});
+    if(!response.ok)throw makeError(`${label}: HTTP ${response.status}`,'MODEL_FETCH');
+    const buffer=await response.arrayBuffer();
+    logDebug(`${label}: descarga binaria correcta`,{bytes:buffer.byteLength});
+    if(operation?.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
+    return new Uint8Array(buffer);
+  }finally{clearTimeout(timer)}
+}
+
 window.addEventListener('error',e=>logDebug('ERROR GLOBAL',{message:e.message,source:e.filename,line:e.lineno,column:e.colno,error:serialize(e.error)}));
 window.addEventListener('unhandledrejection',e=>logDebug('PROMESA RECHAZADA',e.reason));
 
@@ -201,8 +220,10 @@ async function createWithFallback(factory,operation,label){
 async function ensurePersonSegmenter(operation){
   logDebug('PERSON SEGMENTER: ensure inicio');
   await loadModule(operation);logDebug('PERSON SEGMENTER: módulo listo');if(state.imageSegmenter)return state.imageSegmenter;
+  if(!state.personModelBuffer)state.personModelBuffer=await fetchModelBuffer(PERSON_MODEL,operation,'MODELO PERSONA');
   state.imageSegmenter=await createWithFallback(delegate=>{
-    const baseOptions={modelAssetPath:PERSON_MODEL};
+    const modelBuffer=state.personModelBuffer;
+    const baseOptions=modelBuffer?{modelAssetBuffer:modelBuffer}:{modelAssetPath:PERSON_MODEL};
     if(delegate)baseOptions.delegate=delegate;
     return state.module.ImageSegmenter.createFromOptions(state.fileset,{
       baseOptions,runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false
@@ -212,8 +233,10 @@ async function ensurePersonSegmenter(operation){
 }
 async function ensureInteractiveSegmenter(operation){
   await loadModule(operation);if(state.interactiveSegmenter)return state.interactiveSegmenter;
+  if(!state.interactiveModelBuffer)state.interactiveModelBuffer=await fetchModelBuffer(INTERACTIVE_MODEL,operation,'MODELO INTERACTIVO');
   state.interactiveSegmenter=await createWithFallback(delegate=>{
-    const baseOptions={modelAssetPath:INTERACTIVE_MODEL};
+    const modelBuffer=state.interactiveModelBuffer;
+    const baseOptions=modelBuffer?{modelAssetBuffer:modelBuffer}:{modelAssetPath:INTERACTIVE_MODEL};
     if(delegate)baseOptions.delegate=delegate;
     return state.module.InteractiveSegmenter.createFromOptions(state.fileset,{
       baseOptions,outputCategoryMask:false,outputConfidenceMasks:true
