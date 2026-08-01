@@ -1,11 +1,13 @@
-# PHOTO IA 7.3.4 — iPhone Segmentation Runtime Fix
+# PHOTO IA 7.4 DEBUG — Diagnóstico de segmentación
 
-Correcciones principales:
-- Cambia “Separar persona” al modelo SelfieSegmenter ligero y optimizado para móviles.
-- En iPhone/iPad usa CPU para evitar bloqueos del delegate WebGL/GPU.
-- Reduce la copia de trabajo en móviles para terminar la inferencia con menos memoria.
-- Bloquea completamente el desplazamiento de la página mientras aparece el proceso.
-- Evita que una operación cancelada cierre o altere una operación nueva.
-- Renueva la caché del service worker a 7.3.4.
+Esta compilación no intenta ocultar el fallo. Registra cada etapa del motor MediaPipe: descarga ESM, carga WASM, acceso a modelos, creación del segmentador e inferencia.
 
-Instalación: reemplaza todos los archivos, cierra la app instalada y vuelve a abrirla. Si conserva la versión anterior, elimina la app de inicio y agrégala de nuevo para limpiar el service worker.
+## Prueba
+1. Reemplaza todos los archivos en GitHub.
+2. Espera a que GitHub Pages publique el cambio.
+3. Abre la página en Safari y recárgala.
+4. En “Diagnóstico técnico 7.4”, pulsa “Probar conexiones”.
+5. Pulsa “Separar persona”.
+6. Usa “Copiar diagnóstico” o “Guardar diagnóstico” y comparte el resultado.
+
+El registro no incluye la fotografía ni datos personales de la imagen.

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.3.0';
+const VERSION='1.4.0-debug';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -9,13 +9,74 @@ const MEDIAPIPE_WASM=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TAS
 const PERSON_MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite';
 const INTERACTIVE_MODEL='https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite';
 const PERSON_CLASS_ID=1;
-const LOAD_TIMEOUT=25000;
+const LOAD_TIMEOUT=30000;
 const RUN_TIMEOUT=45000;
 const state={
   module:null,fileset:null,imageSegmenter:null,interactiveSegmenter:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
   tapMode:false,workCanvas:null,operation:null,operationId:0
 };
+
+const debug={entries:[],startedAt:Date.now()};
+function serialize(value){
+  if(value instanceof Error)return {name:value.name,message:value.message,stack:value.stack,code:value.code};
+  if(value===undefined)return 'undefined';
+  try{return JSON.parse(JSON.stringify(value));}catch(_){return String(value);}
+}
+function logDebug(step,data){
+  const entry={time:new Date().toISOString(),ms:Date.now()-debug.startedAt,step,data:serialize(data)};
+  debug.entries.push(entry); if(debug.entries.length>250)debug.entries.shift();
+  console.log('[PHOTO IA DEBUG]',step,data??''); renderDebug();
+  return entry;
+}
+function environmentInfo(){
+  return {
+    version:VERSION,url:location.href,online:navigator.onLine,userAgent:navigator.userAgent,
+    platform:navigator.platform,language:navigator.language,hardwareConcurrency:navigator.hardwareConcurrency,
+    deviceMemory:navigator.deviceMemory||'unknown',crossOriginIsolated:self.crossOriginIsolated,
+    webAssembly:typeof WebAssembly!=='undefined',webGL:!!document.createElement('canvas').getContext('webgl'),
+    webGL2:!!document.createElement('canvas').getContext('webgl2'),screen:`${screen.width}x${screen.height}`
+  };
+}
+function debugText(){return JSON.stringify({environment:environmentInfo(),entries:debug.entries},null,2)}
+function renderDebug(){
+  const box=$('segment-debug-log'); if(!box)return;
+  box.textContent=debug.entries.map(e=>`+${(e.ms/1000).toFixed(2)}s  ${e.step}${e.data!==undefined?'
+'+JSON.stringify(e.data,null,2):''}`).join('
+
+');
+  box.scrollTop=box.scrollHeight;
+}
+async function copyDebug(){
+  const text=debugText();
+  try{await navigator.clipboard.writeText(text);api()?.toast('Diagnóstico copiado');}
+  catch(_){const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();document.execCommand('copy');ta.remove();api()?.toast('Diagnóstico copiado');}
+}
+function downloadDebug(){
+  const blob=new Blob([debugText()],{type:'application/json'});const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);a.download=`photo-ia-diagnostico-${Date.now()}.json`;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+async function probeUrl(name,url){
+  logDebug(`PRUEBA ${name}: inicio`,url);
+  const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),10000);
+  try{
+    const r=await fetch(url,{method:'GET',cache:'no-store',signal:controller.signal});
+    logDebug(`PRUEBA ${name}: respuesta`,{ok:r.ok,status:r.status,type:r.type,contentType:r.headers.get('content-type'),length:r.headers.get('content-length')});
+    try{await r.body?.cancel?.();}catch(_){}
+    return r.ok;
+  }catch(err){logDebug(`PRUEBA ${name}: ERROR`,err);return false;}finally{clearTimeout(timer)}
+}
+async function runConnectionTests(){
+  setStatus('Ejecutando pruebas de conexión…','loading');
+  const results=[];
+  results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
+  results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
+  results.push(await probeUrl('Modelo persona',PERSON_MODEL));
+  results.push(await probeUrl('Modelo interactivo',INTERACTIVE_MODEL));
+  setStatus(results.every(Boolean)?'Todas las direcciones respondieron. Prueba Separar persona.':'Una o más descargas fallaron. Abre el diagnóstico.','error');
+}
+window.addEventListener('error',e=>logDebug('ERROR GLOBAL',{message:e.message,source:e.filename,line:e.lineno,column:e.colno,error:serialize(e.error)}));
+window.addEventListener('unhandledrejection',e=>logDebug('PROMESA RECHAZADA',e.reason));
 
 function setStatus(text,kind=''){
   const el=$('segment-status'); if(!el)return;
@@ -37,16 +98,18 @@ function makeError(message,code='SEGMENTATION_ERROR'){
   const err=new Error(message); err.code=code; return err;
 }
 function timeout(promise,ms,message,operation){
+  logDebug('Timeout armado',{ms,message,operationId:operation?.id});
   let timer;
   return Promise.race([
     promise,
-    new Promise((_,reject)=>{timer=setTimeout(()=>reject(makeError(message,'TIMEOUT')),ms)})
+    new Promise((_,reject)=>{timer=setTimeout(()=>{logDebug('TIMEOUT DISPARADO',{ms,message,operationId:operation?.id});reject(makeError(message,'TIMEOUT'))},ms)})
   ]).finally(()=>clearTimeout(timer)).then(value=>{
     if(operation?.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
     return value;
   });
 }
 function beginOperation(label){
+  logDebug('OPERACIÓN INICIADA',label);
   cancelCurrent(false);
   const operation={id:++state.operationId,cancelled:false,label};
   state.operation=operation; state.loading=true; updateUI();
@@ -54,6 +117,7 @@ function beginOperation(label){
   return operation;
 }
 function finishOperation(operation){
+  logDebug('OPERACIÓN FINALIZADA',{id:operation?.id,cancelled:operation?.cancelled});
   if(state.operation!==operation)return;
   state.operation=null;
   state.loading=false; api()?.processing(false); updateUI();
@@ -76,6 +140,7 @@ function friendlyError(err){
 }
 function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.decoding='async';img.onload=()=>resolve(img);img.onerror=()=>reject(makeError('No pude leer la fotografía.'));img.src=src;});}
 async function getWorkCanvas(operation){
+  logDebug('Preparando canvas de trabajo');
   const photo=api()?.state?.photo;if(!photo)throw makeError('Abre una foto primero.');
   const img=await timeout(loadImage(api().state.originalDataUrl),8000,'La fotografía tardó demasiado en abrirse.',operation);
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -86,21 +151,26 @@ async function getWorkCanvas(operation){
   canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
   const ctx=canvas.getContext('2d',{willReadFrequently:true,alpha:false});
   ctx.drawImage(img,0,0,canvas.width,canvas.height);
-  state.workCanvas=canvas; return canvas;
+  state.workCanvas=canvas; logDebug('Canvas listo',{width:canvas.width,height:canvas.height,originalWidth:img.naturalWidth,originalHeight:img.naturalHeight}); return canvas;
 }
 async function loadModule(operation){
   if(state.module&&state.fileset)return state.module;
   if(!state.modulePromise){
     state.modulePromise=(async()=>{
       setStatus('Descargando motor de segmentación…','loading');
+      logDebug('IMPORT ESM: inicio',MEDIAPIPE_ESM);
       const mod=await import(MEDIAPIPE_ESM);
+      logDebug('IMPORT ESM: correcto',{exports:Object.keys(mod)});
+      logDebug('FILESET WASM: inicio',MEDIAPIPE_WASM);
       const fileset=await mod.FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
+      logDebug('FILESET WASM: correcto',fileset);
       state.module=mod;state.fileset=fileset;return mod;
-    })().catch(err=>{state.modulePromise=null;state.module=null;state.fileset=null;throw err;});
+    })().catch(err=>{logDebug('CARGA DEL MOTOR: ERROR',err);state.modulePromise=null;state.module=null;state.fileset=null;throw err;});
   }
   return timeout(state.modulePromise,LOAD_TIMEOUT,'El motor tardó demasiado en descargar. Revisa internet y vuelve a intentar.',operation);
 }
 async function createWithFallback(factory,operation,label){
+  logDebug('CREAR MODELO: entrada',{label,isIOS:/iPad|iPhone|iPod/.test(navigator.userAgent)});
   setStatus(label,'loading');
   const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
   // En iPhone/iPad el delegate GPU puede quedarse bloqueado dentro de WebGL.
@@ -110,19 +180,26 @@ async function createWithFallback(factory,operation,label){
     // opción puede dejar createFromOptions pendiente. Sin delegate usa CPU/WASM
     // automáticamente, que es el camino compatible con iPhone.
     setStatus(`${label} Iniciando motor compatible con iPhone…`,'loading');
-    return timeout(factory(null),LOAD_TIMEOUT,'No se pudo iniciar el modelo compatible con iPhone.',operation);
+    logDebug('CREATE FROM OPTIONS: automático/CPU inicio');
+    const created=await timeout(factory(null),LOAD_TIMEOUT,'No se pudo iniciar el modelo compatible con iPhone.',operation);
+    logDebug('CREATE FROM OPTIONS: automático/CPU correcto');return created;
   }
   try{
-    return await timeout(factory('GPU'),LOAD_TIMEOUT,'El modelo tardó demasiado en iniciar.',operation);
+    logDebug('CREATE FROM OPTIONS: GPU inicio');
+    const created=await timeout(factory('GPU'),LOAD_TIMEOUT,'El modelo tardó demasiado en iniciar.',operation);
+    logDebug('CREATE FROM OPTIONS: GPU correcto');return created;
   }catch(gpuErr){
     if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
-    console.warn('GPU unavailable, retrying on CPU',gpuErr);
+    logDebug('CREATE FROM OPTIONS: GPU ERROR',gpuErr);console.warn('GPU unavailable, retrying on CPU',gpuErr);
     setStatus('La GPU no respondió. Reintentando con CPU…','loading');
-    return timeout(factory('CPU'),LOAD_TIMEOUT,'No se pudo iniciar el modelo ni con GPU ni con CPU.',operation);
+    logDebug('CREATE FROM OPTIONS: CPU inicio');
+    const created=await timeout(factory('CPU'),LOAD_TIMEOUT,'No se pudo iniciar el modelo ni con GPU ni con CPU.',operation);
+    logDebug('CREATE FROM OPTIONS: CPU correcto');return created;
   }
 }
 async function ensurePersonSegmenter(operation){
-  await loadModule(operation);if(state.imageSegmenter)return state.imageSegmenter;
+  logDebug('PERSON SEGMENTER: ensure inicio');
+  await loadModule(operation);logDebug('PERSON SEGMENTER: módulo listo');if(state.imageSegmenter)return state.imageSegmenter;
   state.imageSegmenter=await createWithFallback(delegate=>{
     const baseOptions={modelAssetPath:PERSON_MODEL};
     if(delegate)baseOptions.delegate=delegate;
@@ -147,6 +224,7 @@ async function letOverlayPaint(){
   await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,35)));
 }
 async function runTask(start,operation){
+  logDebug('INFERENCIA: inicio');
   if(operation?.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
   await letOverlayPaint();
   // MediaPipe puede devolver el resultado directamente. En Safari/Chrome móvil,
@@ -154,6 +232,7 @@ async function runTask(start,operation){
   const result=await timeout(Promise.resolve().then(start),RUN_TIMEOUT,
     'El análisis tardó demasiado. Intenta otra vez o usa una foto más pequeña.',operation);
   if(operation?.cancelled){closeResult(result);throw makeError('Proceso cancelado.','CANCELLED');}
+  logDebug('INFERENCIA: resultado recibido',Object.keys(result||{}));
   return result;
 }
 function closeResult(result){
@@ -177,7 +256,7 @@ async function segmentPerson(){
     await setMask(mask,maskObj.width||work.width,maskObj.height||work.height,'Persona');
     setStatus('Persona segmentada. Ya puedes quitar el fondo.','ready');api().toast('Máscara de persona lista');
   }catch(err){
-    const msg=friendlyError(err);console.error(err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);
+    const msg=friendlyError(err);logDebug('SEGMENTAR PERSONA: ERROR',err);console.error(err);setStatus(`${msg} Abre “Diagnóstico técnico” abajo.`, 'error');if(err?.code!=='CANCELLED')api().toast(msg);
   }finally{closeResult(result);finishOperation(operation);}
 }
 function canvasPointToNormalized(pointer){
@@ -244,9 +323,12 @@ function boot(){
   if(!$('segment-person'))return;
   $('segment-person').onclick=segmentPerson;$('segment-tap').onclick=beginTapMode;$('segment-show').onclick=()=>showMask(true);$('segment-hide').onclick=()=>showMask(false);$('segment-clear').onclick=clearMask;$('segment-cutout').onclick=createCutout;
   if($('segment-cancel'))$('segment-cancel').onclick=()=>cancelCurrent(true);
+  if($('segment-debug-copy'))$('segment-debug-copy').onclick=copyDebug;
+  if($('segment-debug-download'))$('segment-debug-download').onclick=downloadDebug;
+  if($('segment-debug-test'))$('segment-debug-test').onclick=runConnectionTests;
   if($('processing-cancel'))$('processing-cancel').onclick=()=>cancelCurrent(true);
   api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(e.target?.photoRole==='main')clearMask();});
-  updateUI();setStatus('La primera segmentación descarga el modelo. Puede tardar hasta 25 segundos.');
+  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Versión de diagnóstico lista. Pulsa “Probar conexiones” antes de segmentar.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
 window.PhotoSegmentation={version:VERSION,segmentPerson,beginTapMode,createCutout,clearMask,showMask,cancel:()=>cancelCurrent(true),command,get mask(){return state.mask}};

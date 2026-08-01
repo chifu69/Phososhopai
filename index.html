@@ -7,10 +7,10 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 7.3.4 con segmentación local estable, cancelación y límites de tiempo.">
+  <meta name="description" content="PHOTO IA 7.4 DEBUG con segmentación local estable, cancelación y límites de tiempo.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=7.3.4">
+  <link rel="stylesheet" href="styles.css?v=7.4.0-debug">
   <title>PHOTO IA 7.3 — Vision Engine 1.0</title>
 </head>
 <body>
@@ -224,6 +224,16 @@
         <button id="segment-cancel" class="secondary segment-cancel" disabled>Cancelar proceso</button>
       </div>
       <p class="vision-help">Puedes escribir “segmenta la persona”, “selección inteligente” o “quita el fondo”. Para cualquier objeto, pulsa “Tocar objeto” y luego toca su centro en la foto.</p>
+      <details class="segment-debug" open>
+        <summary>🧪 Diagnóstico técnico 7.4</summary>
+        <p>Primero pulsa <strong>Probar conexiones</strong>. Después intenta <strong>Separar persona</strong>. El registro mostrará exactamente dónde se detiene.</p>
+        <div class="segment-debug-actions">
+          <button id="segment-debug-test" class="secondary">Probar conexiones</button>
+          <button id="segment-debug-copy" class="secondary">Copiar diagnóstico</button>
+          <button id="segment-debug-download" class="secondary">Guardar diagnóstico</button>
+        </div>
+        <pre id="segment-debug-log" class="segment-debug-log">Esperando prueba…</pre>
+      </details>
     </section>
 
     <section id="object-inspector" class="panel object-inspector">
@@ -272,7 +282,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 7.3.4 • Vision Engine estable • <strong>7.3.4</strong></footer>
+  <footer>PHOTO IA 7.4 DEBUG • Vision Engine estable • <strong>7.4.0-debug</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -283,13 +293,13 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=7.3.4"></script>
-<script src="creative-tools.js?v=7.3.4"></script>
-<script src="brain.js?v=7.3.4"></script>
+<script src="app.js?v=7.4.0-debug"></script>
+<script src="creative-tools.js?v=7.4.0-debug"></script>
+<script src="brain.js?v=7.4.0-debug"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-<script src="vision.js?v=7.3.4"></script>
-<script src="segmentation.js?v=7.3.4"></script>
+<script src="vision.js?v=7.4.0-debug"></script>
+<script src="segmentation.js?v=7.4.0-debug"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>

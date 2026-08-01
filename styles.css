@@ -82,3 +82,12 @@ html:has(body.processing-lock),body.processing-lock{overflow:hidden!important;ov
 body.processing-lock{position:fixed!important;left:0;right:0;width:100%;touch-action:none!important}
 .processing{touch-action:none!important;overscroll-behavior:contain!important;-webkit-user-select:none;user-select:none}
 .processing *{touch-action:none!important}
+
+/* PHOTO IA 7.4 — diagnóstico visible de segmentación */
+.segment-debug{margin-top:16px;padding:14px;border:1px solid var(--line);border-radius:16px;background:var(--surface2)}
+.segment-debug summary{font-weight:900;cursor:pointer}
+.segment-debug p{font-size:.86rem;color:var(--muted);line-height:1.45}
+.segment-debug-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+.segment-debug-actions button{font-size:.72rem;padding:9px 6px}
+.segment-debug-log{max-height:310px;overflow:auto;white-space:pre-wrap;word-break:break-word;background:#111827;color:#e5e7eb;padding:12px;border-radius:12px;font:11px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;text-align:left}
+@media(max-width:520px){.segment-debug-actions{grid-template-columns:1fr}.segment-debug-log{max-height:260px}}
