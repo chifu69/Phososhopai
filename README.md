@@ -1,24 +1,12 @@
-# PHOTO IA 7.1 — Brain Core
+# PHOTO IA 7.3 — Vision Engine 1.0
 
-Incluye comandos encadenados, memoria del último objeto, selección por nombre de objeto y macros guardadas localmente.
+Esta versión añade segmentación local con MediaPipe:
 
-Ejemplos:
-- `Cuadro rojo sin relleno, luego texto “Oferta” arriba`
-- `Selecciona el círculo y luego hazlo más grande`
-- `Guarda macro oferta: cuadro rojo sin relleno; texto “Oferta” amarillo arriba`
-- `Aplica macro oferta`
+- Detectar personas y objetos comunes.
+- Separar automáticamente una persona por píxeles.
+- Tocar cualquier objeto para crear una selección inteligente.
+- Mostrar u ocultar una máscara de segmentación.
+- Quitar el fondo y convertir la selección en una capa transparente editable.
+- Comandos: “segmenta la persona”, “selección inteligente”, “quita el fondo”.
 
-
-## 7.1.1 Color Engine
-- Recognizes masculine, feminine, singular, plural, and English color words.
-- Applies detected colors consistently to arrows, lines, shapes, text, fill, and outline.
-
-## 7.2.0 — Vision Engine 0.1
-
-- Detección local de personas, animales, vehículos y objetos comunes con TensorFlow.js + COCO-SSD.
-- Detección de rostros cuando el navegador ofrece FaceDetector.
-- Recuadros seleccionables sobre el lienzo.
-- Panel con conteos por tipo de objeto.
-- Comandos: “analiza la foto”, “selecciona la persona”, “oculta las detecciones”, “muestra las detecciones”.
-- Las detecciones no aparecen en la imagen exportada.
-- La primera carga del modelo necesita internet; el Service Worker intenta conservar los recursos para usos posteriores.
+La primera ejecución de cada modelo necesita internet. Las fotografías se procesan en el dispositivo y no se envían a un servidor propio.
