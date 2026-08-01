@@ -73,3 +73,6 @@ body[data-canvas-mode="move"] #canvas-wrap{cursor:default}
 .segment-actions button{min-height:48px;border-radius:15px;font-weight:800}
 .segment-actions .accent{border-color:#06b6d4;background:color-mix(in srgb,#06b6d4 10%,var(--surface));color:var(--text)}
 @media(max-width:520px){.segment-actions{grid-template-columns:1fr 1fr}.segment-actions button{font-size:.78rem;padding:10px 8px}}
+
+.segment-actions .segment-cancel{grid-column:1/-1;border-color:#f59e0b;background:color-mix(in srgb,#f59e0b 10%,var(--surface));color:var(--text)}
+.processing{gap:10px}.processing-cancel{border:1px solid rgba(255,255,255,.7);background:rgba(0,0,0,.28);color:#fff;border-radius:999px;padding:10px 18px;font-weight:900;font-size:1rem}.processing-cancel[hidden]{display:none!important}
