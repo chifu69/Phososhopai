@@ -29,3 +29,8 @@
 body[data-canvas-mode="draw"] #canvas-wrap,body[data-canvas-mode="erase"] #canvas-wrap{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 45%,transparent)}
 body[data-canvas-mode="move"] #canvas-wrap{cursor:default}
 @media(max-width:700px){.mode-toolbar{grid-template-columns:repeat(6,76px);margin-left:-4px;margin-right:-4px}.mode-tool{min-height:62px}.mode-tool span{font-size:1.3rem}}
+
+/* PHOTO IA 6.3.3 — Shape Studio */
+.shape-options{display:grid;gap:14px}.transparent-toggle{display:flex!important;align-items:center;gap:10px;padding:13px 15px;border:1px solid var(--line);border-radius:15px;background:var(--surface2);color:var(--text)!important}.transparent-toggle input{width:24px;height:24px;accent-color:var(--accent)}.shape-tool-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.control-disabled{opacity:.48}.control-disabled input,.control-disabled select{pointer-events:none}.shape-tool-grid select{margin-top:0}.shape-corner-control{transition:.18s}
+@media(max-width:720px){.shape-tool-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:430px){.shape-tool-grid{grid-template-columns:1fr}.transparent-toggle{font-size:.92rem}}

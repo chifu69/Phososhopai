@@ -60,8 +60,8 @@ const onReady=()=>{
     const input=$(id),out=$(id+'-out');
     if(input&&out) input.addEventListener('input',()=>out.textContent=input.value+suffix);
   };
-  ['text-size','text-stroke-width','text-spacing','text-line-height','brush-size','shape-stroke-width'].forEach(id=>outputPair(id));
-  ['object-opacity','brush-opacity'].forEach(id=>outputPair(id,'%'));
+  ['text-size','text-stroke-width','text-spacing','text-line-height','brush-size','shape-stroke-width','shape-corner-radius'].forEach(id=>outputPair(id));
+  ['object-opacity','brush-opacity','shape-fill-opacity','shape-stroke-opacity'].forEach(id=>outputPair(id,'%'));
 
   function selected(){return canvas.getActiveObject()}
   function updateSelection(){
@@ -87,6 +87,10 @@ const onReady=()=>{
         setToggle('text-italic',obj.fontStyle==='italic');
         setToggle('text-underline',!!obj.underline);
       }
+      if(obj.layerType==='shape'){
+        syncShapeControls(obj.shapeSettings||loadShapeSettings());
+        document.querySelector('.shape-corner-control')?.classList.toggle('control-disabled',obj.type!=='rect');
+      }else document.querySelector('.shape-corner-control')?.classList.remove('control-disabled');
     }
   }
   function normalizeColor(value,fallback){return typeof value==='string'&&/^#[0-9a-f]{6}$/i.test(value)?value:fallback}
@@ -155,29 +159,76 @@ const onReady=()=>{
   canvas.on('path:created',e=>{decorate(e.path,'Trazo','drawing');safeSnapshot()});
   $('clear-drawing').onclick=()=>{const paths=canvas.getObjects().filter(o=>o.layerType==='drawing');paths.forEach(o=>canvas.remove(o));canvas.requestRenderAll();safeSnapshot();api.toast('Trazos eliminados')};
 
+  const SHAPE_SETTINGS_KEY='photoiaShapeSettingsV1';
+  const defaultShapeSettings={fill:'#ff9f0a',fillTransparent:false,fillOpacity:100,stroke:'#111111',strokeOpacity:100,strokeWidth:3,lineStyle:'solid',cornerRadius:12};
+  function loadShapeSettings(){
+    try{return {...defaultShapeSettings,...JSON.parse(localStorage.getItem(SHAPE_SETTINGS_KEY)||'{}')}}catch(_){return {...defaultShapeSettings}}
+  }
+  function dashArray(style,width=3){
+    const w=Math.max(1,Number(width)||1);
+    if(style==='dashed')return [w*4,w*2.5];
+    if(style==='dotted')return [w,w*2.2];
+    return null;
+  }
+  function colorWithOpacity(hex,opacity){return hexToRgba(hex,Math.max(0,Math.min(1,Number(opacity)/100)))}
+  function currentShapeSettings(){
+    return {fill:$('shape-fill').value,fillTransparent:$('shape-fill-transparent').checked,fillOpacity:Number($('shape-fill-opacity').value),stroke:$('shape-stroke').value,strokeOpacity:Number($('shape-stroke-opacity').value),strokeWidth:Number($('shape-stroke-width').value),lineStyle:$('shape-line-style').value,cornerRadius:Number($('shape-corner-radius').value)};
+  }
+  function saveShapeSettings(){localStorage.setItem(SHAPE_SETTINGS_KEY,JSON.stringify(currentShapeSettings()))}
+  function syncShapeControls(settings=loadShapeSettings()){
+    $('shape-fill').value=settings.fill;$('shape-fill-transparent').checked=!!settings.fillTransparent;
+    $('shape-fill-opacity').value=settings.fillOpacity;$('shape-fill-opacity-out').textContent=settings.fillOpacity+'%';
+    $('shape-stroke').value=settings.stroke;$('shape-stroke-opacity').value=settings.strokeOpacity;$('shape-stroke-opacity-out').textContent=settings.strokeOpacity+'%';
+    $('shape-stroke-width').value=settings.strokeWidth;$('shape-stroke-width-out').textContent=settings.strokeWidth;
+    $('shape-line-style').value=settings.lineStyle;$('shape-corner-radius').value=settings.cornerRadius;$('shape-corner-radius-out').textContent=settings.cornerRadius;
+    $('shape-fill').disabled=!!settings.fillTransparent;$('shape-fill-opacity').disabled=!!settings.fillTransparent;
+    $('shape-fill-color-label').classList.toggle('control-disabled',!!settings.fillTransparent);
+  }
+  function setShapeVisual(obj,settings){
+    const fill=settings.fillTransparent?'transparent':colorWithOpacity(settings.fill,settings.fillOpacity);
+    const stroke=colorWithOpacity(settings.stroke,settings.strokeOpacity);
+    const strokeDashArray=dashArray(settings.lineStyle,settings.strokeWidth);
+    if(obj.type==='group'){
+      const children=obj.getObjects();
+      children.forEach((child,index)=>{
+        if(child.type==='line')child.set({stroke,strokeWidth:Math.max(3,settings.strokeWidth),strokeDashArray});
+        else child.set({fill:stroke,stroke});
+      });
+      obj.set({stroke:null,fill:null});
+    }else if(obj.type==='line')obj.set({fill:null,stroke,strokeWidth:settings.strokeWidth,strokeDashArray});
+    else{
+      obj.set({fill,stroke,strokeWidth:settings.strokeWidth,strokeDashArray});
+      if(obj.type==='rect')obj.set({rx:settings.cornerRadius,ry:settings.cornerRadius});
+    }
+    obj.shapeSettings={...settings};obj.setCoords();
+  }
+  syncShapeControls();
   function addShape(kind){
-    const common={...center(),fill:$('shape-fill').value,stroke:$('shape-stroke').value,strokeWidth:Number($('shape-stroke-width').value),opacity:Number($('object-opacity').value)/100};
+    const settings=currentShapeSettings();saveShapeSettings();
+    const common={...center(),opacity:Number($('object-opacity').value)/100};
     let obj,name='Forma';
-    if(kind==='rect'){obj=new fabric.Rect({...common,width:180,height:120,rx:12,ry:12});name='Rectángulo'}
+    if(kind==='rect'){obj=new fabric.Rect({...common,width:180,height:120});name='Rectángulo'}
     if(kind==='circle'){obj=new fabric.Circle({...common,radius:72});name='Círculo'}
     if(kind==='triangle'){obj=new fabric.Triangle({...common,width:170,height:145});name='Triángulo'}
-    if(kind==='line'){obj=new fabric.Line([-90,0,90,0],{...common,fill:null});name='Línea'}
+    if(kind==='line'){obj=new fabric.Line([-90,0,90,0],common);name='Línea'}
     if(kind==='arrow'){
-      const line=new fabric.Line([-90,0,65,0],{stroke:common.stroke,strokeWidth:Math.max(3,common.strokeWidth),originX:'center',originY:'center'});
-      const head=new fabric.Triangle({left:80,top:0,width:28,height:34,fill:common.stroke,angle:90,originX:'center',originY:'center'});
+      const line=new fabric.Line([-90,0,65,0],{originX:'center',originY:'center'});
+      const head=new fabric.Triangle({left:80,top:0,width:28,height:34,angle:90,originX:'center',originY:'center'});
       obj=new fabric.Group([line,head],common);name='Flecha';
     }
-    decorate(obj,name,'shape');canvas.add(obj);canvas.setActiveObject(obj);canvas.requestRenderAll();safeSnapshot();setCanvasMode('move',{openPanel:false,announce:false});api.toast(name+' agregado: ya puedes moverlo');
+    setShapeVisual(obj,settings);decorate(obj,name,'shape');canvas.add(obj);canvas.setActiveObject(obj);canvas.requestRenderAll();safeSnapshot();setCanvasMode('move',{openPanel:false,announce:false});api.toast(name+' agregado: ya puedes moverlo');
   }
   document.querySelectorAll('[data-add-shape]').forEach(b=>b.onclick=()=>addShape(b.dataset.addShape));
-  ['shape-fill','shape-stroke','shape-stroke-width'].forEach(id=>$(id).addEventListener('input',()=>{
+  const shapeControls=['shape-fill','shape-fill-transparent','shape-fill-opacity','shape-stroke','shape-stroke-opacity','shape-stroke-width','shape-line-style','shape-corner-radius'];
+  function updateSelectedShape(){
+    const settings=currentShapeSettings();saveShapeSettings();syncShapeControls(settings);
     const obj=selected();if(!obj||obj.layerType!=='shape')return;
-    if(id==='shape-fill')obj.set('fill',$(id).value);
-    if(id==='shape-stroke')obj.set('stroke',$(id).value);
-    if(id==='shape-stroke-width')obj.set('strokeWidth',Number($(id).value));
-    canvas.requestRenderAll();
-  }));
-  ['shape-fill','shape-stroke','shape-stroke-width'].forEach(id=>$(id).addEventListener('change',commitSelected));
+    setShapeVisual(obj,settings);canvas.requestRenderAll();
+  }
+  shapeControls.forEach(id=>{
+    $(id).addEventListener('input',updateSelectedShape);
+    $(id).addEventListener('change',()=>{updateSelectedShape();commitSelected()});
+  });
 
   document.querySelectorAll('[data-sticker]').forEach(b=>b.onclick=()=>{
     const emoji=b.dataset.sticker;const obj=decorate(new fabric.Text(emoji,{...center(),fontSize:82}),'Sticker '+emoji,'sticker');

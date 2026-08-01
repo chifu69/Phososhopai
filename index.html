@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 6.3.2: Texto Pro, dibujo, formas y capas editables.">
+  <meta name="description" content="PHOTO IA 6.3.3: Texto Pro, dibujo, formas y capas editables.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=6.3.2">
-  <title>PHOTO IA 6.3.2</title>
+  <link rel="stylesheet" href="styles.css?v=6.3.3">
+  <title>PHOTO IA 6.3.3</title>
 </head>
 <body>
 <div class="app-shell">
@@ -101,7 +101,7 @@
     <section class="panel creative-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CREATIVE STUDIO</p><h2>Texto, dibujo y formas</h2></div>
-        <span class="engine-badge">6.3.2</span>
+        <span class="engine-badge">6.3.3</span>
       </div>
       <div class="creative-tabs" role="tablist">
         <button class="creative-tab active" data-tool-tab="text">🔤 Texto</button>
@@ -153,10 +153,17 @@
       </div>
 
       <div class="creative-pane" data-tool-pane="shapes">
-        <div class="tool-grid">
-          <label>Relleno<input id="shape-fill" type="color" value="#ff9f0a"></label>
-          <label>Contorno<input id="shape-stroke" type="color" value="#111111"></label>
-          <label>Grosor<input id="shape-stroke-width" type="range" min="0" max="16" value="3"><output id="shape-stroke-width-out">3</output></label>
+        <div class="shape-options">
+          <label class="transparent-toggle"><input id="shape-fill-transparent" type="checkbox"> <span>Sin relleno (transparente)</span></label>
+          <div class="tool-grid shape-tool-grid">
+            <label id="shape-fill-color-label">Relleno<input id="shape-fill" type="color" value="#ff9f0a"></label>
+            <label>Opacidad del relleno<input id="shape-fill-opacity" type="range" min="0" max="100" value="100"><output id="shape-fill-opacity-out">100%</output></label>
+            <label>Contorno<input id="shape-stroke" type="color" value="#111111"></label>
+            <label>Opacidad del contorno<input id="shape-stroke-opacity" type="range" min="0" max="100" value="100"><output id="shape-stroke-opacity-out">100%</output></label>
+            <label>Grosor<input id="shape-stroke-width" type="range" min="0" max="16" value="3"><output id="shape-stroke-width-out">3</output></label>
+            <label>Tipo de línea<select id="shape-line-style"><option value="solid">━ Sólida</option><option value="dashed">- - Discontinua</option><option value="dotted">··· Punteada</option></select></label>
+            <label class="shape-corner-control">Esquinas redondeadas<input id="shape-corner-radius" type="range" min="0" max="60" value="12"><output id="shape-corner-radius-out">12</output></label>
+          </div>
         </div>
         <div class="button-row creative-buttons">
           <button data-add-shape="rect" class="secondary" disabled>▭ Rectángulo</button>
@@ -202,7 +209,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 6.3.2 • Herramientas de lienzo • <strong>6.3.2</strong></footer>
+  <footer>PHOTO IA 6.3.3 • Shape Studio • <strong>6.3.3</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -213,8 +220,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=6.3.2"></script>
-<script src="creative-tools.js?v=6.3.2"></script>
+<script src="app.js?v=6.3.3"></script>
+<script src="creative-tools.js?v=6.3.3"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>
