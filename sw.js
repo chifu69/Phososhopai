@@ -1,5 +1,5 @@
-const CACHE='photo-ia-7.4.2-debug';
-const CORE=['./','./index.html','./styles.css?v=7.4.2-debug','./app.js?v=7.4.2-debug','./creative-tools.js?v=7.4.2-debug','./brain.js?v=7.4.2-debug','./vision.js?v=7.4.2-debug','./segmentation.js?v=7.4.2-debug','./manifest.webmanifest'];
+const CACHE='photo-ia-7.4.3-debug';
+const CORE=['./','./index.html','./styles.css?v=7.4.3-debug','./app.js?v=7.4.3-debug','./creative-tools.js?v=7.4.3-debug','./brain.js?v=7.4.3-debug','./vision.js?v=7.4.3-debug','./segmentation.js?v=7.4.3-debug','./manifest.webmanifest'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',e=>{if(e.request.method!=='GET')return;const u=new URL(e.request.url);if(u.origin===location.origin){e.respondWith(fetch(e.request).then(r=>{const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy));return r}).catch(()=>caches.match(e.request).then(r=>r||caches.match('./index.html'))));}else{e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request).then(r=>{if(r.ok){const copy=r.clone();caches.open(CACHE).then(c=>c.put(e.request,copy))}return r})));}});

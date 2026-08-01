@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.4.2-debug';
+const VERSION='1.4.3-debug';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -17,7 +17,7 @@ const state={
   tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null
 };
 
-const DEBUG_KEY='photoia-segmentation-debug-v742';
+const DEBUG_KEY='photoia-segmentation-debug-v743';
 const debug={entries:[],startedAt:Date.now()};
 try{const saved=JSON.parse(localStorage.getItem(DEBUG_KEY)||'null');if(saved?.entries?.length)debug.entries=saved.entries.slice(-250);}catch(_){ }
 function serialize(value){
@@ -221,27 +221,35 @@ async function ensurePersonSegmenter(operation){
   logDebug('PERSON SEGMENTER: ensure inicio');
   await loadModule(operation);logDebug('PERSON SEGMENTER: módulo listo');if(state.imageSegmenter)return state.imageSegmenter;
   if(!state.personModelBuffer)state.personModelBuffer=await fetchModelBuffer(PERSON_MODEL,operation,'MODELO PERSONA');
-  state.imageSegmenter=await createWithFallback(delegate=>{
-    const modelBuffer=state.personModelBuffer;
-    const baseOptions=modelBuffer?{modelAssetBuffer:modelBuffer}:{modelAssetPath:PERSON_MODEL};
-    if(delegate)baseOptions.delegate=delegate;
-    return state.module.ImageSegmenter.createFromOptions(state.fileset,{
-      baseOptions,runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false
-    });
-  },operation,'Preparando segmentación de persona…');
+  setStatus('Preparando segmentación de persona…','loading');
+  logDebug('CREATE FROM MODEL BUFFER: persona inicio',{bytes:state.personModelBuffer?.byteLength});
+  state.imageSegmenter=await timeout(
+    state.module.ImageSegmenter.createFromModelBuffer(state.fileset,state.personModelBuffer),
+    LOAD_TIMEOUT,'No se pudo crear el segmentador de persona.',operation
+  );
+  logDebug('CREATE FROM MODEL BUFFER: persona correcto');
+  logDebug('SET OPTIONS: persona inicio');
+  await timeout(state.imageSegmenter.setOptions({
+    runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false
+  }),LOAD_TIMEOUT,'No se pudieron configurar las opciones de segmentación.',operation);
+  logDebug('SET OPTIONS: persona correcto');
   return state.imageSegmenter;
 }
 async function ensureInteractiveSegmenter(operation){
   await loadModule(operation);if(state.interactiveSegmenter)return state.interactiveSegmenter;
   if(!state.interactiveModelBuffer)state.interactiveModelBuffer=await fetchModelBuffer(INTERACTIVE_MODEL,operation,'MODELO INTERACTIVO');
-  state.interactiveSegmenter=await createWithFallback(delegate=>{
-    const modelBuffer=state.interactiveModelBuffer;
-    const baseOptions=modelBuffer?{modelAssetBuffer:modelBuffer}:{modelAssetPath:INTERACTIVE_MODEL};
-    if(delegate)baseOptions.delegate=delegate;
-    return state.module.InteractiveSegmenter.createFromOptions(state.fileset,{
-      baseOptions,outputCategoryMask:false,outputConfidenceMasks:true
-    });
-  },operation,'Preparando selección inteligente…');
+  setStatus('Preparando selección inteligente…','loading');
+  logDebug('CREATE FROM MODEL BUFFER: interactivo inicio',{bytes:state.interactiveModelBuffer?.byteLength});
+  state.interactiveSegmenter=await timeout(
+    state.module.InteractiveSegmenter.createFromModelBuffer(state.fileset,state.interactiveModelBuffer),
+    LOAD_TIMEOUT,'No se pudo crear el segmentador interactivo.',operation
+  );
+  logDebug('CREATE FROM MODEL BUFFER: interactivo correcto');
+  logDebug('SET OPTIONS: interactivo inicio');
+  await timeout(state.interactiveSegmenter.setOptions({
+    outputCategoryMask:false,outputConfidenceMasks:true
+  }),LOAD_TIMEOUT,'No se pudieron configurar las opciones de selección inteligente.',operation);
+  logDebug('SET OPTIONS: interactivo correcto');
   return state.interactiveSegmenter;
 }
 async function letOverlayPaint(){
