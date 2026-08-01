@@ -1,12 +1,12 @@
 (() => {
 'use strict';
-const VERSION='1.2.0';
+const VERSION='1.3.0';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
 const MEDIAPIPE_ESM=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/+esm`;
 const MEDIAPIPE_WASM=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`;
-const PERSON_MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
+const PERSON_MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite';
 const INTERACTIVE_MODEL='https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite';
 const PERSON_CLASS_ID=1;
 const LOAD_TIMEOUT=25000;
@@ -106,8 +106,11 @@ async function createWithFallback(factory,operation,label){
   // En iPhone/iPad el delegate GPU puede quedarse bloqueado dentro de WebGL.
   // CPU es más estable y con los modelos reducidos termina en pocos segundos.
   if(isIOS){
-    setStatus(`${label} Usando modo compatible con iPhone…`,'loading');
-    return timeout(factory('CPU'),LOAD_TIMEOUT,'No se pudo iniciar el modelo en modo compatible.',operation);
+    // MediaPipe Web no necesita que se fuerce el texto "CPU". En WebKit esa
+    // opción puede dejar createFromOptions pendiente. Sin delegate usa CPU/WASM
+    // automáticamente, que es el camino compatible con iPhone.
+    setStatus(`${label} Iniciando motor compatible con iPhone…`,'loading');
+    return timeout(factory(null),LOAD_TIMEOUT,'No se pudo iniciar el modelo compatible con iPhone.',operation);
   }
   try{
     return await timeout(factory('GPU'),LOAD_TIMEOUT,'El modelo tardó demasiado en iniciar.',operation);
@@ -120,16 +123,24 @@ async function createWithFallback(factory,operation,label){
 }
 async function ensurePersonSegmenter(operation){
   await loadModule(operation);if(state.imageSegmenter)return state.imageSegmenter;
-  state.imageSegmenter=await createWithFallback(delegate=>state.module.ImageSegmenter.createFromOptions(state.fileset,{
-    baseOptions:{modelAssetPath:PERSON_MODEL,delegate},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false
-  }),operation,'Preparando segmentación de persona…');
+  state.imageSegmenter=await createWithFallback(delegate=>{
+    const baseOptions={modelAssetPath:PERSON_MODEL};
+    if(delegate)baseOptions.delegate=delegate;
+    return state.module.ImageSegmenter.createFromOptions(state.fileset,{
+      baseOptions,runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false
+    });
+  },operation,'Preparando segmentación de persona…');
   return state.imageSegmenter;
 }
 async function ensureInteractiveSegmenter(operation){
   await loadModule(operation);if(state.interactiveSegmenter)return state.interactiveSegmenter;
-  state.interactiveSegmenter=await createWithFallback(delegate=>state.module.InteractiveSegmenter.createFromOptions(state.fileset,{
-    baseOptions:{modelAssetPath:INTERACTIVE_MODEL,delegate},outputCategoryMask:false,outputConfidenceMasks:true
-  }),operation,'Preparando selección inteligente…');
+  state.interactiveSegmenter=await createWithFallback(delegate=>{
+    const baseOptions={modelAssetPath:INTERACTIVE_MODEL};
+    if(delegate)baseOptions.delegate=delegate;
+    return state.module.InteractiveSegmenter.createFromOptions(state.fileset,{
+      baseOptions,outputCategoryMask:false,outputConfidenceMasks:true
+    });
+  },operation,'Preparando selección inteligente…');
   return state.interactiveSegmenter;
 }
 async function letOverlayPaint(){
