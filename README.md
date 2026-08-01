@@ -1,5 +1,3 @@
-# PHOTO IA 6.3.4 — Object Inspector
+# PHOTO IA 6.4.0 — Photo Brain
 
-Incluye inspector contextual para objetos, barra flotante de acciones, controles de tamaño/posición/rotación/opacidad y guías inteligentes con ajuste al centro.
-
-Sube todos los archivos de esta carpeta directamente a la raíz del repositorio de GitHub Pages.
+Motor modular de comandos naturales para filtros, texto, formas, capas y navegación hacia futuros módulos de IA.
