@@ -1,11 +1,12 @@
-# PHOTO IA 6.2
+# PHOTO IA 6.2.1 — Flat Fix
 
-Editor privado para fotos con Fabric.js. Esta versión agrega herramientas creativas reales:
+Todos los archivos están en la raíz para evitar errores al subir carpetas desde el teléfono.
 
-- Texto editable con fuente, tamaño, color, contorno, opacidad y sombra.
-- Dibujo libre con lápiz y marcador.
-- Formas editables: rectángulo, círculo, triángulo, línea y flecha.
-- Galería de stickers.
-- Capas, historial, filtros, recorte y exportación.
-
-Sube el contenido de esta carpeta directamente a la raíz del repositorio de GitHub Pages.
+Sube estos archivos directamente a la raíz de GitHub Pages y reemplaza los anteriores:
+- index.html
+- styles.css
+- app.js
+- creative-tools.js
+- sw.js
+- manifest.webmanifest
+- README.md
