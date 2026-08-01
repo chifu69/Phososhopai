@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.5.1-script-loader-fix';
+const VERSION='1.5.2-bodypix-loader-rebuild';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -17,69 +17,92 @@ const state={
   tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null
 };
 
-const DEBUG_KEY='photoia-segmentation-debug-v751';
+const DEBUG_KEY='photoia-segmentation-debug-v752';
 
-const TFJS_URL='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
-const BODYPIX_URL='https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js';
+const TFJS_URLS=[
+  'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',
+  'https://unpkg.com/@tensorflow/tfjs@4.22.0/dist/tf.min.js'
+];
+// Use the package browser entry. The previous /dist/body-pix.min.js URL can load
+// without exposing window.bodyPix in some CDN/browser combinations.
+const BODYPIX_URLS=[
+  'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1',
+  'https://unpkg.com/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js'
+];
 function scriptGlobalReady(label){
-  if(label==='TensorFlow.js')return !!window.tf;
-  if(label==='BodyPix')return !!window.bodyPix?.load;
+  if(label==='TensorFlow.js')return !!(window.tf&&window.tf.ready&&window.tf.version?.tfjs);
+  if(label==='BodyPix')return !!(window.bodyPix&&typeof window.bodyPix.load==='function');
   return false;
 }
-function loadClassicScript(src,label){
+function normalizedScriptUrl(src){
+  try{return new URL(src,location.href).href}catch(_){return src}
+}
+function removeStaleScripts(urls,label){
+  const wanted=new Set(urls.map(normalizedScriptUrl));
+  [...document.scripts].forEach(el=>{
+    if(!wanted.has(el.src))return;
+    if(scriptGlobalReady(label))return;
+    logDebug(`${label}: quitando script incompleto`,el.src);
+    el.remove();
+  });
+}
+function injectClassicScript(src,label,timeoutMs=20000){
   return new Promise((resolve,reject)=>{
-    if(scriptGlobalReady(label)){
-      logDebug(`${label}: ya estaba disponible`);
-      return resolve();
-    }
-    const existing=[...document.scripts].find(x=>x.src===src);
-    if(existing){
-      if(existing.dataset.loaded==='1'||scriptGlobalReady(label))return resolve();
-      const pollStarted=Date.now();
-      const poll=setInterval(()=>{
-        if(scriptGlobalReady(label)){
-          clearInterval(poll);clearTimeout(limit);existing.dataset.loaded='1';
-          logDebug(`${label}: detectado después de carga previa`);resolve();
-        }
-      },50);
-      const limit=setTimeout(()=>{
-        clearInterval(poll);
-        reject(makeError(`${label} está en la página, pero no terminó de iniciar.`,'SCRIPT_STALLED'));
-      },10000);
-      existing.addEventListener('load',()=>{
-        if(scriptGlobalReady(label)){
-          clearInterval(poll);clearTimeout(limit);existing.dataset.loaded='1';resolve();
-        }
-      },{once:true});
-      existing.addEventListener('error',()=>{
-        clearInterval(poll);clearTimeout(limit);reject(makeError(`No se pudo cargar ${label}.`,'SCRIPT_LOAD'));
-      },{once:true});
-      return;
-    }
-    const el=document.createElement('script');el.src=src;el.async=true;el.crossOrigin='anonymous';
+    if(scriptGlobalReady(label))return resolve();
+    const full=normalizedScriptUrl(src);
+    let settled=false;
+    const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);clearInterval(poll);fn(value)};
+    const el=document.createElement('script');
+    el.src=full;el.async=true;el.crossOrigin='anonymous';el.dataset.photoiaLoader=label;
+    const poll=setInterval(()=>{
+      if(scriptGlobalReady(label)){
+        el.dataset.loaded='1';
+        logDebug(`${label}: global detectado`,{src:full});
+        finish(resolve);
+      }
+    },50);
+    const timer=setTimeout(()=>finish(reject,makeError(`${label} no terminó de iniciar desde ${full}`,'SCRIPT_STALLED')),timeoutMs);
     el.onload=()=>{
-      el.dataset.loaded='1';
-      if(!scriptGlobalReady(label))return reject(makeError(`${label} cargó, pero no creó su objeto global.`,'SCRIPT_GLOBAL_MISSING'));
-      logDebug(`${label}: script listo`);resolve();
+      logDebug(`${label}: evento load`,{src:full,ready:scriptGlobalReady(label)});
+      if(scriptGlobalReady(label)){el.dataset.loaded='1';finish(resolve)}
+      // Do not reject immediately: some UMD bundles expose the global on the next task.
     };
-    el.onerror=()=>reject(makeError(`No se pudo cargar ${label}.`,'SCRIPT_LOAD'));
+    el.onerror=()=>finish(reject,makeError(`No se pudo cargar ${label} desde ${full}`,'SCRIPT_LOAD'));
     document.head.appendChild(el);
   });
+}
+async function loadClassicScript(urls,label){
+  if(scriptGlobalReady(label)){
+    logDebug(`${label}: ya estaba disponible`);
+    return;
+  }
+  const list=Array.isArray(urls)?urls:[urls];
+  removeStaleScripts(list,label);
+  let lastError;
+  for(const src of list){
+    try{
+      logDebug(`${label}: intentando cargar`,src);
+      await injectClassicScript(src,label);
+      if(scriptGlobalReady(label))return;
+    }catch(err){lastError=err;logDebug(`${label}: intento fallido`,err)}
+    removeStaleScripts([src],label);
+  }
+  throw lastError||makeError(`${label} no quedó disponible.`,'SCRIPT_GLOBAL_MISSING');
 }
 async function ensureBodyPix(operation){
   if(state.bodyPixNet)return state.bodyPixNet;
   if(!state.bodyPixPromise){
     state.bodyPixPromise=(async()=>{
       setStatus('Cargando motor alternativo estable…','loading');
-      logDebug('BODYPIX: carga TensorFlow inicio',TFJS_URL);
-      await timeout(loadClassicScript(TFJS_URL,'TensorFlow.js'),LOAD_TIMEOUT,'TensorFlow.js tardó demasiado en cargar.',operation);
+      logDebug('BODYPIX: carga TensorFlow inicio',TFJS_URLS);
+      await timeout(loadClassicScript(TFJS_URLS,'TensorFlow.js'),45000,'TensorFlow.js tardó demasiado en cargar.',operation);
       logDebug('BODYPIX: TensorFlow listo',{version:window.tf?.version?.tfjs});
       if(window.tf?.setBackend){
         try{await window.tf.setBackend('webgl');await window.tf.ready();logDebug('BODYPIX: backend listo',window.tf.getBackend());}
         catch(err){logDebug('BODYPIX: WebGL falló, usando CPU',err);await window.tf.setBackend('cpu');await window.tf.ready();}
       }
-      logDebug('BODYPIX: carga librería inicio',BODYPIX_URL);
-      await timeout(loadClassicScript(BODYPIX_URL,'BodyPix'),LOAD_TIMEOUT,'BodyPix tardó demasiado en cargar.',operation);
+      logDebug('BODYPIX: carga librería inicio',BODYPIX_URLS);
+      await timeout(loadClassicScript(BODYPIX_URLS,'BodyPix'),45000,'BodyPix tardó demasiado en cargar.',operation);
       if(!window.bodyPix?.load)throw makeError('BodyPix no quedó disponible.','BODYPIX_MISSING');
       setStatus('Preparando modelo de persona…','loading');
       logDebug('BODYPIX: modelo inicio');
@@ -445,7 +468,7 @@ function boot(){
   if($('segment-debug-test'))$('segment-debug-test').onclick=runConnectionTests;
   if($('processing-cancel'))$('processing-cancel').onclick=()=>cancelCurrent(true);
   api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(e.target?.photoRole==='main')clearMask();});
-  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Versión de diagnóstico lista. Pulsa “Probar conexiones” antes de segmentar.');
+  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor 7.5.2 listo. La primera separación puede tardar mientras descarga el modelo.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
 window.PhotoSegmentation={version:VERSION,segmentPerson,beginTapMode,createCutout,clearMask,showMask,cancel:()=>cancelCurrent(true),command,get mask(){return state.mask}};
