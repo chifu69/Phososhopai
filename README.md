@@ -1,15 +1,20 @@
-# PHOTO IA 7.3.1 — Segmentation Stability Fix
+# PHOTO IA 7.3.2 — Segmentation Runtime Fix
 
-Correcciones principales:
+Esta versión corrige el bloqueo indefinido de **Separar persona** y **Selección inteligente** en navegadores móviles.
 
-- Tiempo máximo de 25 segundos para cargar MediaPipe/modelos.
-- Tiempo máximo de 20 segundos para cada segmentación.
-- Botón Cancelar tanto en el panel como en la pantalla de procesamiento.
-- La interfaz siempre se recupera después de un error o cancelación.
-- Reintento automático con CPU cuando GPU falla.
-- Imagen temporal reducida a 512 px en iPhone/iPad y 640 px en otros equipos.
-- Mensajes específicos para red, memoria, GPU y timeout.
-- MediaPipe fijado a @mediapipe/tasks-vision 0.10.35 para evitar cambios inesperados de `latest`.
-- Caché actualizada a 7.3.1.
+## Cambios principales
 
-Sube todos los archivos directamente a la raíz del repositorio.
+- La inferencia de MediaPipe usa el resultado directo en lugar del callback que podía no ejecutarse en Safari/Chrome móvil.
+- El overlay se alcanza a dibujar antes de iniciar el análisis pesado.
+- Las máscaras usan sus dimensiones reales.
+- Tiempo máximo ampliado para teléfonos más lentos.
+- Caché del service worker renovada a 7.3.2.
+- El botón Cancelar queda como protección; el objetivo principal es que la función termine correctamente.
+
+## Prueba recomendada
+
+1. Instala/publica todos los archivos de esta carpeta.
+2. Cierra por completo la versión anterior.
+3. Vuelve a abrir y, si está instalada como app, recárgala dos veces para reemplazar la caché anterior.
+4. Abre una foto y prueba **Separar persona**.
+5. Prueba **Tocar objeto**, toca cerca del centro del objeto y luego **Quitar fondo**.

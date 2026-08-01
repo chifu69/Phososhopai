@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.0.1';
+const VERSION='1.1.0';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -10,7 +10,7 @@ const PERSON_MODEL='https://storage.googleapis.com/mediapipe-assets/deeplabv3.tf
 const INTERACTIVE_MODEL='https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite';
 const PERSON_CLASS_ID=15;
 const LOAD_TIMEOUT=25000;
-const RUN_TIMEOUT=20000;
+const RUN_TIMEOUT=45000;
 const state={
   module:null,fileset:null,imageSegmenter:null,interactiveSegmenter:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
@@ -124,11 +124,18 @@ async function ensureInteractiveSegmenter(operation){
   }),operation,'Preparando selección inteligente…');
   return state.interactiveSegmenter;
 }
-function runTask(start,operation){
-  return timeout(new Promise((resolve,reject)=>{
-    try{start(result=>operation.cancelled?reject(makeError('Proceso cancelado.','CANCELLED')):resolve(result));}
-    catch(err){reject(err);}
-  }),RUN_TIMEOUT,'El análisis tardó demasiado. Intenta otra vez o usa una foto más pequeña.',operation);
+async function letOverlayPaint(){
+  await new Promise(resolve=>requestAnimationFrame(()=>setTimeout(resolve,35)));
+}
+async function runTask(start,operation){
+  if(operation?.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
+  await letOverlayPaint();
+  // MediaPipe puede devolver el resultado directamente. En Safari/Chrome móvil,
+  // la variante con callback puede no llamar nunca al callback y dejar la app cargando.
+  const result=await timeout(Promise.resolve().then(start),RUN_TIMEOUT,
+    'El análisis tardó demasiado. Intenta otra vez o usa una foto más pequeña.',operation);
+  if(operation?.cancelled){closeResult(result);throw makeError('Proceso cancelado.','CANCELLED');}
+  return result;
 }
 function closeResult(result){
   try{result?.categoryMask?.close?.();}catch(_){ }
@@ -143,12 +150,12 @@ async function segmentPerson(){
     const work=await getWorkCanvas(operation);
     const segmenter=await ensurePersonSegmenter(operation);
     setStatus('Analizando píxel por píxel…','loading');
-    result=await runTask(done=>segmenter.segment(work,done),operation);
+    result=await runTask(()=>segmenter.segment(work),operation);
     const maskObj=result.categoryMask;if(!maskObj)throw makeError('El modelo no devolvió una máscara.');
     const values=maskObj.getAsUint8Array();const mask=new Uint8Array(values.length);let selected=0;
     for(let i=0;i<values.length;i++){if(values[i]===PERSON_CLASS_ID){mask[i]=255;selected++;}}
     if(selected<100)throw makeError('No encontré una persona claramente. Prueba “Tocar objeto”.');
-    await setMask(mask,work.width,work.height,'Persona');
+    await setMask(mask,maskObj.width||work.width,maskObj.height||work.height,'Persona');
     setStatus('Persona segmentada. Ya puedes quitar el fondo.','ready');api().toast('Máscara de persona lista');
   }catch(err){
     const msg=friendlyError(err);console.error(err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);
@@ -167,12 +174,12 @@ async function segmentAtPoint(x,y){
     const work=await getWorkCanvas(operation);
     const segmenter=await ensureInteractiveSegmenter(operation);
     setStatus('Buscando los bordes del objeto…','loading');
-    result=await runTask(done=>segmenter.segment(work,{keypoint:{x,y}},done),operation);
+    result=await runTask(()=>segmenter.segment(work,{keypoint:{x,y}}),operation);
     const maskObj=result.confidenceMasks?.[0];if(!maskObj)throw makeError('El modelo no devolvió una selección.');
     const values=maskObj.getAsFloat32Array();const mask=new Uint8Array(values.length);let selected=0;
     for(let i=0;i<values.length;i++){const v=values[i];if(v>=0.48){mask[i]=Math.min(255,Math.round(v*255));selected++;}}
     if(selected<80)throw makeError('No pude separar ese objeto. Toca más cerca del centro.');
-    await setMask(mask,work.width,work.height,'Objeto');
+    await setMask(mask,maskObj.width||work.width,maskObj.height||work.height,'Objeto');
     setStatus('Objeto seleccionado con máscara.','ready');api().toast('Selección inteligente lista');
   }catch(err){const msg=friendlyError(err);console.error(err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
   finally{closeResult(result);finishOperation(operation);}
