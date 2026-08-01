@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.5.0-engine-replacement';
+const VERSION='1.5.1-script-loader-fix';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -17,16 +17,51 @@ const state={
   tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null
 };
 
-const DEBUG_KEY='photoia-segmentation-debug-v750';
+const DEBUG_KEY='photoia-segmentation-debug-v751';
 
 const TFJS_URL='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js';
 const BODYPIX_URL='https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js';
+function scriptGlobalReady(label){
+  if(label==='TensorFlow.js')return !!window.tf;
+  if(label==='BodyPix')return !!window.bodyPix?.load;
+  return false;
+}
 function loadClassicScript(src,label){
   return new Promise((resolve,reject)=>{
+    if(scriptGlobalReady(label)){
+      logDebug(`${label}: ya estaba disponible`);
+      return resolve();
+    }
     const existing=[...document.scripts].find(x=>x.src===src);
-    if(existing){if(existing.dataset.loaded==='1')return resolve();existing.addEventListener('load',resolve,{once:true});existing.addEventListener('error',()=>reject(makeError(`No se pudo cargar ${label}.`,'SCRIPT_LOAD')),{once:true});return;}
+    if(existing){
+      if(existing.dataset.loaded==='1'||scriptGlobalReady(label))return resolve();
+      const pollStarted=Date.now();
+      const poll=setInterval(()=>{
+        if(scriptGlobalReady(label)){
+          clearInterval(poll);clearTimeout(limit);existing.dataset.loaded='1';
+          logDebug(`${label}: detectado después de carga previa`);resolve();
+        }
+      },50);
+      const limit=setTimeout(()=>{
+        clearInterval(poll);
+        reject(makeError(`${label} está en la página, pero no terminó de iniciar.`,'SCRIPT_STALLED'));
+      },10000);
+      existing.addEventListener('load',()=>{
+        if(scriptGlobalReady(label)){
+          clearInterval(poll);clearTimeout(limit);existing.dataset.loaded='1';resolve();
+        }
+      },{once:true});
+      existing.addEventListener('error',()=>{
+        clearInterval(poll);clearTimeout(limit);reject(makeError(`No se pudo cargar ${label}.`,'SCRIPT_LOAD'));
+      },{once:true});
+      return;
+    }
     const el=document.createElement('script');el.src=src;el.async=true;el.crossOrigin='anonymous';
-    el.onload=()=>{el.dataset.loaded='1';logDebug(`${label}: script listo`);resolve();};
+    el.onload=()=>{
+      el.dataset.loaded='1';
+      if(!scriptGlobalReady(label))return reject(makeError(`${label} cargó, pero no creó su objeto global.`,'SCRIPT_GLOBAL_MISSING'));
+      logDebug(`${label}: script listo`);resolve();
+    };
     el.onerror=()=>reject(makeError(`No se pudo cargar ${label}.`,'SCRIPT_LOAD'));
     document.head.appendChild(el);
   });
