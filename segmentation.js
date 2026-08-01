@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.4.0-debug';
+const VERSION='1.4.1-debug';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -40,11 +40,12 @@ function environmentInfo(){
 }
 function debugText(){return JSON.stringify({environment:environmentInfo(),entries:debug.entries},null,2)}
 function renderDebug(){
-  const box=$('segment-debug-log'); if(!box)return;
-  box.textContent=debug.entries.map(e=>`+${(e.ms/1000).toFixed(2)}s  ${e.step}${e.data!==undefined?'
-'+JSON.stringify(e.data,null,2):''}`).join('
-
-');
+  const box=$('segment-debug-log');
+  if(!box)return;
+  box.textContent=debug.entries.map(e=>{
+    const details=e.data!==undefined?`\n${JSON.stringify(e.data,null,2)}`:'';
+    return `+${(e.ms/1000).toFixed(2)}s  ${e.step}${details}`;
+  }).join('\n\n');
   box.scrollTop=box.scrollHeight;
 }
 async function copyDebug(){
