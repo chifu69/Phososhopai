@@ -1,4 +1,4 @@
-# PHOTO IA 6.3.1 — Text Pro
+# PHOTO IA 6.3.2 — Canvas Tools
 
 Actualización basada directamente en PHOTO IA 6.2.1.
 

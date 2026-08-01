@@ -15,6 +15,17 @@
 @media(max-width:700px){.tool-grid,.text-tool-grid{grid-template-columns:1fr 1fr}.creative-buttons{grid-template-columns:1fr 1fr}.sticker-grid{grid-template-columns:repeat(4,1fr)}.selected-properties{grid-template-columns:1fr 1fr}.selected-properties strong,.selected-properties span{grid-column:span 1}}
 
 
-/* PHOTO IA 6.3.1 — Text Pro */
+/* PHOTO IA 6.3.2 — Text Pro */
 .text-style-row{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:9px;margin:4px 0 14px}.style-toggle{min-height:46px;border:1px solid var(--line);border-radius:14px;background:var(--surface2);color:var(--text);font-size:1.05rem;font-weight:900}.style-toggle.active{background:var(--accent);border-color:var(--accent);color:#211604;box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 22%,transparent)}.text-style-row .secondary{padding:10px}.tool-grid input[type=checkbox]{width:26px;height:26px;accent-color:var(--accent);justify-self:start}.tool-grid select{margin-top:0}.text-tool-grid{grid-template-columns:repeat(4,minmax(0,1fr))}.text-tool-grid>label:first-child{grid-column:span 2}
 @media(max-width:700px){.text-style-row{grid-template-columns:repeat(3,1fr)}.text-tool-grid{grid-template-columns:1fr 1fr}.text-tool-grid>label:first-child{grid-column:span 2}}
+
+
+/* PHOTO IA 6.3.2 — Canvas mode toolbar */
+.mode-toolbar{display:grid;grid-template-columns:repeat(6,minmax(72px,1fr));gap:9px;margin:16px 0 8px;overflow-x:auto;padding-bottom:2px}
+.mode-tool{min-height:68px;border:1px solid var(--line);border-radius:17px;background:var(--surface2);color:var(--text);font-weight:850;display:grid;place-items:center;align-content:center;gap:3px;white-space:nowrap}
+.mode-tool span{font-size:1.45rem;line-height:1}.mode-tool small{font-size:.7rem;color:var(--muted)}
+.mode-tool.active{background:var(--accent);border-color:var(--accent);color:#211604;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+.mode-tool.active small{color:#211604}.mode-help{margin:0 0 10px;color:var(--muted);font-size:.8rem;font-weight:750;line-height:1.35}
+body[data-canvas-mode="draw"] #canvas-wrap,body[data-canvas-mode="erase"] #canvas-wrap{box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 45%,transparent)}
+body[data-canvas-mode="move"] #canvas-wrap{cursor:default}
+@media(max-width:700px){.mode-toolbar{grid-template-columns:repeat(6,76px);margin-left:-4px;margin-right:-4px}.mode-tool{min-height:62px}.mode-tool span{font-size:1.3rem}}

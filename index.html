@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 6.3.1: Texto Pro, dibujo, formas y capas editables.">
+  <meta name="description" content="PHOTO IA 6.3.2: Texto Pro, dibujo, formas y capas editables.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=6.3.1">
-  <title>PHOTO IA 6.3.1</title>
+  <link rel="stylesheet" href="styles.css?v=6.3.2">
+  <title>PHOTO IA 6.3.2</title>
 </head>
 <body>
 <div class="app-shell">
@@ -44,6 +44,15 @@
 
     <section class="panel workspace">
       <div class="canvas-toolbar"><div><p class="eyebrow">LIENZO PROFESIONAL</p><h2 id="project-title">Nueva edición</h2></div><button id="compare-btn" class="secondary" disabled>Antes / Después</button></div>
+      <div id="mode-toolbar" class="mode-toolbar" aria-label="Herramientas del lienzo">
+        <button class="mode-tool active" data-canvas-mode="move" type="button" disabled><span>✋</span><small>Mover</small></button>
+        <button class="mode-tool" data-canvas-mode="draw" type="button" disabled><span>🖌</span><small>Dibujar</small></button>
+        <button class="mode-tool" data-canvas-mode="erase" type="button" disabled><span>🧽</span><small>Borrar</small></button>
+        <button class="mode-tool" data-canvas-mode="sticker" type="button" disabled><span>😀</span><small>Sticker</small></button>
+        <button class="mode-tool" data-canvas-mode="text" type="button" disabled><span>🔤</span><small>Texto</small></button>
+        <button class="mode-tool" data-canvas-mode="shape" type="button" disabled><span>⬜</span><small>Forma</small></button>
+      </div>
+      <p id="mode-help" class="mode-help">Modo Mover: toca un objeto para seleccionarlo, moverlo, rotarlo o cambiar su tamaño.</p>
       <div id="canvas-wrap" class="canvas-wrap">
         <canvas id="editor-canvas"></canvas>
         <div id="empty-state" class="empty-state">
@@ -92,7 +101,7 @@
     <section class="panel creative-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CREATIVE STUDIO</p><h2>Texto, dibujo y formas</h2></div>
-        <span class="engine-badge">6.3.1</span>
+        <span class="engine-badge">6.3.2</span>
       </div>
       <div class="creative-tabs" role="tablist">
         <button class="creative-tab active" data-tool-tab="text">🔤 Texto</button>
@@ -193,7 +202,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 6.3.1 • Texto Pro • <strong>6.3.1</strong></footer>
+  <footer>PHOTO IA 6.3.2 • Herramientas de lienzo • <strong>6.3.2</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -204,8 +213,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=6.3.1"></script>
-<script src="creative-tools.js?v=6.3.1"></script>
+<script src="app.js?v=6.3.2"></script>
+<script src="creative-tools.js?v=6.3.2"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>

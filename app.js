@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='6.3.1';
+const VERSION='6.3.2';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -8,7 +8,7 @@ const state={canvas:null,photo:null,originalDataUrl:'',history:[],future:[],crop
 
 function toast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2200)}
 function processing(on,label='Procesando…'){state.loading=on;$('processing').hidden=!on;$('processing').querySelector('b').textContent=label}
-function setEnabled(enabled){document.querySelectorAll('[data-command],[data-preset],#command-input,#command-btn,#compare-btn,#reset-btn,#rotate-left,#rotate-right,#flip-x,#crop-btn,#add-text,#add-sticker,#download-btn,.slider-list input,#create-text,#draw-pencil,#draw-marker,#draw-off,#clear-drawing,[data-add-shape],[data-sticker],[data-text-preset]').forEach(el=>el.disabled=!enabled)}
+function setEnabled(enabled){document.querySelectorAll('[data-command],[data-preset],#command-input,#command-btn,#compare-btn,#reset-btn,#rotate-left,#rotate-right,#flip-x,#crop-btn,#add-text,#add-sticker,#download-btn,.slider-list input,#create-text,#draw-pencil,#draw-marker,#draw-off,#clear-drawing,[data-add-shape],[data-sticker],[data-text-preset],[data-canvas-mode]').forEach(el=>el.disabled=!enabled)}
 function normalize(text){return String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()}
 function fitCanvas(){const wrap=$('canvas-wrap');const w=Math.max(280,wrap.clientWidth);const h=Math.max(360,Math.min(window.innerHeight*.62,650));state.canvas.setDimensions({width:w,height:h});if(state.photo) fitPhoto();state.canvas.requestRenderAll()}
 function fitPhoto(){const p=state.photo;if(!p)return;const pad=20;const scale=Math.min((state.canvas.width-pad*2)/p.width,(state.canvas.height-pad*2)/p.height);p.scale(scale);p.set({left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center'});p.setCoords()}
@@ -144,9 +144,9 @@ function renderLayers(){
    const eye=document.createElement('button');eye.type='button';eye.title=obj.visible===false?'Mostrar capa':'Ocultar capa';eye.textContent=obj.visible===false?'🙈':'👁';
    eye.onclick=e=>{e.stopPropagation();obj.visible=obj.visible===false;state.canvas.requestRenderAll();snapshot()};
    const lock=document.createElement('button');lock.type='button';lock.title=obj.selectable===false?'Desbloquear capa':'Bloquear capa';lock.textContent=obj.photoRole==='main'?'🔒':(obj.selectable===false?'🔒':'🔓');lock.disabled=obj.photoRole==='main';
-   lock.onclick=e=>{e.stopPropagation();const willLock=obj.selectable!==false;obj.set({selectable:!willLock,evented:!willLock});if(willLock)state.canvas.discardActiveObject();state.canvas.requestRenderAll();snapshot()};
+   lock.onclick=e=>{e.stopPropagation();const willLock=!obj.userLocked;obj.userLocked=willLock;obj.set({selectable:!willLock,evented:!willLock});if(willLock)state.canvas.discardActiveObject();state.canvas.requestRenderAll();snapshot();renderLayers()};
    const main=document.createElement('div');main.className='layer-main';main.innerHTML=`<strong>${escapeHTML(objectLabel(obj))}</strong><small>${escapeHTML(objectTypeLabel(obj))}</small>`;
-   main.onclick=()=>{if(obj.selectable===false)return toast(obj.photoRole==='main'?'La fotografía base permanece bloqueada.':'Desbloquea la capa para editarla.');state.canvas.setActiveObject(obj);state.canvas.requestRenderAll();renderLayers()};
+   main.onclick=()=>{if(obj.photoRole==='main'||obj.userLocked)return toast(obj.photoRole==='main'?'La fotografía base permanece bloqueada.':'Desbloquea la capa para editarla.');window.PhotoIA?.setCanvasMode?.('move',{openPanel:false,announce:false});state.canvas.setActiveObject(obj);state.canvas.requestRenderAll();renderLayers()};
    main.ondblclick=()=>{if(obj.photoRole==='main')return;const name=prompt('Nombre de la capa:',objectLabel(obj));if(name&&name.trim()){obj.layerName=name.trim().slice(0,40);snapshot()}};
    const thumb=document.createElement('div');thumb.className='layer-thumb';thumb.textContent=layerIcon(obj);
    row.append(eye,lock,main,thumb);list.appendChild(row);

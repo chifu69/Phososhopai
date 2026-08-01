@@ -9,9 +9,51 @@ const onReady=()=>{
   const center=()=>({left:canvas.width/2,top:canvas.height/2,originX:'center',originY:'center'});
   const decorate=(obj,name,type)=>{obj.layerId=api.nextLayerId();obj.layerName=name;obj.layerType=type;return obj};
 
+  const modeHelp={
+    move:'Modo Mover: toca un objeto para seleccionarlo, moverlo, rotarlo o cambiar su tamaño.',
+    draw:'Modo Dibujar: usa el dedo sobre la foto. Pulsa Mover cuando termines.',
+    erase:'Modo Borrar: toca un trazo para eliminarlo. Las fotos, textos y stickers están protegidos.',
+    sticker:'Elige un sticker abajo. Después regresarás automáticamente a Mover.',
+    text:'Configura el texto abajo. Después de agregarlo podrás moverlo libremente.',
+    shape:'Elige una forma abajo. Después podrás moverla, rotarla y cambiar su tamaño.'
+  };
+  let canvasMode='move';
+  function setCanvasMode(mode,{openPanel=true,announce=true}={}){
+    canvasMode=mode;document.body.dataset.canvasMode=mode;
+    canvas.isDrawingMode=mode==='draw';
+    document.body.classList.toggle('drawing-active',mode==='draw');
+    canvas.selection=mode==='move';
+    canvas.skipTargetFind=!['move','erase'].includes(mode);
+    canvas.defaultCursor=mode==='erase'?'not-allowed':mode==='draw'?'crosshair':'default';
+    canvas.hoverCursor=mode==='erase'?'not-allowed':'move';
+    canvas.getObjects().forEach(obj=>{
+      const movable=mode==='move'&&obj.photoRole!=='main'&&!obj.userLocked;
+      obj.selectable=mode==='erase'?obj.layerType==='drawing':movable;
+      obj.evented=mode==='erase'?obj.layerType==='drawing':(mode==='move'&&obj.photoRole!=='main'&&!obj.userLocked);
+    });
+    canvas.discardActiveObject();canvas.requestRenderAll();
+    document.querySelectorAll('[data-canvas-mode]').forEach(btn=>btn.classList.toggle('active',btn.dataset.canvasMode===mode));
+    if($('mode-help'))$('mode-help').textContent=modeHelp[mode]||'';
+    if(openPanel){
+      const tabMap={draw:'draw',sticker:'stickers',text:'text',shape:'shapes'};
+      const tab=tabMap[mode]&&document.querySelector(`[data-tool-tab="${tabMap[mode]}"]`);
+      if(tab)tab.click();
+    }
+    if(announce)api.toast(modeHelp[mode].split(':')[0]);
+  }
+  document.querySelectorAll('[data-canvas-mode]').forEach(btn=>btn.addEventListener('click',()=>setCanvasMode(btn.dataset.canvasMode)));
+  canvas.on('mouse:down',event=>{
+    if(canvasMode!=='erase')return;
+    const target=event.target;
+    if(target?.layerType==='drawing'){canvas.remove(target);canvas.requestRenderAll();safeSnapshot();api.toast('Trazo borrado');}
+    else api.toast('El borrador solo elimina trazos de dibujo.');
+  });
+  setCanvasMode('move',{openPanel:false,announce:false});
+
   document.querySelectorAll('.creative-tab').forEach(btn=>btn.addEventListener('click',()=>{
     document.querySelectorAll('.creative-tab').forEach(x=>x.classList.toggle('active',x===btn));
     document.querySelectorAll('.creative-pane').forEach(p=>p.classList.toggle('active',p.dataset.toolPane===btn.dataset.toolTab));
+    if(btn.dataset.toolTab!=='draw'&&canvasMode==='draw')setCanvasMode('move',{openPanel:false,announce:false});
   }));
 
   const outputPair=(id,suffix='')=>{
@@ -72,7 +114,7 @@ const onReady=()=>{
       textBackgroundColor:$('text-background-enabled').checked?$('text-background-color').value:'',
       opacity:Number($('object-opacity').value)/100,shadow:shadowFromControls()
     }),'Texto','text');
-    canvas.add(text);canvas.setActiveObject(text);canvas.requestRenderAll();safeSnapshot();api.toast('Texto agregado');
+    canvas.add(text);canvas.setActiveObject(text);canvas.requestRenderAll();safeSnapshot();setCanvasMode('move',{openPanel:false,announce:false});api.toast('Texto agregado: ya puedes moverlo');
   };
   // Existing quick text button opens text tab instead of adding generic text.
   if($('add-text')) $('add-text').onclick=()=>document.querySelector('[data-tool-tab="text"]').click();
@@ -101,7 +143,7 @@ const onReady=()=>{
   $('object-opacity').addEventListener('change',commitSelected);
 
   function drawing(mode){
-    canvas.isDrawingMode=true;document.body.classList.add('drawing-active');
+    setCanvasMode('draw',{openPanel:false,announce:false});
     const alpha=Number($('brush-opacity').value)/100;
     const color=hexToRgba($('brush-color').value,mode==='marker'?Math.min(alpha,.35):alpha);
     canvas.freeDrawingBrush.color=color;canvas.freeDrawingBrush.width=Number($('brush-size').value)*(mode==='marker'?2:1);
@@ -109,7 +151,7 @@ const onReady=()=>{
   }
   function hexToRgba(hex,a){const n=parseInt(hex.slice(1),16);return `rgba(${n>>16},${n>>8&255},${n&255},${a})`}
   $('draw-pencil').onclick=()=>drawing('pencil');$('draw-marker').onclick=()=>drawing('marker');
-  $('draw-off').onclick=()=>{canvas.isDrawingMode=false;document.body.classList.remove('drawing-active');api.toast('Dibujo terminado')};
+  $('draw-off').onclick=()=>{setCanvasMode('move',{openPanel:false});api.toast('Dibujo terminado: modo Mover activado')};
   canvas.on('path:created',e=>{decorate(e.path,'Trazo','drawing');safeSnapshot()});
   $('clear-drawing').onclick=()=>{const paths=canvas.getObjects().filter(o=>o.layerType==='drawing');paths.forEach(o=>canvas.remove(o));canvas.requestRenderAll();safeSnapshot();api.toast('Trazos eliminados')};
 
@@ -125,7 +167,7 @@ const onReady=()=>{
       const head=new fabric.Triangle({left:80,top:0,width:28,height:34,fill:common.stroke,angle:90,originX:'center',originY:'center'});
       obj=new fabric.Group([line,head],common);name='Flecha';
     }
-    decorate(obj,name,'shape');canvas.add(obj);canvas.setActiveObject(obj);canvas.requestRenderAll();safeSnapshot();api.toast(name+' agregado');
+    decorate(obj,name,'shape');canvas.add(obj);canvas.setActiveObject(obj);canvas.requestRenderAll();safeSnapshot();setCanvasMode('move',{openPanel:false,announce:false});api.toast(name+' agregado: ya puedes moverlo');
   }
   document.querySelectorAll('[data-add-shape]').forEach(b=>b.onclick=()=>addShape(b.dataset.addShape));
   ['shape-fill','shape-stroke','shape-stroke-width'].forEach(id=>$(id).addEventListener('input',()=>{
@@ -139,12 +181,13 @@ const onReady=()=>{
 
   document.querySelectorAll('[data-sticker]').forEach(b=>b.onclick=()=>{
     const emoji=b.dataset.sticker;const obj=decorate(new fabric.Text(emoji,{...center(),fontSize:82}),'Sticker '+emoji,'sticker');
-    canvas.add(obj);canvas.setActiveObject(obj);canvas.requestRenderAll();safeSnapshot();api.toast('Sticker agregado');
+    canvas.add(obj);canvas.setActiveObject(obj);canvas.requestRenderAll();safeSnapshot();setCanvasMode('move',{openPanel:false,announce:false});api.toast('Sticker agregado: arrástralo para moverlo');
   });
 
   $('bring-front').onclick=()=>{const obj=selected();if(!obj||obj.photoRole==='main')return;canvas.bringToFront(obj);canvas.requestRenderAll();safeSnapshot()};
   $('send-back').onclick=()=>{const obj=selected();if(!obj||obj.photoRole==='main')return;canvas.sendToBack(obj);if(api.state.photo)canvas.sendToBack(api.state.photo);canvas.requestRenderAll();safeSnapshot()};
 
+  api.setCanvasMode=setCanvasMode;
   updateSelection();
 };
 window.addEventListener('photoia-ready',onReady,{once:true});
