@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='7.0.1';
+const VERSION='7.1.0';
 const MACRO_KEY='photoIAMacrosV1';
 const CONTEXT_KEY='photoIABrainContextV1';
 const $=id=>document.getElementById(id);
@@ -18,10 +18,14 @@ const registry=[];
 const register=plugin=>registry.push(plugin);
 const api=()=>window.PhotoIA;
 const ready=()=>!!api()?.state?.canvas;
-const brainState={lastObjectId:null,lastPlugin:null,lastCommand:'',batch:null};
+const brainState={lastObjectId:null,lastPlugin:null,lastCommand:'',batch:null,conversation:[],lastIntent:null};
 try{Object.assign(brainState,JSON.parse(localStorage.getItem(CONTEXT_KEY)||'{}'));}catch(_){ }
 function persistContext(){
   try{localStorage.setItem(CONTEXT_KEY,JSON.stringify({lastObjectId:brainState.lastObjectId,lastPlugin:brainState.lastPlugin,lastCommand:brainState.lastCommand}));}catch(_){ }
+}
+function logConversation(role,text){
+  brainState.conversation.push({role,text,time:Date.now()});
+  if(brainState.conversation.length>12)brainState.conversation.shift();
 }
 function renderMessage(message,type='ok'){
   api()?.toast?.(message);
@@ -30,6 +34,7 @@ function renderMessage(message,type='ok'){
   box.className=`brain-response ${type}`;box.textContent=`🤖 ${message}`;
 }
 function say(message,type='ok'){
+  logConversation('assistant',message);
   if(brainState.batch){brainState.batch.messages.push(message);if(type==='error')brainState.batch.type='error';else if(type==='warn'&&brainState.batch.type!=='error')brainState.batch.type='warn';return;}
   renderMessage(message,type);
 }
@@ -82,8 +87,10 @@ function hexToRgb(hex){const value=String(hex||'').replace('#','');if(!/^[0-9a-f
 function colorDistance(a,b){const ar=hexToRgb(a),br=hexToRgb(b);if(!ar||!br)return a===b?0:999;return Math.sqrt(ar.reduce((sum,v,i)=>sum+(v-br[i])**2,0));}
 function objectMatchesColor(obj,color){if(!color)return true;return objectColors(obj).some(value=>value===color.toLowerCase()||colorDistance(value,color)<38);}
 function textNeedle(text){const m=text.match(/(?:texto|que diga|llamado|nombre)\s+["“”']?([^"“”']+?)["“”']?(?:\s+(?:rojo|azul|verde|amarillo|negro|blanco|arriba|abajo|centro)|$)/);return m?m[1].trim():'';}
-function findTarget(text){
+function findTargets(text){
   const kind=targetKind(text),requestedColor=colorMatches(text)[0]?.value||null,needle=textNeedle(text),objects=canvasObjects().slice().reverse();
+  const explicitLast=/ultimo|ultima|mas reciente/.test(text),explicitSelected=/seleccionad|actual|este|esta|ese|esa|hazlo|ponlo|muevelo|giralo|rotalo/.test(text);
+  if(explicitSelected&&!kind&&!requestedColor&&!needle){const active=currentObject();return active?[active]:[];}
   const matches=objects.filter(o=>{
     const actual=objectKind(o);
     const kindOk=!kind||actual===kind||(kind==='cuadrado'&&actual==='rectangulo')||(kind==='rectangulo'&&actual==='cuadrado');
@@ -91,18 +98,24 @@ function findTarget(text){
     const textOk=!needle||normalize(o.text||o.layerName||'').includes(normalize(needle));
     return kindOk&&colorOk&&textOk;
   });
-  if(matches.length)return matches[0];
-  if(kind||requestedColor||needle)return null;
-  return currentObject()||objects[0]||null;
+  if(explicitLast)return matches.slice(0,1);
+  if(matches.length)return matches;
+  if(kind||requestedColor||needle)return [];
+  const active=currentObject();return active?[active]:(objects[0]?[objects[0]]:[]);
 }
+function findTarget(text){return findTargets(text)[0]||null;}
+function wantsAll(text){return /\b(todos|todas|cada)\b/.test(text);}
+
 function detectIntent(t){
   if(/\b(elimina|eliminar|borra|borrar|quita|quitar|remueve|remover)\b/.test(t))return 'delete';
   if(/\b(selecciona|seleccionar|escoge|elige|toca)\b/.test(t))return 'select';
   if(/\b(duplica|duplicar|copia|copiar)\b/.test(t))return 'duplicate';
-  if(/\b(cambia|cambiar|ponlo|hazlo|muevelo|mueve|gira|giralo|rota|rotalo|agranda|reduce|bloquea|desbloquea|trae|envia|manda)\b/.test(t))return 'modify';
+  if(/\b(cambia|cambiar|ponlo|hazlo|muevelo|mueve|gira|giralo|rota|rotalo|agranda|reduce|bloquea|desbloquea|trae|envia|manda|alinea|centra)\b/.test(t))return 'modify';
+  if(/^(?:ahora\s+)?(?:sin relleno|con relleno|relleno|borde|contorno|mas grande|mas pequeno|arriba|abajo|izquierda|derecha|centro|transparente|opacidad)/.test(t))return 'modify';
   if(/\b(agrega|agregar|anade|anadir|crea|crear|pon|inserta|insertar|escribe)\b/.test(t))return 'create';
   return 'unknown';
 }
+
 function describeTarget(t,obj){return {intent:detectIntent(t),kind:targetKind(t)||'objeto',color:colorMatches(t)[0]?.name||'cualquiera',matches:obj?1:0};}
 function renderDebug(info){
   let box=$('brain-debug');
@@ -113,35 +126,52 @@ function renderDebug(info){
 function runPriorityIntent(t,raw){
   const intent=detectIntent(t);
   if(!['delete','select','duplicate','modify'].includes(intent))return false;
-  const obj=findTarget(t);renderDebug(describeTarget(t,obj));
+  const matches=findTargets(t),obj=matches[0]||null,all=wantsAll(t);
+  renderDebug({intent,kind:targetKind(t)||'objeto',color:colorMatches(t)[0]?.name||'cualquiera',matches:matches.length});
+  brainState.lastIntent=intent;persistContext();
   if(!obj){say('No encontré un objeto que coincida con esa descripción.','warn');return true;}
-  const c=api().state.canvas;
-  if(intent==='select'){if(activate(obj))say(`${objectKind(obj)} seleccionado.`);return true;}
+  const c=api().state.canvas,targets=all?matches:[obj];
+  if(intent==='select'){
+    if(targets.length>1){const active=new fabric.ActiveSelection(targets,{canvas:c});c.setActiveObject(active);c.requestRenderAll();api().renderLayers();brainState.lastObjectId=targets[0].layerId;persistContext();say(`${targets.length} objetos seleccionados.`);}else if(activate(obj))say(`${objectKind(obj)} seleccionado.`);
+    return true;
+  }
   if(intent==='delete'){
-    if(obj.userLocked){say('Ese objeto está bloqueado. Desbloquéalo antes de eliminarlo.','warn');return true;}
-    c.remove(obj);c.discardActiveObject();c.requestRenderAll();snapshot();brainState.lastObjectId=null;persistContext();say(`${objectKind(obj)} eliminado.`);return true;
+    const removable=targets.filter(o=>!o.userLocked);
+    if(!removable.length){say('Los objetos encontrados están bloqueados.','warn');return true;}
+    removable.forEach(o=>c.remove(o));c.discardActiveObject();c.requestRenderAll();snapshot();brainState.lastObjectId=null;persistContext();say(removable.length===1?`${objectKind(removable[0])} eliminado.`:`${removable.length} objetos eliminados.`);return true;
   }
   if(intent==='duplicate'){
-    if(obj.userLocked){say('Ese objeto está bloqueado. Desbloquéalo antes de duplicarlo.','warn');return true;}
-    obj.clone(cl=>{cl.set({left:(obj.left||0)+18,top:(obj.top||0)+18});cl.layerId=layerId();cl.layerName=(obj.layerName||'Objeto')+' copia';cl.userLocked=false;addAndSelect(cl,'layers');say('Objeto duplicado.');});return true;
+    let pending=targets.length,created=[];
+    const finish=()=>{if(!created.length)return say('No pude duplicar objetos bloqueados.','warn');const active=created.length===1?created[0]:new fabric.ActiveSelection(created,{canvas:c});c.setActiveObject(active);c.requestRenderAll();snapshot();remember(created[0],'layers');say(created.length===1?'Objeto duplicado.':`${created.length} objetos duplicados.`);};
+    targets.forEach(source=>{if(source.userLocked){if(--pending===0)finish();return;}source.clone(cl=>{cl.set({left:(source.left||0)+18,top:(source.top||0)+18});cl.layerId=layerId();cl.layerName=(source.layerName||'Objeto')+' copia';cl.userLocked=false;c.add(cl);created.push(cl);if(--pending===0)finish();});});
+    return true;
   }
   if(intent==='modify'){
-    if(!activate(obj))return true;
-    const colors=parseColors(t);let changed=false;
-    if(colorMatches(t).length){if(objectKind(obj)==='texto'||objectKind(obj)==='sticker')obj.set('fill',colors.fill);else{obj.set('stroke',colors.stroke);if(!/borde|contorno/.test(t))obj.set('fill',colors.fill);}changed=true;}
-    if(/sin relleno|transparente/.test(t)){obj.set('fill','rgba(0,0,0,0)');changed=true;}
-    if(/mas grande|agranda|aumenta/.test(t)){obj.scaleX=(obj.scaleX||1)*1.2;obj.scaleY=(obj.scaleY||1)*1.2;changed=true;}
-    if(/mas pequeno|reduce|disminuye/.test(t)){obj.scaleX=(obj.scaleX||1)*.82;obj.scaleY=(obj.scaleY||1)*.82;changed=true;}
-    const angle=t.match(/(?:gira|giralo|rota|rotalo)\s*(?:a|de)?\s*(-?\d+)?/);if(angle){obj.rotate((obj.angle||0)+Number(angle[1]||15));changed=true;}
-    if(/arriba|abajo|izquierda|derecha|centro/.test(t)){obj.set(parsePosition(t,c,obj.getScaledWidth?.()||0,obj.getScaledHeight?.()||0));changed=true;}
-    if(/trae.*frente/.test(t)){c.bringToFront(obj);changed=true;}
-    if(/envia.*atras|manda.*atras/.test(t)){c.sendToBack(obj);if(api().state.photo)c.sendToBack(api().state.photo);changed=true;}
-    if(/desbloquea/.test(t)){obj.userLocked=false;obj.set({selectable:true,evented:true});changed=true;}else if(/bloquea/.test(t)){obj.userLocked=true;obj.set({selectable:false,evented:false});c.discardActiveObject();changed=true;}
-    if(changed){obj.setCoords();c.requestRenderAll();snapshot();remember(obj,'context');say('Objeto actualizado.');}else say('Seleccioné el objeto, pero no entendí qué cambio aplicar.','warn');
+    let changed=0;
+    targets.forEach(target=>{
+      if(target.userLocked)return;
+      const colors=parseColors(t);let local=false;
+      if(/relleno\s+|fondo\s+/.test(t)&&colorMatches(t).length){target.set('fill',colors.fill);local=true;}
+      else if(/borde|contorno/.test(t)&&colorMatches(t).length){target.set('stroke',colors.stroke);local=true;}
+      else if(colorMatches(t).length){if(objectKind(target)==='texto'||objectKind(target)==='sticker')target.set('fill',colors.fill);else{target.set('stroke',colors.stroke);target.set('fill',colors.fill);}local=true;}
+      if(/sin relleno|relleno transparente|solo contorno/.test(t)){target.set('fill','rgba(0,0,0,0)');local=true;}
+      if(/con relleno/.test(t)&&!/sin relleno/.test(t)){target.set('fill',colors.fill||target.stroke||'#ef4444');local=true;}
+      const pct=t.match(/(?:opacidad|transparencia)\s*(?:de\s*)?(\d{1,3})\s*%?/);if(pct){target.set('opacity',Math.max(.05,Math.min(1,Number(pct[1])/100)));local=true;}
+      if(/mas grande|agranda|aumenta/.test(t)){target.scaleX=(target.scaleX||1)*1.2;target.scaleY=(target.scaleY||1)*1.2;local=true;}
+      if(/mas pequeno|reduce|disminuye|achica/.test(t)){target.scaleX=(target.scaleX||1)*.82;target.scaleY=(target.scaleY||1)*.82;local=true;}
+      const angle=t.match(/(?:gira|giralo|rota|rotalo)\s*(?:a|de)?\s*(-?\d+)?/);if(angle){target.rotate((target.angle||0)+Number(angle[1]||15));local=true;}
+      if(/arriba|abajo|izquierda|derecha|centro|centrad/.test(t)){target.set(parsePosition(t,c,target.getScaledWidth?.()||0,target.getScaledHeight?.()||0));local=true;}
+      if(/trae.*frente/.test(t)){c.bringToFront(target);local=true;}
+      if(/envia.*atras|manda.*atras/.test(t)){c.sendToBack(target);if(api().state.photo)c.sendToBack(api().state.photo);local=true;}
+      if(/desbloquea/.test(t)){target.userLocked=false;target.set({selectable:true,evented:true});local=true;}else if(/bloquea/.test(t)){target.userLocked=true;target.set({selectable:false,evented:false});local=true;}
+      if(local){target.setCoords();changed++;}
+    });
+    if(changed){c.requestRenderAll();snapshot();remember(obj,'context');if(!obj.userLocked)activate(obj);say(changed===1?'Objeto actualizado.':`${changed} objetos actualizados.`);}else say('Seleccioné el objeto, pero no entendí qué cambio aplicar.','warn');
     return true;
   }
   return false;
 }
+
 function activate(obj){if(!obj)return false;const c=api().state.canvas;if(obj.userLocked||obj.selectable===false){say('Ese objeto está bloqueado. Desbloquéalo primero.','warn');return false;}api()?.setCanvasMode?.('move',{openPanel:false,announce:false});c.setActiveObject(obj);c.requestRenderAll();api().renderLayers();remember(obj,'selection');return true;}
 function splitCommands(raw){
   const protectedQuotes=[];let safe=raw.replace(/["“”'][^"“”']+["“”']/g,m=>{protectedQuotes.push(m);return `__QUOTE_${protectedQuotes.length-1}__`;});
@@ -206,6 +236,7 @@ register({name:'transform',score:t=>/gira|rotar|espejo|voltea|recorta/.test(t)?7
 register({name:'future-ai',score:t=>/cabello|pelo|peinado|ropa|outfit|face swap|intercambia.*cara|cambiar fondo|quita.*fondo|borra.*objeto/.test(t)?60:0,run(t){const module=/cabello|pelo|peinado/.test(t)?'Hair Studio':/ropa|outfit/.test(t)?'Outfit Studio':/face swap|intercambia.*cara/.test(t)?'Face Swap':/fondo/.test(t)?'Background Studio':'Magic Eraser';say(`${module} quedó identificado. Falta conectar el modelo generativo para ejecutar ese cambio.`,'info');}});
 
 function executeSingle(raw){
+  logConversation('user',raw);
   const t=normalize(raw);if(!t)return say('Escribe lo que quieres hacer.','warn');
   const macro=extractMacro(raw,t);if(macro){
     if(macro.mode==='save'){const all=macros();all[macro.name]=macro.commands;saveMacros(all);return say(`Macro “${macro.name}” guardada.`);}
@@ -226,9 +257,9 @@ function execute(raw,options={}){
   const completed=batch.messages.length;const prefix=options.fromMacro?`Macro “${options.fromMacro}”`: `${completed} acción${completed===1?'':'es'}`;renderMessage(`${prefix} completada${completed===1?'':'s'}. ${batch.messages.join(' ')}`.trim(),batch.type);
 }
 function boot(){
-  const input=$('command-input'),button=$('command-btn');if(!input||!button)return;button.onclick=()=>execute(input.value);input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();execute(input.value);}};input.placeholder='Ej.: agrega un círculo azul, luego pon un texto “Oferta” arriba…';
-  const panel=input.closest('.command-panel');if(panel&&!$('brain-examples')){const x=document.createElement('div');x.id='brain-examples';x.className='brain-examples';x.innerHTML='<button>Cuadro rojo sin relleno, luego texto “Oferta” arriba</button><button>Selecciona el círculo y luego hazlo más grande</button><button>Guarda macro oferta: cuadro rojo sin relleno; texto “Oferta” amarillo arriba</button>';x.querySelectorAll('button').forEach(b=>b.onclick=()=>{input.value=b.textContent;execute(b.textContent);});panel.appendChild(x);}
-  if(panel&&!$('brain-macros')){const m=document.createElement('div');m.id='brain-macros';m.className='brain-macros';m.hidden=true;panel.appendChild(m);}renderMacros();window.PhotoBrain={version:VERSION,register,execute,plugins:registry,parseColors,parsePosition,splitCommands,macros};
+  const input=$('command-input'),button=$('command-btn');if(!input||!button)return;button.onclick=()=>execute(input.value);input.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();execute(input.value);}};input.placeholder='Ej.: agrega un círculo azul; ahora hazlo más grande; luego muévelo arriba…';
+  const panel=input.closest('.command-panel');if(panel&&!$('brain-examples')){const x=document.createElement('div');x.id='brain-examples';x.className='brain-examples';x.innerHTML='<button>Agrega un cuadro rojo; ahora sin relleno; luego hazlo más grande</button><button>Selecciona todos los círculos azules</button><button>Elimina todos los stickers</button>';x.querySelectorAll('button').forEach(b=>b.onclick=()=>{input.value=b.textContent;execute(b.textContent);});panel.appendChild(x);}
+  if(panel&&!$('brain-macros')){const m=document.createElement('div');m.id='brain-macros';m.className='brain-macros';m.hidden=true;panel.appendChild(m);}renderMacros();const c=api().state.canvas;c.on('selection:created',e=>{const o=e.selected?.[0]||c.getActiveObject();if(o&&o.photoRole!=='main')remember(o,'selection');});c.on('selection:updated',e=>{const o=e.selected?.[0]||c.getActiveObject();if(o&&o.photoRole!=='main')remember(o,'selection');});window.PhotoBrain={version:VERSION,register,execute,plugins:registry,parseColors,parsePosition,splitCommands,macros};
 }
 let booted=false;function safeBoot(){if(booted)return;if(window.PhotoIA?.state?.canvas){booted=true;boot();return;}setTimeout(safeBoot,80);}window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();
 })();

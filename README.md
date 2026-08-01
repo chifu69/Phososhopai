@@ -1,4 +1,4 @@
-# PHOTO IA 7.0 — Photo Brain 2.0
+# PHOTO IA 7.1 — Brain Core
 
 Incluye comandos encadenados, memoria del último objeto, selección por nombre de objeto y macros guardadas localmente.
 
