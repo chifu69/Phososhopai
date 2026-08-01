@@ -1,14 +1,11 @@
-# PHOTO IA 6.1
+# PHOTO IA 6.2
 
-Editor privado con motor Fabric.js, OpenCV opcional, recorte profesional y panel de capas.
+Editor privado para fotos con Fabric.js. Esta versión agrega herramientas creativas reales:
 
-## Nuevo en 6.1
-- Panel de capas con selección visual
-- Mostrar y ocultar capas
-- Bloquear y desbloquear objetos
-- Duplicar y eliminar capas
-- Cambiar el orden de las capas
-- Renombrar con doble toque/clic
-- Historial compatible con las operaciones de capas
+- Texto editable con fuente, tamaño, color, contorno, opacidad y sombra.
+- Dibujo libre con lápiz y marcador.
+- Formas editables: rectángulo, círculo, triángulo, línea y flecha.
+- Galería de stickers.
+- Capas, historial, filtros, recorte y exportación.
 
-Sube todos los archivos de esta carpeta a la raíz del repositorio de PHOTO IA.
+Sube el contenido de esta carpeta directamente a la raíz del repositorio de GitHub Pages.

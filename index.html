@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 5.0: editor privado con lienzo Fabric y procesamiento OpenCV opcional.">
+  <meta name="description" content="PHOTO IA 6.2: texto profesional, dibujo, formas y capas editables.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=6.1.0">
-  <title>PHOTO IA 6.1</title>
+  <link rel="stylesheet" href="css/styles.css?v=6.2.0">
+  <title>PHOTO IA 6.2</title>
 </head>
 <body>
 <div class="app-shell">
@@ -89,6 +89,75 @@
     </section>
 
 
+    <section class="panel creative-panel">
+      <div class="section-heading">
+        <div><p class="eyebrow">CREATIVE STUDIO</p><h2>Texto, dibujo y formas</h2></div>
+        <span class="engine-badge">6.2</span>
+      </div>
+      <div class="creative-tabs" role="tablist">
+        <button class="creative-tab active" data-tool-tab="text">🔤 Texto</button>
+        <button class="creative-tab" data-tool-tab="draw">🖌 Dibujar</button>
+        <button class="creative-tab" data-tool-tab="shapes">⬜ Formas</button>
+        <button class="creative-tab" data-tool-tab="stickers">😀 Stickers</button>
+      </div>
+
+      <div class="creative-pane active" data-tool-pane="text">
+        <div class="tool-grid text-tool-grid">
+          <label>Texto<input id="text-value" type="text" value="Tu texto" maxlength="120"></label>
+          <label>Fuente<select id="text-font"><option>Arial</option><option>Georgia</option><option>Impact</option><option>Courier New</option><option>Trebuchet MS</option><option>Times New Roman</option></select></label>
+          <label>Tamaño<input id="text-size" type="range" min="12" max="160" value="48"><output id="text-size-out">48</output></label>
+          <label>Color<input id="text-color" type="color" value="#ffffff"></label>
+          <label>Contorno<input id="text-stroke" type="color" value="#111111"></label>
+          <label>Grosor<input id="text-stroke-width" type="range" min="0" max="12" value="2"><output id="text-stroke-width-out">2</output></label>
+          <label>Opacidad<input id="object-opacity" type="range" min="10" max="100" value="100"><output id="object-opacity-out">100%</output></label>
+          <label>Sombra<input id="text-shadow" type="checkbox"></label>
+        </div>
+        <button id="create-text" class="primary wide" type="button" disabled>Agregar texto</button>
+      </div>
+
+      <div class="creative-pane" data-tool-pane="draw">
+        <div class="tool-grid">
+          <label>Color<input id="brush-color" type="color" value="#ff9f0a"></label>
+          <label>Tamaño<input id="brush-size" type="range" min="1" max="60" value="12"><output id="brush-size-out">12</output></label>
+          <label>Opacidad<input id="brush-opacity" type="range" min="10" max="100" value="100"><output id="brush-opacity-out">100%</output></label>
+        </div>
+        <div class="button-row creative-buttons">
+          <button id="draw-pencil" class="secondary" disabled>✏️ Lápiz</button>
+          <button id="draw-marker" class="secondary" disabled>🖍 Marcador</button>
+          <button id="draw-off" class="secondary" disabled>✓ Terminar</button>
+          <button id="clear-drawing" class="secondary danger" disabled>🗑 Borrar trazos</button>
+        </div>
+      </div>
+
+      <div class="creative-pane" data-tool-pane="shapes">
+        <div class="tool-grid">
+          <label>Relleno<input id="shape-fill" type="color" value="#ff9f0a"></label>
+          <label>Contorno<input id="shape-stroke" type="color" value="#111111"></label>
+          <label>Grosor<input id="shape-stroke-width" type="range" min="0" max="16" value="3"><output id="shape-stroke-width-out">3</output></label>
+        </div>
+        <div class="button-row creative-buttons">
+          <button data-add-shape="rect" class="secondary" disabled>▭ Rectángulo</button>
+          <button data-add-shape="circle" class="secondary" disabled>○ Círculo</button>
+          <button data-add-shape="triangle" class="secondary" disabled>△ Triángulo</button>
+          <button data-add-shape="line" class="secondary" disabled>／ Línea</button>
+          <button data-add-shape="arrow" class="secondary" disabled>➜ Flecha</button>
+        </div>
+      </div>
+
+      <div class="creative-pane" data-tool-pane="stickers">
+        <div id="sticker-grid" class="sticker-grid">
+          <button data-sticker="😀" disabled>😀</button><button data-sticker="😂" disabled>😂</button><button data-sticker="😎" disabled>😎</button><button data-sticker="❤️" disabled>❤️</button><button data-sticker="🔥" disabled>🔥</button><button data-sticker="⭐" disabled>⭐</button><button data-sticker="👍" disabled>👍</button><button data-sticker="🤖" disabled>🤖</button><button data-sticker="💯" disabled>💯</button><button data-sticker="🎉" disabled>🎉</button><button data-sticker="⚠️" disabled>⚠️</button><button data-sticker="✅" disabled>✅</button>
+        </div>
+      </div>
+
+      <div class="selected-properties">
+        <strong>Objeto seleccionado</strong>
+        <span id="selected-object-name">Ninguno</span>
+        <button id="bring-front" class="secondary" disabled>Traer al frente</button>
+        <button id="send-back" class="secondary" disabled>Enviar atrás</button>
+      </div>
+    </section>
+
     <section class="panel layers-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CAPAS</p><h2>Organiza tu diseño</h2></div>
@@ -110,7 +179,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 6.1 • Capas profesionales • Fabric + OpenCV opcional • <strong>6.1.0</strong></footer>
+  <footer>PHOTO IA 6.2 • Creative Studio profesional • <strong>6.2.0</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -121,7 +190,8 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=6.1.0"></script>
+<script src="js/app.js?v=6.2.0"></script>
+<script src="js/creative-tools.js?v=6.2.0"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>
