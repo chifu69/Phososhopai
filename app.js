@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='6.4.2';
+const VERSION='7.2.0';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -162,7 +162,7 @@ function rotate(deg){if(!state.photo)return;state.photo.rotate((state.photo.angl
 function flip(){if(!state.photo)return;state.photo.set('flipX',!state.photo.flipX);state.canvas.requestRenderAll();snapshot()}
 function addText(){const text=new fabric.IText('Tu texto',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:42,fontWeight:'bold',fill:'#ffffff',stroke:'#111111',strokeWidth:1});text.layerId=nextLayerId();text.layerName='Texto';text.layerType='text';state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
 function addSticker(){const text=new fabric.Text('⭐',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:72});text.layerId=nextLayerId();text.layerName='Sticker';text.layerType='sticker';state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
-function exportDataUrl(){state.canvas.discardActiveObject();state.canvas.requestRenderAll();const format=$('format').value;const quality=Number($('quality').value)/100;return state.canvas.toDataURL({format:format.split('/')[1],quality,multiplier:2})}
+function exportDataUrl(){state.canvas.discardActiveObject();const vision=state.canvas.getObjects().filter(o=>o.layerType==='vision-detection');const vis=vision.map(o=>o.visible);vision.forEach(o=>o.visible=false);state.canvas.requestRenderAll();const format=$('format').value;const quality=Number($('quality').value)/100;const out=state.canvas.toDataURL({format:format.split('/')[1],quality,multiplier:2});vision.forEach((o,i)=>o.visible=vis[i]);state.canvas.requestRenderAll();return out}
 function download(){const url=exportDataUrl();const a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${$('format').value.split('/')[1].replace('jpeg','jpg')}`;a.click();toast('Imagen preparada para guardar')}
 function compare(showOriginal){if(!state.photo)return;if(showOriginal){state.photo.setSrc(state.originalDataUrl,()=>{fitPhoto();state.canvas.requestRenderAll()})}else restoreJSON(state.history[state.history.length-1])}
 function reset(){if(!state.originalDataUrl)return;processing(true,'Restableciendo…');setMainImage(state.originalDataUrl,$('project-title').textContent).finally(()=>{processing(false);toast('Foto restablecida')})}

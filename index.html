@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 7.0: Photo Brain 2.0 con comandos encadenados, memoria de contexto, selección inteligente y macros.">
+  <meta name="description" content="PHOTO IA 7.2 con Vision Engine local para detectar personas y objetos en tus fotos.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=7.1.1">
-  <title>PHOTO IA 7.0</title>
+  <link rel="stylesheet" href="styles.css?v=7.2.0">
+  <title>PHOTO IA 7.2 — Vision Engine</title>
 </head>
 <body>
 <div class="app-shell">
@@ -110,7 +110,7 @@
     <section class="panel creative-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CREATIVE STUDIO</p><h2>Texto, dibujo y formas</h2></div>
-        <span class="engine-badge">7.1.1</span>
+        <span class="engine-badge">7.2.0</span>
       </div>
       <div class="creative-tabs" role="tablist">
         <button class="creative-tab active" data-tool-tab="text">🔤 Texto</button>
@@ -197,6 +197,23 @@
       </div>
     </section>
 
+
+    <section class="panel vision-panel">
+      <div class="section-heading">
+        <div><p class="eyebrow">VISION ENGINE 0.1</p><h2>¿Qué hay en la foto?</h2></div>
+        <span id="vision-count" class="engine-badge">0 detectados</span>
+      </div>
+      <p id="vision-status" class="vision-status">Modelo se carga al usarlo</p>
+      <div class="vision-actions">
+        <button id="vision-analyze" class="primary" disabled>👁 Analizar foto</button>
+        <button id="vision-show" class="secondary" disabled>Mostrar</button>
+        <button id="vision-hide" class="secondary" disabled>Ocultar</button>
+        <button id="vision-clear" class="secondary danger" disabled>Limpiar</button>
+      </div>
+      <div id="vision-results" class="vision-results"><p class="vision-empty">Abre una foto y pulsa “Analizar foto”.</p></div>
+      <p class="vision-help">También puedes escribir: “analiza la foto”, “selecciona la persona” u “oculta las detecciones”. La primera carga necesita internet.</p>
+    </section>
+
     <section id="object-inspector" class="panel object-inspector">
       <div class="section-heading">
         <div><p class="eyebrow">INSPECTOR</p><h2>Objeto seleccionado</h2></div>
@@ -243,7 +260,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 7.1 • Brain Core • <strong>7.1.1</strong></footer>
+  <footer>PHOTO IA 7.2 • Vision Engine • <strong>7.2.0</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -254,9 +271,12 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=7.1.1"></script>
-<script src="creative-tools.js?v=7.1.1"></script>
-<script src="brain.js?v=7.1.1"></script>
+<script src="app.js?v=7.2.0"></script>
+<script src="creative-tools.js?v=7.2.0"></script>
+<script src="brain.js?v=7.2.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="vision.js?v=7.2.0"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>
