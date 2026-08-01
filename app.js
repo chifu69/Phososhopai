@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='6.4.0';
+const VERSION='6.4.1';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -180,7 +180,8 @@ function init(){
  $('file-input').addEventListener('change',e=>loadFile(e.target.files[0]));$('camera-input').addEventListener('change',e=>loadFile(e.target.files[0]));
  sliders.forEach(id=>{$(id).addEventListener('input',e=>applySlider(id,e.target.value,false));$(id).addEventListener('change',()=>snapshot())});
  document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>{const command=b.dataset.command;const presetMap={professional:'professional',portrait:'portrait',vivid:'vivid',bw:'bw'};if(presetMap[command])applyPreset(presetMap[command]);else executeCommand(command)});
- $('command-btn').onclick=()=>executeCommand($('command-input').value);$('command-input').addEventListener('keydown',e=>{if(e.key==='Enter')executeCommand(e.target.value)});
+ const dispatchCommand=raw=>window.PhotoBrain?.execute?window.PhotoBrain.execute(raw):executeCommand(raw);
+ $('command-btn').onclick=()=>dispatchCommand($('command-input').value);$('command-input').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();dispatchCommand(e.target.value)}});
  $('rotate-left').onclick=()=>rotate(-90);$('rotate-right').onclick=()=>rotate(90);$('flip-x').onclick=flip;$('crop-btn').onclick=()=>openCrop(NaN);$('add-text').onclick=addText;$('add-sticker').onclick=addSticker;$('layer-up').onclick=()=>moveLayer(1);$('layer-down').onclick=()=>moveLayer(-1);$('layer-duplicate').onclick=duplicateLayer;$('layer-delete').onclick=deleteLayer;
  $('undo-btn').onclick=undo;$('redo-btn').onclick=redo;$('download-btn').onclick=download;$('reset-btn').onclick=reset;
  $('compare-btn').addEventListener('pointerdown',()=>compare(true));['pointerup','pointerleave','pointercancel'].forEach(ev=>$('compare-btn').addEventListener(ev,()=>compare(false)));

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='6.4.0';
+const VERSION='6.4.1';
 const $=id=>document.getElementById(id);
 const normalize=s=>(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 const colors={
@@ -46,14 +46,14 @@ register({name:'text',score:t=>/agrega|anade|pon|crear/.test(t)&&/texto|que diga
   const obj=new fabric.IText(value,{left:c.width/2,top:c.height/2,originX:'center',originY:'center',fontSize:/titulo|grande/.test(t)?64:44,fontWeight:/negrita|bold|titulo/.test(t)?'bold':'normal',fontStyle:/cursiva|italic/.test(t)?'italic':'normal',fill,stroke:fill==='#ffffff'?'#111111':null,strokeWidth:fill==='#ffffff'?1:0});
   obj.layerId=layerId();obj.layerName=`Texto: ${value.slice(0,18)}`;obj.layerType='text';select(obj);say(`Texto “${value}” agregado.`);
 }});
-register({name:'shape',score:t=>/cuadrado|rectangulo|circulo|triangulo|flecha|linea/.test(t)?90:0,run(t){
+register({name:'shape',score:t=>/cuadrado|cuadro|rectangulo|circulo|triangulo|flecha|linea/.test(t)?90:0,run(t){
   const c=api().state.canvas,stroke=colorFrom(t),transparent=/sin relleno|transparente|solo contorno/.test(t);let obj,name;
   const common={left:c.width/2,top:c.height/2,originX:'center',originY:'center',fill:transparent?'rgba(0,0,0,0)':stroke,stroke,strokeWidth:/grues/.test(t)?8:4};
   if(/circulo/.test(t)){obj=new fabric.Circle({...common,radius:75});name='Círculo'}
   else if(/triangulo/.test(t)){obj=new fabric.Triangle({...common,width:170,height:145});name='Triángulo'}
   else if(/flecha/.test(t)){const line=new fabric.Line([-90,0,65,0],{stroke,strokeWidth:6});const head=new fabric.Triangle({left:80,top:0,width:28,height:34,angle:90,originX:'center',originY:'center',fill:stroke,stroke});obj=new fabric.Group([line,head],{left:c.width/2,top:c.height/2,originX:'center',originY:'center'});name='Flecha'}
   else if(/linea/.test(t)){obj=new fabric.Line([-90,0,90,0],{...common,fill:null});name='Línea'}
-  else {obj=new fabric.Rect({...common,width:190,height:/cuadrado/.test(t)?190:120,rx:/redondead/.test(t)?22:0,ry:/redondead/.test(t)?22:0});name=/cuadrado/.test(t)?'Cuadrado':'Rectángulo'}
+  else {obj=new fabric.Rect({...common,width:190,height:/cuadrado|cuadro/.test(t)?190:120,rx:/redondead/.test(t)?22:0,ry:/redondead/.test(t)?22:0});name=/cuadrado|cuadro/.test(t)?'Cuadrado':'Rectángulo'}
   if(/puntead/.test(t))obj.set('strokeDashArray',[4,8]);else if(/discontinu/.test(t))obj.set('strokeDashArray',[14,9]);
   obj.layerId=layerId();obj.layerName=name;obj.layerType='shape';select(obj);say(`${name} ${transparent?'sin relleno ':''}agregado.`);
 }});
@@ -86,5 +86,15 @@ function boot(){
   const panel=input.closest('.command-panel');if(panel&&!$('brain-examples')){const x=document.createElement('div');x.id='brain-examples';x.className='brain-examples';x.innerHTML='<button>Cuadrado rojo sin relleno</button><button>Texto “Oferta” en amarillo</button><button>Hazla profesional</button>';x.querySelectorAll('button').forEach(b=>b.onclick=()=>{input.value=b.textContent;execute(b.textContent)});panel.appendChild(x)}
   window.PhotoBrain={version:VERSION,register,execute,plugins:registry};
 }
-window.addEventListener('photoia-ready',boot,{once:true});
+// brain.js may load after app.js has already emitted `photoia-ready`.
+// Boot immediately when the canvas already exists; otherwise wait for the event.
+let booted=false;
+function safeBoot(){
+  if(booted)return;
+  if(window.PhotoIA?.state?.canvas){booted=true;boot();return;}
+  setTimeout(safeBoot,80);
+}
+window.addEventListener('photoia-ready',safeBoot,{once:true});
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});
+else safeBoot();
 })();
