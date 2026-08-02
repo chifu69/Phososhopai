@@ -1,10 +1,10 @@
-const CACHE='photo-ia-8.6.2-smart-buttons-direct';
+const CACHE='photo-ia-9.0.0-adaptive-recipes';
 const VERSION='8.6.2';
 const CORE=[
- './','./index.html','./styles.css?v=8.6.2-smart-buttons-direct','./app.js?v=8.6.2-smart-buttons-direct',
- './creative-tools.js?v=8.6.2-smart-buttons-direct','./brain.js?v=8.6.2-smart-buttons-direct',
- './smart-core.js?v=8.6.2-smart-buttons-direct','./ai-studio.js?v=8.6.2-smart-buttons-direct',
- './vision.js?v=8.6.2-smart-buttons-direct','./segmentation.js?v=8.6.2-smart-buttons-direct','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=9.0.0-adaptive-recipes','./app.js?v=9.0.0-adaptive-recipes',
+ './creative-tools.js?v=9.0.0-adaptive-recipes','./brain.js?v=9.0.0-adaptive-recipes',
+ './smart-core.js?v=9.0.0-adaptive-recipes','./ai-studio.js?v=9.0.0-adaptive-recipes',
+ './vision.js?v=9.0.0-adaptive-recipes','./segmentation.js?v=9.0.0-adaptive-recipes','./manifest.webmanifest'
 ];
 const ASSETS=[
  {local:'./assets/vendor/fabric.min.js?v=8.6.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},

@@ -1,19 +1,7 @@
-# PHOTO IA 8.6.1 — Resilient Local Installer
+# PHOTO IA 9.0 — Adaptive Recipes Core
 
-Corrección del instalador local-first:
-
-- La app ya no queda bloqueada si falla un archivo opcional.
-- Los archivos esenciales y opcionales se verifican por separado.
-- Cada recurso muestra su estado real.
-- Los recursos opcionales (OpenCV y MediaPipe) pueden terminar después.
-- El botón “Abrir app ahora” permite continuar inmediatamente.
-- Los fallos de red ya no dejan la pantalla congelada en un porcentaje.
-- Se conserva el editor, el núcleo adaptativo, la segmentación local y el puente al Alienware.
-
-Sube todos los archivos principales a GitHub Pages. La carpeta windows-server sigue siendo solo para el Alienware.
-
-
-## 8.6.2
-- Botones adaptativos conectados directamente.
-- Recetas de filtros aplicadas en una sola operación estable para Safari.
-- Mensajes de error visibles si falta un filtro.
+- Los modos Natural, Retrato, Noche, Documento y Vibrante generan recetas distintas según el análisis real de cada fotografía.
+- Eventos directos y respaldo delegado para Safari/PWA.
+- Cada modo muestra los valores que aplicó.
+- Cambios visibles, guardados en Deshacer/Rehacer.
+- Conserva el núcleo local-first y el puente con Alienware.

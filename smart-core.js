@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='8.6.2-smart-buttons-direct';
+const VERSION='9.0.0-adaptive-recipes';
 const $=id=>document.getElementById(id);
 const normalize=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 const storeKey='photoia-smart-queue-v2';
@@ -67,13 +67,62 @@ async function applyRecommendations(button){
  }finally{setButtonBusy(button,false)}
 }
 async function applyMode(mode,button){
- setButtonBusy(button,true,'Aplicando…');setStatus('Aplicando modo…','working');
+ setButtonBusy(button,true,'Calculando…');setStatus('Creando receta…','working');
  try{
   const a=lastAnalysis||await analyze();
-  const modes={natural:{brightness:a.recommendation.brightness,contrast:a.recommendation.contrast,saturation:clamp(a.recommendation.saturation,-8,12),temperature:a.recommendation.temperature,sharpness:clamp(a.recommendation.sharpness,0,12),blur:0},portrait:{brightness:Math.max(5,a.recommendation.brightness),contrast:clamp(a.recommendation.contrast,-5,8),saturation:clamp(a.recommendation.saturation,2,9),temperature:Math.max(3,a.recommendation.temperature),sharpness:8,blur:1},night:{brightness:clamp(Math.max(15,a.recommendation.brightness),0,28),contrast:clamp(a.recommendation.contrast,-3,10),saturation:clamp(a.recommendation.saturation,-5,8),temperature:clamp(a.recommendation.temperature,-5,8),sharpness:6,blur:1},document:{brightness:8,contrast:35,saturation:-100,temperature:0,sharpness:28,blur:0},vivid:{brightness:a.recommendation.brightness,contrast:Math.max(12,a.recommendation.contrast),saturation:Math.max(22,a.recommendation.saturation),temperature:a.recommendation.temperature,sharpness:Math.max(12,a.recommendation.sharpness),blur:0}};
-  const rec=modes[mode]||modes.natural;applyValues(rec);document.querySelectorAll('[data-smart-mode]').forEach(x=>x.classList.toggle('active',x===button));api().toast(`Modo ${button?.textContent?.trim()||mode} aplicado`);setStatus('Mejora aplicada','ready');
+  const lowLight=a.p50<105, highNoise=a.noiseLevel>15, flat=a.dynamicRange<82, portrait=a.scene==='Retrato';
+  const base=a.recommendation;
+  const recipes={
+   natural:{
+    brightness:clamp(base.brightness,-14,22),
+    contrast:clamp(flat?Math.max(8,base.contrast):base.contrast,-10,16),
+    saturation:clamp(base.saturation,-8,14),
+    temperature:clamp(base.temperature,-10,10),
+    sharpness:clamp(highNoise?Math.min(7,base.sharpness):Math.max(6,base.sharpness),0,14),
+    blur:highNoise?1:0
+   },
+   portrait:{
+    brightness:clamp(Math.max(lowLight?14:6,base.brightness),4,24),
+    contrast:clamp(portrait?base.contrast:4,-4,8),
+    saturation:clamp(Math.max(5,base.saturation),3,11),
+    temperature:clamp(Math.max(4,base.temperature),2,12),
+    sharpness:highNoise?5:9,
+    blur:highNoise?2:1
+   },
+   night:{
+    brightness:clamp(Math.max(18,base.brightness),12,30),
+    contrast:clamp(flat?10:5,2,13),
+    saturation:clamp(base.saturation,-4,8),
+    temperature:clamp(base.temperature,-8,5),
+    sharpness:highNoise?4:7,
+    blur:highNoise?3:1
+   },
+   document:{brightness:12,contrast:48,saturation:-100,temperature:0,sharpness:38,blur:0},
+   vivid:{
+    brightness:clamp(base.brightness,-8,16),
+    contrast:clamp(Math.max(18,base.contrast),15,28),
+    saturation:clamp(Math.max(32,base.saturation),26,44),
+    temperature:clamp(base.temperature,-6,9),
+    sharpness:clamp(Math.max(16,base.sharpness),14,24),
+    blur:0
+   }
+  };
+  const rec=recipes[mode]||recipes.natural;
+  applyValues(rec);
+  document.querySelectorAll('[data-smart-mode]').forEach(x=>x.classList.toggle('active',x===button));
+  const labels={natural:'Natural',portrait:'Retrato',night:'Noche',document:'Documento',vivid:'Vibrante'};
+  renderRecipe(labels[mode]||mode,rec,a);
+  api().toast(`Modo ${labels[mode]||mode} aplicado`);setStatus(`${labels[mode]||mode} aplicado`,'ready');
  }finally{setButtonBusy(button,false)}
 }
+function renderRecipe(name,rec,a){
+ const el=$('smart-recipe-result');if(!el)return;
+ const names={brightness:'Luz',contrast:'Contraste',saturation:'Color',temperature:'Temperatura',sharpness:'Detalle',blur:'Suavizado'};
+ const rows=Object.entries(rec).map(([k,v])=>`<div><span>${names[k]}</span><strong>${v>0?'+':''}${v}</strong></div>`).join('');
+ el.hidden=false;
+ el.innerHTML=`<div class="smart-recipe-head"><strong>Receta ${escapeHTML(name)}</strong><small>${escapeHTML(a.scene)} · ${a.confidence}% confianza</small></div><div class="smart-recipe-values">${rows}</div>`;
+}
+
 function classify(raw){const t=normalize(raw);const complex=/abraz|pose|cambia.*ropa|vestido|traje realista|ponme en|playa|paris|disney|agrega.*persona|quita.*persona|elimina.*objeto grande|reconstru|genera|crea una escena|cambia.*cuerpo|face swap|intercambia.*cara|foto de referencia/.test(t);const local=/brillo|contraste|color|satur|nitidez|desenfoc|recort|gira|espejo|texto|sticker|circulo|cuadrado|rectangulo|flecha|linea|fondo|mascara|separa.*persona|quita.*fondo|profesional|retrato|blanco y negro|natural|noche|documento|mejora/.test(t);return complex?'pc':local?'phone':'unknown';}
 function queueForPC(raw){const q=loadQueue();q.push({id:crypto.randomUUID?.()||String(Date.now()),title:raw.trim().slice(0,120),prompt:raw.trim(),createdAt:Date.now(),status:'waiting'});saveQueue(q);const prompt=$('ai-prompt');if(prompt&&!prompt.value)prompt.value=raw.trim();api().toast('Tarea guardada para cuando enciendas el Alienware');setStatus('Guardada para PC','queued');return true;}
 function explainRoute(raw){const kind=classify(raw);if(kind==='phone')return 'Esta edición se puede resolver directamente en el teléfono.';if(kind==='pc')return 'Esta edición necesita crear contenido nuevo; se guardará para el Alienware.';return 'Primero intentaré resolverla localmente y solo usaré la PC si hace falta generar contenido.';}
@@ -85,11 +134,21 @@ function bindSmartButtons(){
  const analyzeBtn=$('smart-analyze'),applyBtn=$('smart-apply');
  if(analyzeBtn)analyzeBtn.onclick=()=>analyze().catch(err=>{console.error(err);setStatus('No se pudo analizar','error');api()?.toast(err.message)});
  if(applyBtn)applyBtn.onclick=()=>applyRecommendations(applyBtn).catch(err=>{console.error(err);setStatus('Error al aplicar','error');api()?.toast(err.message)});
+ const runMode=(button,event)=>{
+  event?.preventDefault?.();event?.stopPropagation?.();
+  if(button.dataset.running==='1')return;
+  button.dataset.running='1';
+  applyMode(button.dataset.smartMode,button).catch(err=>{console.error(err);setStatus('Error al aplicar','error');api()?.toast(err.message)}).finally(()=>button.dataset.running='0');
+ };
  document.querySelectorAll('[data-smart-mode]').forEach(button=>{
-  button.disabled=false;
-  button.onclick=event=>{event.preventDefault();event.stopPropagation();applyMode(button.dataset.smartMode,button).catch(err=>{console.error(err);setStatus('Error al aplicar','error');api()?.toast(err.message)});};
+  button.disabled=false;button.removeAttribute('disabled');button.style.pointerEvents='auto';
+  button.onclick=e=>runMode(button,e);
  });
+ // Respaldo delegado para Safari/PWA si el DOM se vuelve a renderizar.
+ const grid=document.querySelector('.smart-mode-grid');
+ if(grid&&!grid.dataset.bound){grid.dataset.bound='1';grid.addEventListener('click',e=>{const b=e.target.closest('[data-smart-mode]');if(b&&typeof b.onclick!=='function')runMode(b,e)});}
 }
+
 function boot(){
  renderQueue();bindSmartButtons();
  $('smart-queue-clear')?.addEventListener('click',()=>saveQueue([]));

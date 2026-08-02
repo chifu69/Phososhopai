@@ -10,7 +10,7 @@
   <meta name="description" content="PHOTO IA 8.2 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="assets/vendor/cropper.min.css?v=8.6.0">
-  <link rel="stylesheet" href="styles.css?v=8.6.2-smart-buttons-direct">
+  <link rel="stylesheet" href="styles.css?v=9.0.0-adaptive-recipes">
   <title>PHOTO IA 8.5 — Núcleo adaptativo local</title>
 </head>
 <body>
@@ -61,6 +61,7 @@
         <button type="button" data-smart-mode="document">📄 Documento</button>
         <button type="button" data-smart-mode="vivid">🌈 Vibrante</button>
       </div>
+      <div id="smart-recipe-result" class="smart-recipe-result" hidden></div>
       <div class="smart-route-box"><strong>Decisión automática</strong><p id="smart-route-hint">PHOTO IA decidirá si la tarea se hace aquí o se guarda para la PC.</p></div>
       <details class="smart-queue"><summary>Tareas guardadas para Alienware <span id="smart-queue-count">0</span></summary><div id="smart-queue-list"></div><button id="smart-queue-clear" class="text-btn" type="button">Vaciar lista</button></details>
     </section>
@@ -368,7 +369,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 8.6.2 • Núcleo adaptativo local + Alienware AI • <strong>8.6.2-smart-buttons-direct</strong></footer>
+  <footer>PHOTO IA 9.0 • Núcleo adaptativo local + Alienware AI • <strong>9.0.0-adaptive-recipes</strong></footer>
 </div>
 
 <div id="local-install" class="local-install" hidden>
@@ -391,15 +392,15 @@
 
 <script src="assets/vendor/fabric.min.js?v=8.6.0"></script>
 <script src="assets/vendor/cropper.min.js?v=8.6.0"></script>
-<script src="app.js?v=8.6.2-smart-buttons-direct"></script>
-<script src="creative-tools.js?v=8.6.2-smart-buttons-direct"></script>
-<script src="brain.js?v=8.6.2-smart-buttons-direct"></script>
-<script src="smart-core.js?v=8.6.2-smart-buttons-direct"></script>
-<script src="ai-studio.js?v=8.6.2-smart-buttons-direct"></script>
+<script src="app.js?v=9.0.0-adaptive-recipes"></script>
+<script src="creative-tools.js?v=9.0.0-adaptive-recipes"></script>
+<script src="brain.js?v=9.0.0-adaptive-recipes"></script>
+<script src="smart-core.js?v=9.0.0-adaptive-recipes"></script>
+<script src="ai-studio.js?v=9.0.0-adaptive-recipes"></script>
 <script src="assets/vendor/tf.min.js?v=8.6.0"></script>
 <script src="assets/vendor/coco-ssd.min.js?v=8.6.0"></script>
-<script src="vision.js?v=8.6.2-smart-buttons-direct"></script>
-<script src="segmentation.js?v=8.6.2-smart-buttons-direct"></script>
+<script src="vision.js?v=9.0.0-adaptive-recipes"></script>
+<script src="segmentation.js?v=9.0.0-adaptive-recipes"></script>
 <script async src="assets/vendor/opencv.js?v=8.6.0" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 <script>
 (() => {
