@@ -75,16 +75,32 @@ function applySlider(id,value,commit=false){if(!state.photo)return;const v=Numbe
 }
 function applyAdaptiveAdjustments(values={}, commit=true){
  if(!state.photo)throw new Error('Abre una foto primero.');
+ const F=fabric?.Image?.filters;
+ if(!F)throw new Error('El motor de filtros todavía no está listo.');
  const allowed=['brightness','contrast','saturation','temperature','sharpness','blur'];
+ const normalized={};
  for(const id of allowed){
-  if(!(id in values))continue;
-  const el=$(id);const min=Number(el?.min??-100),max=Number(el?.max??100);const v=Math.max(min,Math.min(max,Math.round(Number(values[id])||0)));
+  const el=$(id);const min=Number(el?.min??-100),max=Number(el?.max??100);
+  const raw=(id in values)?values[id]:Number(el?.value||0);
+  const v=Math.max(min,Math.min(max,Math.round(Number(raw)||0)));
+  normalized[id]=v;
   if(el)el.value=String(v);const out=$(`${id}-out`);if(out)out.textContent=String(v);
-  applySlider(id,v,false);
  }
- state.photo.dirty=true;state.photo.applyFilters();state.canvas.requestRenderAll();
+ // Construye toda la receta de una sola vez. Safari es mucho más estable así
+ // que llamando applyFilters seis veces durante la misma pulsación.
+ const keep=(state.photo.filters||[]).filter(f=>!allowed.includes(f.__key));
+ const add=(key,filter)=>{if(filter){filter.__key=key;keep.push(filter)}};
+ const b=normalized.brightness,c=normalized.contrast,s=normalized.saturation,t=normalized.temperature,sh=normalized.sharpness,bl=normalized.blur;
+ if(b&&F.Brightness)add('brightness',new F.Brightness({brightness:b/100}));
+ if(c&&F.Contrast)add('contrast',new F.Contrast({contrast:c/100}));
+ if(s&&F.Saturation)add('saturation',new F.Saturation({saturation:s/100}));
+ if(t&&F.BlendColor)add('temperature',new F.BlendColor({color:t>=0?'#ff9a48':'#63a6ff',mode:'tint',alpha:Math.abs(t/100)*.28}));
+ if(bl&&F.Blur)add('blur',new F.Blur({blur:Math.min(.8,bl/20*.6)}));
+ if(sh&&F.Convolute)add('sharpness',new F.Convolute({matrix:[0,-sh/200,0,-sh/200,1+sh/50,-sh/200,0,-sh/200,0]}));
+ state.photo.filters=keep;state.photo.dirty=true;
+ state.photo.applyFilters();state.canvas.requestRenderAll();
  if(commit)snapshot();
- return true;
+ return normalized;
 }
 function applyPreset(name){if(!state.photo)return;resetSliderUI();state.photo.filters=[];const F=fabric.Image.filters;
  const add=(key,f)=>{f.__key=key;state.photo.filters.push(f)};

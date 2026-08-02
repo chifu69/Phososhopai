@@ -11,3 +11,9 @@ Corrección del instalador local-first:
 - Se conserva el editor, el núcleo adaptativo, la segmentación local y el puente al Alienware.
 
 Sube todos los archivos principales a GitHub Pages. La carpeta windows-server sigue siendo solo para el Alienware.
+
+
+## 8.6.2
+- Botones adaptativos conectados directamente.
+- Recetas de filtros aplicadas en una sola operación estable para Safari.
+- Mensajes de error visibles si falta un filtro.

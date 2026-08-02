@@ -1,10 +1,10 @@
-const CACHE='photo-ia-8.6.1-resilient-local-core';
-const VERSION='8.6.1';
+const CACHE='photo-ia-8.6.2-smart-buttons-direct';
+const VERSION='8.6.2';
 const CORE=[
- './','./index.html','./styles.css?v=8.6.1-resilient-local-core','./app.js?v=8.6.1-resilient-local-core',
- './creative-tools.js?v=8.6.1-resilient-local-core','./brain.js?v=8.6.1-resilient-local-core',
- './smart-core.js?v=8.6.1-resilient-local-core','./ai-studio.js?v=8.6.1-resilient-local-core',
- './vision.js?v=8.6.1-resilient-local-core','./segmentation.js?v=8.6.1-resilient-local-core','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=8.6.2-smart-buttons-direct','./app.js?v=8.6.2-smart-buttons-direct',
+ './creative-tools.js?v=8.6.2-smart-buttons-direct','./brain.js?v=8.6.2-smart-buttons-direct',
+ './smart-core.js?v=8.6.2-smart-buttons-direct','./ai-studio.js?v=8.6.2-smart-buttons-direct',
+ './vision.js?v=8.6.2-smart-buttons-direct','./segmentation.js?v=8.6.2-smart-buttons-direct','./manifest.webmanifest'
 ];
 const ASSETS=[
  {local:'./assets/vendor/fabric.min.js?v=8.6.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},

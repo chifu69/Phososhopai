@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='8.6.0-local-first-core';
+const VERSION='8.6.2-smart-buttons-direct';
 const $=id=>document.getElementById(id);
 const normalize=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 const storeKey='photoia-smart-queue-v2';
@@ -81,6 +81,21 @@ function registerBrain(){if(!window.PhotoBrain?.register)return setTimeout(regis
  window.PhotoBrain.register({name:'adaptive-local-core',score:t=>/mejora.*intelig|auto.*foto|corrige.*foto|color natural|modo retrato|foto nocturna|modo noche|documento/.test(t)?115:0,run:(t)=>{if(/retrato/.test(t))applyMode('portrait');else if(/noche|nocturna/.test(t))applyMode('night');else if(/documento/.test(t))applyMode('document');else if(/vibrante/.test(t))applyMode('vivid');else applyMode('natural');const box=$('brain-response');if(box){box.textContent='Apliqué un ajuste adaptativo local basado en el contenido de la fotografía.';box.className='brain-response success';}}});
  window.PhotoBrain.register({name:'smart-pc-router',score:t=>/abraz|pose|cambia.*ropa|vestido|ponme en|playa|paris|disney|agrega.*persona|quita.*persona|reconstru|genera|crea una escena|cambia.*cuerpo|face swap|intercambia.*cara|foto de referencia/.test(t)?110:0,run:(t,raw)=>{queueForPC(raw);const box=$('brain-response');if(box){box.textContent='Esta edición es generativa. La guardé para ejecutarla cuando enciendas el Alienware.';box.className='brain-response info';}}});
 }
-function boot(){renderQueue();$('smart-analyze')?.addEventListener('click',e=>analyze().catch(err=>{console.error(err);setStatus('No se pudo analizar','error');api()?.toast(err.message)}));$('smart-apply')?.addEventListener('click',e=>applyRecommendations(e.currentTarget).catch(err=>{console.error(err);setStatus('Error','error');api()?.toast(err.message)}));document.addEventListener('click',e=>{const b=e.target.closest?.('[data-smart-mode]');if(!b)return;e.preventDefault();applyMode(b.dataset.smartMode,b).catch(err=>{console.error(err);setStatus('Error','error');api()?.toast(err.message)});},true);$('smart-queue-clear')?.addEventListener('click',()=>saveQueue([]));const input=$('command-input');input?.addEventListener('input',()=>{const text=input.value.trim();$('smart-route-hint').textContent=text?explainRoute(text):'PHOTO IA decidirá si la tarea se hace aquí o se guarda para la PC.';});registerBrain();window.PhotoSmartCore={version:VERSION,analyze,applyRecommendations,applyMode,classify,queueForPC,loadQueue,capabilities};setStatus('Núcleo adaptativo listo','ready');}
+function bindSmartButtons(){
+ const analyzeBtn=$('smart-analyze'),applyBtn=$('smart-apply');
+ if(analyzeBtn)analyzeBtn.onclick=()=>analyze().catch(err=>{console.error(err);setStatus('No se pudo analizar','error');api()?.toast(err.message)});
+ if(applyBtn)applyBtn.onclick=()=>applyRecommendations(applyBtn).catch(err=>{console.error(err);setStatus('Error al aplicar','error');api()?.toast(err.message)});
+ document.querySelectorAll('[data-smart-mode]').forEach(button=>{
+  button.disabled=false;
+  button.onclick=event=>{event.preventDefault();event.stopPropagation();applyMode(button.dataset.smartMode,button).catch(err=>{console.error(err);setStatus('Error al aplicar','error');api()?.toast(err.message)});};
+ });
+}
+function boot(){
+ renderQueue();bindSmartButtons();
+ $('smart-queue-clear')?.addEventListener('click',()=>saveQueue([]));
+ const input=$('command-input');input?.addEventListener('input',()=>{const text=input.value.trim();$('smart-route-hint').textContent=text?explainRoute(text):'PHOTO IA decidirá si la tarea se hace aquí o se guarda para la PC.';});
+ registerBrain();window.PhotoSmartCore={version:VERSION,analyze,applyRecommendations,applyMode,classify,queueForPC,loadQueue,capabilities,bindSmartButtons};
+ setStatus(api()?.state?.canvas?'Núcleo adaptativo listo':'Esperando editor…','ready');
+}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();
