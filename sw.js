@@ -1,10 +1,10 @@
-const CACHE='photo-ia-9.0.0-adaptive-recipes';
-const VERSION='8.6.2';
+const CACHE='photo-ia-9.1.0-smart-edit-bridge';
+const VERSION='9.1.0';
 const CORE=[
- './','./index.html','./styles.css?v=9.0.0-adaptive-recipes','./app.js?v=9.0.0-adaptive-recipes',
- './creative-tools.js?v=9.0.0-adaptive-recipes','./brain.js?v=9.0.0-adaptive-recipes',
- './smart-core.js?v=9.0.0-adaptive-recipes','./ai-studio.js?v=9.0.0-adaptive-recipes',
- './vision.js?v=9.0.0-adaptive-recipes','./segmentation.js?v=9.0.0-adaptive-recipes','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=9.1.0-smart-edit-bridge','./app.js?v=9.1.0-smart-edit-bridge',
+ './creative-tools.js?v=9.1.0-smart-edit-bridge','./brain.js?v=9.1.0-smart-edit-bridge',
+ './smart-core.js?v=9.1.0-smart-edit-bridge','./ai-studio.js?v=9.1.0-smart-edit-bridge',
+ './vision.js?v=9.1.0-smart-edit-bridge','./segmentation.js?v=9.1.0-smart-edit-bridge','./manifest.webmanifest'
 ];
 const ASSETS=[
  {local:'./assets/vendor/fabric.min.js?v=8.6.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},

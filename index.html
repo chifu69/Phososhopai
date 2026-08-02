@@ -10,7 +10,7 @@
   <meta name="description" content="PHOTO IA 8.2 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="assets/vendor/cropper.min.css?v=8.6.0">
-  <link rel="stylesheet" href="styles.css?v=9.0.0-adaptive-recipes">
+  <link rel="stylesheet" href="styles.css?v=9.1.0-smart-edit-bridge">
   <title>PHOTO IA 8.5 — Núcleo adaptativo local</title>
 </head>
 <body>
@@ -250,12 +250,12 @@
         <textarea id="ai-prompt" rows="4" placeholder="Ej.: Ponme abrazando a mi hijo en una playa al atardecer. Conserva nuestros rostros y haz que parezca una fotografía real."></textarea>
       </label>
       <div class="ai-quick-actions" aria-label="Acciones rápidas de IA">
-        <button type="button" data-ai-action="Cambia el fondo por una playa tropical realista al atardecer. Conserva exactamente a la persona.">🏖️ Cambiar fondo</button>
-        <button type="button" data-ai-action="Cambia la ropa de la persona por un traje elegante y realista. Conserva el rostro, cuerpo y fondo.">👔 Cambiar ropa</button>
-        <button type="button" data-ai-action="Integra a la persona de la imagen de referencia junto a la persona principal, en una pose natural y realista.">👨‍👦 Agregar persona</button>
-        <button type="button" data-ai-action="Elimina el objeto señalado o el elemento principal no deseado y reconstruye el fondo de forma natural.">🧹 Quitar objeto</button>
-        <button type="button" data-ai-action="Restaura esta fotografía, corrige daños, mejora color y detalle sin cambiar la identidad.">🪄 Restaurar</button>
-        <button type="button" data-ai-action="Mejora esta fotografía como una sesión profesional: luz natural, detalle realista, piel natural y alta calidad.">✨ Profesional</button>
+        <button type="button" data-ai-mode="replace_background" data-ai-action="Cambia el fondo por una playa tropical realista al atardecer. Conserva exactamente a la persona.">🏖️ Cambiar fondo</button>
+        <button type="button" data-ai-mode="change_clothes" data-ai-action="Cambia la ropa de la persona por un traje elegante y realista. Conserva el rostro, cuerpo y fondo.">👔 Cambiar ropa</button>
+        <button type="button" data-ai-mode="add_person" data-ai-action="Integra a la persona de la imagen de referencia junto a la persona principal, en una pose natural y realista.">👨‍👦 Agregar persona</button>
+        <button type="button" data-ai-mode="remove_object" data-ai-action="Elimina el objeto señalado o el elemento principal no deseado y reconstruye el fondo de forma natural.">🧹 Quitar objeto</button>
+        <button type="button" data-ai-mode="restore" data-ai-action="Restaura esta fotografía, corrige daños, mejora color y detalle sin cambiar la identidad.">🪄 Restaurar</button>
+        <button type="button" data-ai-mode="enhance" data-ai-action="Mejora esta fotografía como una sesión profesional: luz natural, detalle realista, piel natural y alta calidad.">✨ Profesional</button>
       </div>
 
       <div class="ai-generate-row">
@@ -369,12 +369,12 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 9.0 • Núcleo adaptativo local + Alienware AI • <strong>9.0.0-adaptive-recipes</strong></footer>
+  <footer>PHOTO IA 9.1 • Smart Edit Bridge + núcleo local • <strong>9.1.0-smart-edit-bridge</strong></footer>
 </div>
 
 <div id="local-install" class="local-install" hidden>
   <div class="local-install-card">
-    <p class="eyebrow">NÚCLEO LOCAL 8.6.2</p>
+    <p class="eyebrow">NÚCLEO LOCAL 9.1</p>
     <h2>Instalando PHOTO IA en este teléfono</h2>
     <p id="local-install-text">Preparando archivos esenciales…</p>
     <div class="local-install-track"><span id="local-install-bar"></span></div>
@@ -392,19 +392,19 @@
 
 <script src="assets/vendor/fabric.min.js?v=8.6.0"></script>
 <script src="assets/vendor/cropper.min.js?v=8.6.0"></script>
-<script src="app.js?v=9.0.0-adaptive-recipes"></script>
-<script src="creative-tools.js?v=9.0.0-adaptive-recipes"></script>
-<script src="brain.js?v=9.0.0-adaptive-recipes"></script>
-<script src="smart-core.js?v=9.0.0-adaptive-recipes"></script>
-<script src="ai-studio.js?v=9.0.0-adaptive-recipes"></script>
+<script src="app.js?v=9.1.0-smart-edit-bridge"></script>
+<script src="creative-tools.js?v=9.1.0-smart-edit-bridge"></script>
+<script src="brain.js?v=9.1.0-smart-edit-bridge"></script>
+<script src="smart-core.js?v=9.1.0-smart-edit-bridge"></script>
+<script src="ai-studio.js?v=9.1.0-smart-edit-bridge"></script>
 <script src="assets/vendor/tf.min.js?v=8.6.0"></script>
 <script src="assets/vendor/coco-ssd.min.js?v=8.6.0"></script>
-<script src="vision.js?v=9.0.0-adaptive-recipes"></script>
-<script src="segmentation.js?v=9.0.0-adaptive-recipes"></script>
+<script src="vision.js?v=9.1.0-smart-edit-bridge"></script>
+<script src="segmentation.js?v=9.1.0-smart-edit-bridge"></script>
 <script async src="assets/vendor/opencv.js?v=8.6.0" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 <script>
 (() => {
-  const VERSION='8.6.2';
+  const VERSION='9.1.0';
   const box=document.getElementById('local-install');
   const bar=document.getElementById('local-install-bar');
   const percent=document.getElementById('local-install-percent');
