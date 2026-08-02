@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.5.2-bodypix-loader-rebuild';
+const VERSION='1.8.3-offline-segmentation-core';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -17,100 +17,99 @@ const state={
   tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null
 };
 
-const DEBUG_KEY='photoia-segmentation-debug-v752';
+const DEBUG_KEY='photoia-segmentation-debug-v830';
 
-const TFJS_URLS=[
-  'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',
-  'https://unpkg.com/@tensorflow/tfjs@4.22.0/dist/tf.min.js'
-];
-// Use the package browser entry. The previous /dist/body-pix.min.js URL can load
-// without exposing window.bodyPix in some CDN/browser combinations.
-const BODYPIX_URLS=[
-  'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-pix@2.2.1',
-  'https://unpkg.com/@tensorflow-models/body-pix@2.2.1/dist/body-pix.min.js'
-];
-function scriptGlobalReady(label){
-  if(label==='TensorFlow.js')return !!(window.tf&&window.tf.ready&&window.tf.version?.tfjs);
-  if(label==='BodyPix')return !!(window.bodyPix&&typeof window.bodyPix.load==='function');
-  return false;
+// PHOTO IA 8.3 uses a dependency-free local portrait cutout engine.
+// It avoids CDN failures and never downloads BodyPix or a model at runtime.
+function colorDistance(r1,g1,b1,r2,g2,b2){
+  const dr=r1-r2,dg=g1-g2,db=b1-b2;
+  return Math.sqrt(dr*dr+dg*dg+db*db);
 }
-function normalizedScriptUrl(src){
-  try{return new URL(src,location.href).href}catch(_){return src}
+function sampleBorderPalette(rgba,w,h){
+  const samples=[];
+  const step=Math.max(2,Math.floor(Math.min(w,h)/48));
+  const push=(x,y)=>{const i=(y*w+x)*4;samples.push([rgba[i],rgba[i+1],rgba[i+2]]);};
+  for(let x=0;x<w;x+=step){push(x,0);push(x,h-1)}
+  for(let y=0;y<h;y+=step){push(0,y);push(w-1,y)}
+  // Compact the edge colors into a small palette so gradients remain supported.
+  const palette=[];
+  for(const c of samples){
+    let best=-1,bestD=1e9;
+    for(let i=0;i<palette.length;i++){
+      const p=palette[i],d=colorDistance(c[0],c[1],c[2],p.r,p.g,p.b);
+      if(d<bestD){bestD=d;best=i}
+    }
+    if(best<0||bestD>42){
+      if(palette.length<18)palette.push({r:c[0],g:c[1],b:c[2],n:1});
+    }else{
+      const p=palette[best],n=p.n+1;
+      p.r=(p.r*p.n+c[0])/n;p.g=(p.g*p.n+c[1])/n;p.b=(p.b*p.n+c[2])/n;p.n=n;
+    }
+  }
+  return palette;
 }
-function removeStaleScripts(urls,label){
-  const wanted=new Set(urls.map(normalizedScriptUrl));
-  [...document.scripts].forEach(el=>{
-    if(!wanted.has(el.src))return;
-    if(scriptGlobalReady(label))return;
-    logDebug(`${label}: quitando script incompleto`,el.src);
-    el.remove();
-  });
+function nearestPaletteDistance(r,g,b,palette){
+  let best=442;
+  for(const p of palette){const d=colorDistance(r,g,b,p.r,p.g,p.b);if(d<best)best=d;}
+  return best;
 }
-function injectClassicScript(src,label,timeoutMs=20000){
-  return new Promise((resolve,reject)=>{
-    if(scriptGlobalReady(label))return resolve();
-    const full=normalizedScriptUrl(src);
-    let settled=false;
-    const finish=(fn,value)=>{if(settled)return;settled=true;clearTimeout(timer);clearInterval(poll);fn(value)};
-    const el=document.createElement('script');
-    el.src=full;el.async=true;el.crossOrigin='anonymous';el.dataset.photoiaLoader=label;
-    const poll=setInterval(()=>{
-      if(scriptGlobalReady(label)){
-        el.dataset.loaded='1';
-        logDebug(`${label}: global detectado`,{src:full});
-        finish(resolve);
+function blurMask(mask,w,h,passes=2){
+  let src=mask;
+  for(let pass=0;pass<passes;pass++){
+    const out=new Uint8Array(src.length);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      let sum=0,weight=0;
+      for(let dy=-1;dy<=1;dy++)for(let dx=-1;dx<=1;dx++){
+        const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=w||yy>=h)continue;
+        const ww=(dx===0&&dy===0)?4:(dx===0||dy===0?2:1);sum+=src[yy*w+xx]*ww;weight+=ww;
       }
-    },50);
-    const timer=setTimeout(()=>finish(reject,makeError(`${label} no terminó de iniciar desde ${full}`,'SCRIPT_STALLED')),timeoutMs);
-    el.onload=()=>{
-      logDebug(`${label}: evento load`,{src:full,ready:scriptGlobalReady(label)});
-      if(scriptGlobalReady(label)){el.dataset.loaded='1';finish(resolve)}
-      // Do not reject immediately: some UMD bundles expose the global on the next task.
-    };
-    el.onerror=()=>finish(reject,makeError(`No se pudo cargar ${label} desde ${full}`,'SCRIPT_LOAD'));
-    document.head.appendChild(el);
-  });
+      out[y*w+x]=Math.round(sum/weight);
+    }
+    src=out;
+  }
+  return src;
 }
-async function loadClassicScript(urls,label){
-  if(scriptGlobalReady(label)){
-    logDebug(`${label}: ya estaba disponible`);
-    return;
+function largestCenterComponent(mask,w,h){
+  const seen=new Uint8Array(mask.length),queue=new Int32Array(mask.length);let best=[];
+  const cx=w/2,cy=h*.48;
+  for(let i=0;i<mask.length;i++){
+    if(seen[i]||mask[i]<110)continue;
+    let head=0,tail=0;queue[tail++]=i;seen[i]=1;const component=[];let centerBonus=0,touches=0;
+    while(head<tail){
+      const idx=queue[head++],x=idx%w,y=(idx/w)|0;component.push(idx);
+      const nd=Math.hypot((x-cx)/(w*.5),(y-cy)/(h*.55));if(nd<.65)centerBonus+=2;
+      if(x<2||y<2||x>w-3||y>h-3)touches++;
+      const ns=[idx-1,idx+1,idx-w,idx+w];
+      for(const ni of ns){if(ni<0||ni>=mask.length||seen[ni]||mask[ni]<110)continue;const nx=ni%w,ny=(ni/w)|0;if(Math.abs(nx-x)+Math.abs(ny-y)!==1)continue;seen[ni]=1;queue[tail++]=ni;}
+    }
+    const score=component.length+centerBonus-touches*8;
+    if(!best.length||score>best.score){component.score=score;best=component;}
   }
-  const list=Array.isArray(urls)?urls:[urls];
-  removeStaleScripts(list,label);
-  let lastError;
-  for(const src of list){
-    try{
-      logDebug(`${label}: intentando cargar`,src);
-      await injectClassicScript(src,label);
-      if(scriptGlobalReady(label))return;
-    }catch(err){lastError=err;logDebug(`${label}: intento fallido`,err)}
-    removeStaleScripts([src],label);
-  }
-  throw lastError||makeError(`${label} no quedó disponible.`,'SCRIPT_GLOBAL_MISSING');
+  const out=new Uint8Array(mask.length);
+  for(const idx of best)out[idx]=mask[idx];
+  return out;
 }
-async function ensureBodyPix(operation){
-  if(state.bodyPixNet)return state.bodyPixNet;
-  if(!state.bodyPixPromise){
-    state.bodyPixPromise=(async()=>{
-      setStatus('Cargando motor alternativo estable…','loading');
-      logDebug('BODYPIX: carga TensorFlow inicio',TFJS_URLS);
-      await timeout(loadClassicScript(TFJS_URLS,'TensorFlow.js'),45000,'TensorFlow.js tardó demasiado en cargar.',operation);
-      logDebug('BODYPIX: TensorFlow listo',{version:window.tf?.version?.tfjs});
-      if(window.tf?.setBackend){
-        try{await window.tf.setBackend('webgl');await window.tf.ready();logDebug('BODYPIX: backend listo',window.tf.getBackend());}
-        catch(err){logDebug('BODYPIX: WebGL falló, usando CPU',err);await window.tf.setBackend('cpu');await window.tf.ready();}
-      }
-      logDebug('BODYPIX: carga librería inicio',BODYPIX_URLS);
-      await timeout(loadClassicScript(BODYPIX_URLS,'BodyPix'),45000,'BodyPix tardó demasiado en cargar.',operation);
-      if(!window.bodyPix?.load)throw makeError('BodyPix no quedó disponible.','BODYPIX_MISSING');
-      setStatus('Preparando modelo de persona…','loading');
-      logDebug('BODYPIX: modelo inicio');
-      const net=await timeout(window.bodyPix.load({architecture:'MobileNetV1',outputStride:16,multiplier:0.50,quantBytes:2}),45000,'El modelo alternativo tardó demasiado en iniciar.',operation);
-      logDebug('BODYPIX: modelo listo');state.bodyPixNet=net;return net;
-    })().catch(err=>{state.bodyPixPromise=null;throw err;});
+function offlinePortraitMask(canvas){
+  const ctx=canvas.getContext('2d',{willReadFrequently:true}),w=canvas.width,h=canvas.height;
+  const rgba=ctx.getImageData(0,0,w,h).data,palette=sampleBorderPalette(rgba,w,h);
+  const raw=new Uint8Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=(y*w+x)*4,r=rgba[i],g=rgba[i+1],b=rgba[i+2];
+    const edgeD=nearestPaletteDistance(r,g,b,palette);
+    const nx=(x-w/2)/(w/2),ny=(y-h*.48)/(h*.55),rad=Math.sqrt(nx*nx+ny*ny);
+    const center=Math.max(0,1-rad);
+    const portraitPrior=Math.max(0,1-Math.abs(x-w/2)/(w*.54))*Math.max(0,1-Math.abs(y-h*.52)/(h*.62));
+    const score=edgeD+center*30+portraitPrior*24;
+    raw[y*w+x]=score>74?255:score>54?Math.round((score-54)/20*255):0;
   }
-  return state.bodyPixPromise;
+  let clean=blurMask(raw,w,h,2);
+  clean=largestCenterComponent(clean,w,h);
+  clean=blurMask(clean,w,h,2);
+  let selected=0;for(const v of clean)if(v>110)selected++;
+  if(selected<w*h*.035)throw makeError('No pude separar claramente a la persona. Usa “Tocar objeto” o prueba una foto con más contraste.','OFFLINE_MASK_SMALL');
+  if(selected>w*h*.90)throw makeError('La persona y el fondo tienen colores demasiado parecidos. Usa “Tocar objeto”.','OFFLINE_MASK_LARGE');
+  logDebug('OFFLINE CORE: máscara lista',{width:w,height:h,selected,total:w*h,palette:palette.length});
+  return clean;
 }
 function featherMask(mask,width,height){
   const out=new Uint8Array(mask.length);
@@ -397,13 +396,12 @@ async function segmentPerson(){
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
   const operation=beginOperation('Separando a la persona…');setStatus('Preparando una copia optimizada de la foto…','loading');
   try{
-    const work=await getWorkCanvas(operation);const net=await ensureBodyPix(operation);
-    setStatus('Detectando a la persona…','loading');logDebug('BODYPIX: inferencia inicio',{width:work.width,height:work.height});
-    const result=await timeout(net.segmentPerson(work,{internalResolution:'medium',segmentationThreshold:0.68,maxDetections:5,scoreThreshold:0.2,nmsRadius:20}),RUN_TIMEOUT,'El análisis tardó demasiado.',operation);
-    logDebug('BODYPIX: inferencia lista',{width:result.width,height:result.height});
-    const mask=new Uint8Array(result.data.length);let selected=0;for(let i=0;i<result.data.length;i++){if(result.data[i]){mask[i]=255;selected++;}}
-    if(selected<100)throw makeError('No encontré una persona claramente. Prueba “Tocar objeto”.');
-    await setMask(featherMask(mask,result.width,result.height),result.width,result.height,'Persona');
+    const work=await getWorkCanvas(operation);
+    setStatus('Separando a la persona sin descargar modelos…','loading');logDebug('OFFLINE CORE: inferencia inicio',{width:work.width,height:work.height});
+    await letOverlayPaint();
+    const mask=offlinePortraitMask(work);
+    if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
+    await setMask(mask,work.width,work.height,'Persona');
     setStatus('Persona segmentada. Ya puedes quitar el fondo.','ready');api().toast('Máscara de persona lista');
   }catch(err){const msg=friendlyError(err);logDebug('SEGMENTAR PERSONA: ERROR',err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
   finally{finishOperation(operation);}
@@ -468,7 +466,7 @@ function boot(){
   if($('segment-debug-test'))$('segment-debug-test').onclick=runConnectionTests;
   if($('processing-cancel'))$('processing-cancel').onclick=()=>cancelCurrent(true);
   api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(e.target?.photoRole==='main')clearMask();});
-  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor 7.5.2 listo. La primera separación puede tardar mientras descarga el modelo.');
+  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor 8.3 local listo. No descarga BodyPix ni modelos externos.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
 window.PhotoSegmentation={version:VERSION,segmentPerson,beginTapMode,createCutout,clearMask,showMask,cancel:()=>cancelCurrent(true),command,get mask(){return state.mask}};

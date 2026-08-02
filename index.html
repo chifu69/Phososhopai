@@ -10,7 +10,7 @@
   <meta name="description" content="PHOTO IA 8.2 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=8.2.0-phone-ai-studio">
+  <link rel="stylesheet" href="styles.css?v=8.3.0-offline-segmentation-core">
   <title>PHOTO IA 8.2 — Estudio IA</title>
 </head>
 <body>
@@ -288,8 +288,8 @@
       </div>
       <p class="vision-help">Puedes escribir “segmenta la persona”, “selección inteligente” o “quita el fondo”. Para cualquier objeto, pulsa “Tocar objeto” y luego toca su centro en la foto.</p>
       <details class="segment-debug" open>
-        <summary>🧪 Diagnóstico técnico 7.4</summary>
-        <p>Primero pulsa <strong>Probar conexiones</strong>. Después intenta <strong>Separar persona</strong>. El registro mostrará exactamente dónde se detiene.</p>
+        <summary>🧪 Diagnóstico técnico 8.3</summary>
+        <p>La separación de persona ahora funciona localmente, sin BodyPix ni descargas. El diagnóstico registra cada etapa del motor.</p>
         <div class="segment-debug-actions">
           <button id="segment-debug-test" class="secondary">Probar conexiones</button>
           <button id="segment-debug-copy" class="secondary">Copiar diagnóstico</button>
@@ -345,7 +345,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 8.2 • Editor local + Alienware AI • <strong>8.2.0-phone-ai-studio</strong></footer>
+  <footer>PHOTO IA 8.2 • Editor local + Alienware AI • <strong>8.3.0-offline-segmentation-core</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -356,14 +356,14 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=8.2.0-phone-ai-studio"></script>
-<script src="creative-tools.js?v=8.2.0-phone-ai-studio"></script>
-<script src="brain.js?v=8.2.0-phone-ai-studio"></script>
-<script src="ai-studio.js?v=8.2.0-phone-ai-studio"></script>
+<script src="app.js?v=8.3.0-offline-segmentation-core"></script>
+<script src="creative-tools.js?v=8.3.0-offline-segmentation-core"></script>
+<script src="brain.js?v=8.3.0-offline-segmentation-core"></script>
+<script src="ai-studio.js?v=8.3.0-offline-segmentation-core"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-<script src="vision.js?v=8.2.0-phone-ai-studio"></script>
-<script src="segmentation.js?v=8.2.0-phone-ai-studio"></script>
+<script src="vision.js?v=8.3.0-offline-segmentation-core"></script>
+<script src="segmentation.js?v=8.3.0-offline-segmentation-core"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>
