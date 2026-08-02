@@ -73,6 +73,19 @@ function applySlider(id,value,commit=false){if(!state.photo)return;const v=Numbe
  if(id==='sharpness')filter=v?new F.Convolute({matrix:[0,-v/200,0,-v/200,1+v/50,-v/200,0,-v/200,0]}):null;
  replaceFilter(id,Math.abs(v)>0?filter:null);if(commit)snapshot()
 }
+function applyAdaptiveAdjustments(values={}, commit=true){
+ if(!state.photo)throw new Error('Abre una foto primero.');
+ const allowed=['brightness','contrast','saturation','temperature','sharpness','blur'];
+ for(const id of allowed){
+  if(!(id in values))continue;
+  const el=$(id);const min=Number(el?.min??-100),max=Number(el?.max??100);const v=Math.max(min,Math.min(max,Math.round(Number(values[id])||0)));
+  if(el)el.value=String(v);const out=$(`${id}-out`);if(out)out.textContent=String(v);
+  applySlider(id,v,false);
+ }
+ state.photo.dirty=true;state.photo.applyFilters();state.canvas.requestRenderAll();
+ if(commit)snapshot();
+ return true;
+}
 function applyPreset(name){if(!state.photo)return;resetSliderUI();state.photo.filters=[];const F=fabric.Image.filters;
  const add=(key,f)=>{f.__key=key;state.photo.filters.push(f)};
  if(name==='bw')add('preset',new F.Grayscale());
@@ -211,7 +224,7 @@ window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv
 window.PhotoIA={
   get state(){return state},
   snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,
-  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,rotate,flip,openCrop,addText,exportDataUrl,setMainImage,loadFile,executeLegacyCommand:executeCommand
+  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,rotate,flip,openCrop,addText,exportDataUrl,setMainImage,loadFile,executeLegacyCommand:executeCommand
 };
 document.addEventListener('DOMContentLoaded',()=>{init();window.dispatchEvent(new CustomEvent('photoia-ready'))});
 })();

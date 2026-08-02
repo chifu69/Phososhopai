@@ -1,13 +1,11 @@
-# PHOTO IA 8.5 — Adaptive Local Core
+# PHOTO IA 8.6 — Local First Core
 
-Núcleo local basado en una arquitectura híbrida: análisis clásico adaptativo en el teléfono, enrutamiento por capacidades y cola para tareas generativas del Alienware.
+Esta versión usa rutas locales para las librerías principales. En la primera apertura, el service worker descarga y guarda Fabric.js, Cropper.js, TensorFlow.js, COCO-SSD, OpenCV y los recursos opcionales de MediaPipe dentro del almacenamiento de Safari.
 
-## Mejoras
-- Histograma y percentiles para luz y rango dinámico.
-- Detección de clipping en sombras y altas luces.
-- Estimación de ruido, nitidez, temperatura y saturación.
-- Clasificación ligera de escena: retrato, exterior, naturaleza, noche, documento o general.
-- Receta adaptativa distinta para cada foto.
-- Modos locales Natural, Retrato, Noche, Documento y Vibrante.
-- Botón Aplicar recomendación reparado y conectado al historial.
-- Enrutador teléfono/Alienware y cola persistente.
+Después de completar “Instalando PHOTO IA en este teléfono”, las herramientas principales se sirven desde el caché local. El Alienware sigue reservado para generación compleja.
+
+## Publicación
+Sube los archivos principales a GitHub Pages. La carpeta `windows-server` se conserva solamente para el Alienware.
+
+## Importante
+El ZIP se entrega por `sandbox:` únicamente dentro del chat. La app publicada no usa Sandbox.

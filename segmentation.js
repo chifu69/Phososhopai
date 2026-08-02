@@ -1,13 +1,13 @@
 (() => {
 'use strict';
-const VERSION='1.8.3-offline-segmentation-core';
+const VERSION='1.8.6-local-first-core';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
-const MEDIAPIPE_ESM=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/+esm`;
-const MEDIAPIPE_WASM=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${TASKS_VERSION}/wasm`;
-const PERSON_MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite';
-const INTERACTIVE_MODEL='https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite';
+const MEDIAPIPE_ESM='./assets/mediapipe/tasks-vision.esm.js';
+const MEDIAPIPE_WASM='./assets/mediapipe/wasm';
+const PERSON_MODEL='./assets/models/selfie_segmenter_landscape.tflite';
+const INTERACTIVE_MODEL='./assets/models/interactive_segmenter.tflite';
 const PERSON_CLASS_ID=1;
 const LOAD_TIMEOUT=30000;
 const RUN_TIMEOUT=45000;
