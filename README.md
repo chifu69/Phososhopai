@@ -1,13 +1,14 @@
-# PHOTO IA 7.5 — Diagnóstico de segmentación
+# PHOTO IA 8.1 — Phone AI Studio
 
-Esta compilación no intenta ocultar el fallo. Registra cada etapa del motor MediaPipe: descarga ESM, carga WASM, acceso a modelos, creación del segmentador e inferencia.
+Esta versión conserva el editor local y añade **Estudio IA**, preparado para conectarse al Photoshop AI Server del Alienware.
 
-## Prueba
-1. Reemplaza todos los archivos en GitHub.
-2. Espera a que GitHub Pages publique el cambio.
-3. Abre la página en Safari y recárgala.
-4. En “Diagnóstico técnico 7.4”, pulsa “Probar conexiones”.
-5. Pulsa “Separar persona”.
-6. Usa “Copiar diagnóstico” o “Guardar diagnóstico” y comparte el resultado.
+## Incluye
+- Foto principal y fotografía de referencia.
+- Instrucciones en lenguaje natural.
+- Acciones rápidas para fondo, ropa, personas, objetos, restauración y mejora profesional.
+- Estado del servidor, progreso, cancelación y errores claros.
+- Dirección y token privado guardados localmente en el teléfono.
+- Historial de resultados y colocación automática en el lienzo.
+- API esperada: `GET /health` y `POST /api/v1/edit`.
 
-El registro no incluye la fotografía ni datos personales de la imagen.
+El servidor se construirá en la siguiente fase sobre ComfyUI + FLUX.2 Klein 4B Distilled.

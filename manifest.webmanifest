@@ -1,1 +1,11 @@
-{"name":"PHOTO IA 7.0","short_name":"PHOTO IA","description":"Editor privado con Photo Brain 2.0, memoria, macros y comandos encadenados.","start_url":"./?v=700","display":"standalone","background_color":"#edf2f6","theme_color":"#101820","orientation":"portrait-primary","icons":[]}
+{
+  "name": "PHOTO IA 8.1",
+  "short_name": "PHOTO IA",
+  "description": "Editor privado con Photo Brain 2.0, memoria, macros y comandos encadenados.",
+  "start_url": "./?v=700",
+  "display": "standalone",
+  "background_color": "#edf2f6",
+  "theme_color": "#101820",
+  "orientation": "portrait-primary",
+  "icons": []
+}

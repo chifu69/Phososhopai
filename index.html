@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 7.5 con segmentación local estable, cancelación y límites de tiempo.">
+  <meta name="description" content="PHOTO IA 8.1 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=7.5.2-bodypix-loader-rebuild">
-  <title>PHOTO IA 7.3 — Vision Engine 1.0</title>
+  <link rel="stylesheet" href="styles.css?v=8.1.0-phone-ai-studio">
+  <title>PHOTO IA 8.1 — Estudio IA</title>
 </head>
 <body>
 <div class="app-shell">
@@ -198,6 +198,69 @@
     </section>
 
 
+    <section id="ai-studio" class="panel ai-studio-panel">
+      <div class="section-heading ai-studio-heading">
+        <div><p class="eyebrow">ESTUDIO IA • ALIENWARE</p><h2>Edita con instrucciones</h2></div>
+        <span id="ai-server-badge" class="ai-server-badge offline"><i></i> PC desconectada</span>
+      </div>
+      <p class="ai-studio-copy">Usa el editor local cuando estás fuera. Al encender tu Alienware, PHOTO IA enviará las tareas complejas a FLUX.2 Klein y devolverá el resultado.</p>
+
+      <div class="ai-input-grid">
+        <label class="ai-photo-card primary-photo">
+          <span class="ai-photo-label">Foto principal</span>
+          <div id="ai-main-preview" class="ai-photo-preview"><b>📷</b><small>Usar foto del lienzo</small></div>
+          <input id="ai-main-file" type="file" accept="image/*" hidden>
+          <button id="ai-use-canvas" type="button" class="secondary">Usar lienzo actual</button>
+          <button id="ai-choose-main" type="button" class="text-btn">Elegir otra foto</button>
+        </label>
+        <label class="ai-photo-card reference-photo">
+          <span class="ai-photo-label">Referencia opcional</span>
+          <div id="ai-reference-preview" class="ai-photo-preview"><b>＋</b><small>Persona, ropa o estilo</small></div>
+          <input id="ai-reference-file" type="file" accept="image/*" hidden>
+          <button id="ai-choose-reference" type="button" class="secondary">Agregar referencia</button>
+          <button id="ai-clear-reference" type="button" class="text-btn" disabled>Quitar</button>
+        </label>
+      </div>
+
+      <label class="ai-prompt-label">¿Qué quieres que haga?
+        <textarea id="ai-prompt" rows="4" placeholder="Ej.: Ponme abrazando a mi hijo en una playa al atardecer. Conserva nuestros rostros y haz que parezca una fotografía real."></textarea>
+      </label>
+      <div class="ai-quick-actions" aria-label="Acciones rápidas de IA">
+        <button type="button" data-ai-action="Cambia el fondo por una playa tropical realista al atardecer. Conserva exactamente a la persona.">🏖️ Cambiar fondo</button>
+        <button type="button" data-ai-action="Cambia la ropa de la persona por un traje elegante y realista. Conserva el rostro, cuerpo y fondo.">👔 Cambiar ropa</button>
+        <button type="button" data-ai-action="Integra a la persona de la imagen de referencia junto a la persona principal, en una pose natural y realista.">👨‍👦 Agregar persona</button>
+        <button type="button" data-ai-action="Elimina el objeto señalado o el elemento principal no deseado y reconstruye el fondo de forma natural.">🧹 Quitar objeto</button>
+        <button type="button" data-ai-action="Restaura esta fotografía, corrige daños, mejora color y detalle sin cambiar la identidad.">🪄 Restaurar</button>
+        <button type="button" data-ai-action="Mejora esta fotografía como una sesión profesional: luz natural, detalle realista, piel natural y alta calidad.">✨ Profesional</button>
+      </div>
+
+      <div class="ai-generate-row">
+        <button id="ai-generate" class="primary wide" type="button">Generar en Alienware</button>
+        <button id="ai-cancel-job" class="secondary danger" type="button" hidden>Cancelar tarea</button>
+      </div>
+      <div id="ai-job-status" class="ai-job-status idle">
+        <div><strong>Lista para preparar una tarea</strong><small>La PC puede estar apagada mientras diseñas la edición.</small></div>
+        <span id="ai-progress-text">0%</span>
+        <div class="ai-progress"><i id="ai-progress-bar"></i></div>
+      </div>
+
+      <details class="ai-settings">
+        <summary>⚙️ Conexión privada con el Alienware</summary>
+        <div class="ai-settings-grid">
+          <label>Dirección del servidor<input id="ai-server-url" type="url" inputmode="url" placeholder="http://192.168.1.50:8189"></label>
+          <label>Token privado<input id="ai-server-token" type="password" autocomplete="off" placeholder="Se guardará solo en este teléfono"></label>
+        </div>
+        <div class="button-row">
+          <button id="ai-test-server" class="secondary" type="button">Probar conexión</button>
+          <button id="ai-save-settings" class="secondary" type="button">Guardar</button>
+        </div>
+        <p id="ai-connection-note" class="ai-connection-note">Cuando regresemos a casa configuraremos la dirección y el token del servidor.</p>
+      </details>
+
+      <div class="ai-results-head"><strong>Resultados recientes</strong><button id="ai-clear-history" class="text-btn" type="button">Limpiar</button></div>
+      <div id="ai-history" class="ai-history"><p class="layers-empty">Todavía no hay resultados del Estudio IA.</p></div>
+    </section>
+
     <section class="panel vision-panel">
       <div class="section-heading">
         <div><p class="eyebrow">VISION ENGINE 1.0</p><h2>Detecta y separa objetos</h2></div>
@@ -282,7 +345,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 7.5 • Vision Engine estable • <strong>7.5.2-bodypix-loader-rebuild</strong></footer>
+  <footer>PHOTO IA 8.1 • Editor local + Alienware AI • <strong>8.1.0-phone-ai-studio</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -293,13 +356,14 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=7.5.2-bodypix-loader-rebuild"></script>
-<script src="creative-tools.js?v=7.5.2-bodypix-loader-rebuild"></script>
-<script src="brain.js?v=7.5.2-bodypix-loader-rebuild"></script>
+<script src="app.js?v=8.1.0-phone-ai-studio"></script>
+<script src="creative-tools.js?v=8.1.0-phone-ai-studio"></script>
+<script src="brain.js?v=8.1.0-phone-ai-studio"></script>
+<script src="ai-studio.js?v=8.1.0-phone-ai-studio"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-<script src="vision.js?v=7.5.2-bodypix-loader-rebuild"></script>
-<script src="segmentation.js?v=7.5.2-bodypix-loader-rebuild"></script>
+<script src="vision.js?v=8.1.0-phone-ai-studio"></script>
+<script src="segmentation.js?v=8.1.0-phone-ai-studio"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>

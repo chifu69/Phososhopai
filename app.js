@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='7.3.3';
+const VERSION='8.1.0-phone-ai-studio';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -211,7 +211,7 @@ window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv
 window.PhotoIA={
   get state(){return state},
   snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,
-  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,rotate,flip,openCrop,addText,executeLegacyCommand:executeCommand
+  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,rotate,flip,openCrop,addText,exportDataUrl,setMainImage,loadFile,executeLegacyCommand:executeCommand
 };
 document.addEventListener('DOMContentLoaded',()=>{init();window.dispatchEvent(new CustomEvent('photoia-ready'))});
 })();
