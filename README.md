@@ -1,15 +1,13 @@
-# PHOTO IA 8.4 — Smart Local Core
+# PHOTO IA 8.5 — Adaptive Local Core
 
-Esta versión fortalece el núcleo que trabaja directamente en el teléfono.
+Núcleo local basado en una arquitectura híbrida: análisis clásico adaptativo en el teléfono, enrutamiento por capacidades y cola para tareas generativas del Alienware.
 
-## Nuevo
-- Análisis local real de iluminación, contraste, saturación, temperatura y detalle.
-- Recomendaciones calculadas para cada fotografía, no un filtro fijo.
-- Aplicación automática de correcciones con historial Deshacer/Rehacer.
-- Enrutador inteligente: decide si una orden se resuelve en el teléfono o necesita IA generativa.
-- Cola local para guardar tareas complejas hasta encender el Alienware.
-- Las tareas guardadas se conservan aunque cierres la app.
-- Mantiene segmentación local, capas, herramientas creativas y AI Studio.
-
-## Publicación
-Sube los archivos principales a GitHub Pages. La carpeta `windows-server` permanece únicamente en el Alienware.
+## Mejoras
+- Histograma y percentiles para luz y rango dinámico.
+- Detección de clipping en sombras y altas luces.
+- Estimación de ruido, nitidez, temperatura y saturación.
+- Clasificación ligera de escena: retrato, exterior, naturaleza, noche, documento o general.
+- Receta adaptativa distinta para cada foto.
+- Modos locales Natural, Retrato, Noche, Documento y Vibrante.
+- Botón Aplicar recomendación reparado y conectado al historial.
+- Enrutador teléfono/Alienware y cola persistente.
