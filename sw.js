@@ -1,52 +1,66 @@
-const CACHE='photo-ia-8.6.0-local-first-core';
+const CACHE='photo-ia-8.6.1-resilient-local-core';
+const VERSION='8.6.1';
 const CORE=[
- './','./index.html','./styles.css?v=8.6.0-local-first-core','./app.js?v=8.6.0-local-first-core',
- './creative-tools.js?v=8.6.0-local-first-core','./brain.js?v=8.6.0-local-first-core',
- './smart-core.js?v=8.6.0-local-first-core','./ai-studio.js?v=8.6.0-local-first-core',
- './vision.js?v=8.6.0-local-first-core','./segmentation.js?v=8.6.0-local-first-core','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=8.6.1-resilient-local-core','./app.js?v=8.6.1-resilient-local-core',
+ './creative-tools.js?v=8.6.1-resilient-local-core','./brain.js?v=8.6.1-resilient-local-core',
+ './smart-core.js?v=8.6.1-resilient-local-core','./ai-studio.js?v=8.6.1-resilient-local-core',
+ './vision.js?v=8.6.1-resilient-local-core','./segmentation.js?v=8.6.1-resilient-local-core','./manifest.webmanifest'
 ];
-const LOCAL_ASSETS={
- './assets/vendor/fabric.min.js?v=8.6.0':'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',
- './assets/vendor/cropper.min.js?v=8.6.0':'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',
- './assets/vendor/cropper.min.css?v=8.6.0':'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',
- './assets/vendor/tf.min.js?v=8.6.0':'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',
- './assets/vendor/coco-ssd.min.js?v=8.6.0':'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',
- './assets/vendor/opencv.js?v=8.6.0':'https://docs.opencv.org/4.x/opencv.js',
- './assets/mediapipe/tasks-vision.esm.js':'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',
- './assets/mediapipe/wasm/vision_wasm_internal.js':'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js',
- './assets/mediapipe/wasm/vision_wasm_internal.wasm':'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm',
- './assets/mediapipe/wasm/vision_wasm_nosimd_internal.js':'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.js',
- './assets/mediapipe/wasm/vision_wasm_nosimd_internal.wasm':'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.wasm',
- './assets/models/selfie_segmenter_landscape.tflite':'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite',
- './assets/models/interactive_segmenter.tflite':'https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite'
-};
+const ASSETS=[
+ {local:'./assets/vendor/fabric.min.js?v=8.6.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=8.6.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=8.6.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=8.6.0',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=8.6.0',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=8.6.0',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe opcional',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.js',name:'WASM compatible',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.wasm',name:'Motor WASM compatible',required:false},
+ {local:'./assets/models/selfie_segmenter_landscape.tflite',remote:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite',name:'Modelo de persona opcional',required:false},
+ {local:'./assets/models/interactive_segmenter.tflite',remote:'https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite',name:'Modelo interactivo opcional',required:false}
+];
 const localKey=url=>new URL(url,self.registration.scope).href;
-async function cacheRemoteAsLocal(local,remote){
- const response=await fetch(remote,{mode:'cors',cache:'no-store'});
- if(!response.ok) throw new Error(`${response.status} ${remote}`);
+async function fetchWithTimeout(url,ms=25000){
+ const controller=new AbortController();
+ const timer=setTimeout(()=>controller.abort(),ms);
+ try{return await fetch(url,{mode:'cors',cache:'no-store',signal:controller.signal});}
+ finally{clearTimeout(timer)}
+}
+async function cacheRemote(asset){
+ const response=await fetchWithTimeout(asset.remote,asset.required?25000:12000);
+ if(!response.ok) throw new Error(`${response.status} ${asset.remote}`);
  const cache=await caches.open(CACHE);
- await cache.put(localKey(local),response.clone());
+ await cache.put(localKey(asset.local),response.clone());
 }
 async function notify(data){
  const clients=await self.clients.matchAll({includeUncontrolled:true,type:'window'});
  clients.forEach(c=>c.postMessage(data));
 }
 async function installLocalCore(){
- const entries=Object.entries(LOCAL_ASSETS), total=entries.length;
+ const cache=await caches.open(CACHE);
+ const results=[];
  let done=0;
- for(const [local,remote] of entries){
-  const cache=await caches.open(CACHE);
-  const existing=await cache.match(localKey(local));
-  if(!existing) await cacheRemoteAsLocal(local,remote);
+ for(const asset of ASSETS){
+  let status='cached',error='';
+  try{
+   const existing=await cache.match(localKey(asset.local));
+   if(!existing){await cacheRemote(asset);status='downloaded'}
+  }catch(err){status='failed';error=String(err?.message||err)}
   done++;
-  await notify({type:'LOCAL_CORE_PROGRESS',done,total,label:`Guardando herramienta ${done} de ${total}…`});
+  results.push({name:asset.name,local:asset.local,required:asset.required,status,error});
+  await notify({type:'LOCAL_CORE_PROGRESS',done,total:ASSETS.length,label:status==='failed'?`${asset.name}: no disponible`:`${asset.name}: listo`,item:results.at(-1)});
  }
- await notify({type:'LOCAL_CORE_READY'});
+ const missingRequired=results.filter(r=>r.required&&r.status==='failed');
+ const missingOptional=results.filter(r=>!r.required&&r.status==='failed');
+ await notify({type:'LOCAL_CORE_READY',version:VERSION,results,missingRequired,missingOptional,degraded:missingRequired.length>0});
 }
-self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(CORE)).then(()=>self.skipWaiting())));
+self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(CORE.map(x=>c.add(x)))).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('message',e=>{
- if(e.data?.type==='INSTALL_LOCAL_CORE') e.waitUntil(installLocalCore().catch(async err=>{console.error(err);await notify({type:'LOCAL_CORE_ERROR',message:String(err)})}));
+ if(e.data?.type==='INSTALL_LOCAL_CORE') e.waitUntil(installLocalCore().catch(async err=>notify({type:'LOCAL_CORE_FATAL',message:String(err)})));
+ if(e.data?.type==='SKIP_LOCAL_INSTALL') e.waitUntil(notify({type:'LOCAL_CORE_READY',version:VERSION,results:[],missingRequired:[],missingOptional:[],degraded:true,skipped:true}));
 });
 self.addEventListener('fetch',e=>{
  if(e.request.method!=='GET') return;
@@ -56,14 +70,14 @@ self.addEventListener('fetch',e=>{
   const cache=await caches.open(CACHE);
   const cached=await cache.match(e.request,{ignoreSearch:false}) || await cache.match(url.href);
   if(cached) return cached;
-  const relative='./'+url.pathname.slice(new URL(self.registration.scope).pathname.length)+(url.search||'');
-  const remote=LOCAL_ASSETS[relative];
-  if(remote){
-   try{await cacheRemoteAsLocal(relative,remote);return (await cache.match(localKey(relative)));}
-   catch(err){return new Response('PHOTO IA local asset unavailable',{status:503,headers:{'Content-Type':'text/plain'}})}
+  const scopePath=new URL(self.registration.scope).pathname;
+  const relative='./'+url.pathname.slice(scopePath.length)+(url.search||'');
+  const asset=ASSETS.find(a=>a.local===relative);
+  if(asset){
+   try{await cacheRemote(asset);return (await cache.match(localKey(relative)));}
+   catch(err){return new Response('',{status:204})}
   }
-  try{
-   const r=await fetch(e.request); if(r.ok) cache.put(e.request,r.clone()); return r;
-  }catch(err){return (await cache.match('./index.html')) || new Response('Offline',{status:503});}
+  try{const r=await fetch(e.request);if(r.ok) cache.put(e.request,r.clone());return r}
+  catch(err){return (await cache.match('./index.html'))||new Response('Offline',{status:503})}
  })());
 });

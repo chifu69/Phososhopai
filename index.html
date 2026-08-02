@@ -10,7 +10,7 @@
   <meta name="description" content="PHOTO IA 8.2 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="assets/vendor/cropper.min.css?v=8.6.0">
-  <link rel="stylesheet" href="styles.css?v=8.6.0-local-first-core">
+  <link rel="stylesheet" href="styles.css?v=8.6.1-resilient-local-core">
   <title>PHOTO IA 8.5 — Núcleo adaptativo local</title>
 </head>
 <body>
@@ -368,18 +368,19 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 8.6 • Núcleo adaptativo local + Alienware AI • <strong>8.6.0-local-first-core</strong></footer>
+  <footer>PHOTO IA 8.6.1 • Núcleo adaptativo local + Alienware AI • <strong>8.6.1-resilient-local-core</strong></footer>
 </div>
 
 <div id="local-install" class="local-install" hidden>
   <div class="local-install-card">
-    <p class="eyebrow">NÚCLEO LOCAL 8.6</p>
+    <p class="eyebrow">NÚCLEO LOCAL 8.6.1</p>
     <h2>Instalando PHOTO IA en este teléfono</h2>
     <p id="local-install-text">Preparando archivos esenciales…</p>
     <div class="local-install-track"><span id="local-install-bar"></span></div>
     <b id="local-install-percent">0 %</b>
-    <small>La primera carga puede tardar. Después, las herramientas principales funcionarán desde el almacenamiento local del iPhone.</small>
-    <button id="local-install-retry" class="secondary wide" hidden>Reintentar instalación</button>
+    <small>Los archivos esenciales se guardan primero. Las herramientas opcionales pueden terminar después sin bloquear la app.</small>
+    <div id="local-install-list" class="local-install-list" aria-live="polite"></div>
+    <div class="local-install-actions"><button id="local-install-skip" class="secondary wide">Abrir app ahora</button><button id="local-install-retry" class="secondary wide" hidden>Reintentar faltantes</button></div>
   </div>
 </div>
 <div id="crop-modal" class="crop-modal" hidden>
@@ -390,41 +391,61 @@
 
 <script src="assets/vendor/fabric.min.js?v=8.6.0"></script>
 <script src="assets/vendor/cropper.min.js?v=8.6.0"></script>
-<script src="app.js?v=8.6.0-local-first-core"></script>
-<script src="creative-tools.js?v=8.6.0-local-first-core"></script>
-<script src="brain.js?v=8.6.0-local-first-core"></script>
-<script src="smart-core.js?v=8.6.0-local-first-core"></script>
-<script src="ai-studio.js?v=8.6.0-local-first-core"></script>
+<script src="app.js?v=8.6.1-resilient-local-core"></script>
+<script src="creative-tools.js?v=8.6.1-resilient-local-core"></script>
+<script src="brain.js?v=8.6.1-resilient-local-core"></script>
+<script src="smart-core.js?v=8.6.1-resilient-local-core"></script>
+<script src="ai-studio.js?v=8.6.1-resilient-local-core"></script>
 <script src="assets/vendor/tf.min.js?v=8.6.0"></script>
 <script src="assets/vendor/coco-ssd.min.js?v=8.6.0"></script>
-<script src="vision.js?v=8.6.0-local-first-core"></script>
-<script src="segmentation.js?v=8.6.0-local-first-core"></script>
+<script src="vision.js?v=8.6.1-resilient-local-core"></script>
+<script src="segmentation.js?v=8.6.1-resilient-local-core"></script>
 <script async src="assets/vendor/opencv.js?v=8.6.0" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 <script>
 (() => {
+  const VERSION='8.6.1';
   const box=document.getElementById('local-install');
   const bar=document.getElementById('local-install-bar');
   const percent=document.getElementById('local-install-percent');
   const text=document.getElementById('local-install-text');
   const retry=document.getElementById('local-install-retry');
+  const skip=document.getElementById('local-install-skip');
+  const list=document.getElementById('local-install-list');
+  const items=new Map();
   const set=(done,total,label)=>{const n=total?Math.round(done/total*100):0;bar.style.width=n+'%';percent.textContent=n+' %';if(label)text.textContent=label;};
+  const drawItem=item=>{
+    if(!item||!list)return;
+    items.set(item.local,item);
+    list.innerHTML=[...items.values()].map(x=>`<div class="local-install-item ${x.status}"><span>${x.status==='failed'?'△':'✓'}</span><b>${x.name}</b><small>${x.status==='failed'?(x.required?'Esencial pendiente':'Opcional; se puede instalar después'):'Listo en el teléfono'}</small></div>`).join('');
+  };
+  const finish=(d={})=>{
+    set(1,1,d.degraded?'PHOTO IA lista en modo compatible':'Núcleo local listo');
+    localStorage.setItem('photoia-local-core-ready',VERSION);
+    localStorage.setItem('photoia-local-core-report',JSON.stringify(d.results||[]));
+    if(d.missingOptional?.length||d.missingRequired?.length){
+      retry.hidden=false;
+      text.textContent=d.missingRequired?.length?'La app puede abrir. Algunas herramientas esenciales se cargarán por Internet cuando se usen.':'La app está lista. Algunas herramientas opcionales se instalarán después.';
+      setTimeout(()=>box.hidden=true,1800);
+    }else setTimeout(()=>box.hidden=true,700);
+  };
   const start=async()=>{
-    retry.hidden=true;box.hidden=false;set(0,1,'Comprobando el núcleo local…');
+    retry.hidden=true;box.hidden=false;items.clear();if(list)list.innerHTML='';set(0,1,'Comprobando archivos locales…');
     try{
       if(navigator.storage?.persist) await navigator.storage.persist();
       const reg=await navigator.serviceWorker.ready;
-      reg.active?.postMessage({type:'INSTALL_LOCAL_CORE'});
-    }catch(e){text.textContent='No se pudo iniciar la instalación local.';retry.hidden=false;}
+      (reg.active||reg.waiting||reg.installing)?.postMessage({type:'INSTALL_LOCAL_CORE'});
+    }catch(e){text.textContent='La app puede abrirse, pero no se inició la instalación opcional.';retry.hidden=false;}
   };
   navigator.serviceWorker?.addEventListener('message',e=>{
     const d=e.data||{};
-    if(d.type==='LOCAL_CORE_PROGRESS') set(d.done,d.total,d.label);
-    if(d.type==='LOCAL_CORE_READY') {set(1,1,'Núcleo local listo');setTimeout(()=>box.hidden=true,700);localStorage.setItem('photoia-local-core-ready','8.6.0');}
-    if(d.type==='LOCAL_CORE_ERROR'){text.textContent='Faltaron archivos. Conéctate a Internet y reintenta.';retry.hidden=false;}
+    if(d.type==='LOCAL_CORE_PROGRESS'){set(d.done,d.total,d.label);drawItem(d.item)}
+    if(d.type==='LOCAL_CORE_READY') finish(d);
+    if(d.type==='LOCAL_CORE_FATAL'){text.textContent='La instalación adicional falló, pero PHOTO IA puede abrirse.';retry.hidden=false;skip.hidden=false;}
   });
   retry?.addEventListener('click',start);
+  skip?.addEventListener('click',()=>{box.hidden=true;localStorage.setItem('photoia-local-core-ready',VERSION);navigator.serviceWorker.ready.then(r=>(r.active||r.waiting)?.postMessage({type:'SKIP_LOCAL_INSTALL'})).catch(()=>{});});
   window.addEventListener('load',()=>{
-    const ready=localStorage.getItem('photoia-local-core-ready')==='8.6.0';
+    const ready=localStorage.getItem('photoia-local-core-ready')===VERSION;
     if(!ready) start();
   });
 })();

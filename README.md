@@ -1,11 +1,13 @@
-# PHOTO IA 8.6 — Local First Core
+# PHOTO IA 8.6.1 — Resilient Local Installer
 
-Esta versión usa rutas locales para las librerías principales. En la primera apertura, el service worker descarga y guarda Fabric.js, Cropper.js, TensorFlow.js, COCO-SSD, OpenCV y los recursos opcionales de MediaPipe dentro del almacenamiento de Safari.
+Corrección del instalador local-first:
 
-Después de completar “Instalando PHOTO IA en este teléfono”, las herramientas principales se sirven desde el caché local. El Alienware sigue reservado para generación compleja.
+- La app ya no queda bloqueada si falla un archivo opcional.
+- Los archivos esenciales y opcionales se verifican por separado.
+- Cada recurso muestra su estado real.
+- Los recursos opcionales (OpenCV y MediaPipe) pueden terminar después.
+- El botón “Abrir app ahora” permite continuar inmediatamente.
+- Los fallos de red ya no dejan la pantalla congelada en un porcentaje.
+- Se conserva el editor, el núcleo adaptativo, la segmentación local y el puente al Alienware.
 
-## Publicación
-Sube los archivos principales a GitHub Pages. La carpeta `windows-server` se conserva solamente para el Alienware.
-
-## Importante
-El ZIP se entrega por `sandbox:` únicamente dentro del chat. La app publicada no usa Sandbox.
+Sube todos los archivos principales a GitHub Pages. La carpeta windows-server sigue siendo solo para el Alienware.
