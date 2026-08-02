@@ -1,21 +1,15 @@
-# PHOTO IA 8.3 — Offline Segmentation Core
+# PHOTO IA 8.4 — Smart Local Core
 
-Esta versión elimina BodyPix del flujo de **Separar persona** para evitar fallos de CDN. La nueva máscara se calcula completamente en el teléfono con un motor local de recorte de retrato basado en contraste, bordes y componentes conectados.
+Esta versión fortalece el núcleo que trabaja directamente en el teléfono.
 
-## Cambios
-
-- No descarga BodyPix ni modelos de segmentación.
-- No depende de `unpkg.com` para separar personas.
-- El botón **Separar persona** termina y produce una máscara local.
-- **Tocar objeto** continúa como alternativa para fondos difíciles.
-- **Quitar fondo**, mostrar/ocultar máscara y cancelar siguen funcionando.
-- Caché renovada a 8.3.
-- Conserva AI Studio y el Windows AI Bridge 8.2.
-
-## Importante
-
-El recorte local es una alternativa ligera, no un modelo generativo. En fotos donde la ropa y el fondo tengan colores muy parecidos puede ser menos preciso; en esos casos use **Tocar objeto** o, cuando el servidor Alienware esté activo, el flujo avanzado de ComfyUI.
+## Nuevo
+- Análisis local real de iluminación, contraste, saturación, temperatura y detalle.
+- Recomendaciones calculadas para cada fotografía, no un filtro fijo.
+- Aplicación automática de correcciones con historial Deshacer/Rehacer.
+- Enrutador inteligente: decide si una orden se resuelve en el teléfono o necesita IA generativa.
+- Cola local para guardar tareas complejas hasta encender el Alienware.
+- Las tareas guardadas se conservan aunque cierres la app.
+- Mantiene segmentación local, capas, herramientas creativas y AI Studio.
 
 ## Publicación
-
-Suba los archivos principales a GitHub Pages. La carpeta `windows-server` se copia únicamente al Alienware. Después de publicar, cierre la PWA y vuelva a abrirla para renovar la caché.
+Sube los archivos principales a GitHub Pages. La carpeta `windows-server` permanece únicamente en el Alienware.

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='8.1.0-phone-ai-studio';
+const VERSION='8.4.0-smart-local-core';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];

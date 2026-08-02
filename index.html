@@ -10,7 +10,7 @@
   <meta name="description" content="PHOTO IA 8.2 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=8.3.0-offline-segmentation-core">
+  <link rel="stylesheet" href="styles.css?v=8.4.0-smart-local-core">
   <title>PHOTO IA 8.2 — Estudio IA</title>
 </head>
 <body>
@@ -40,6 +40,22 @@
         <button data-command="vivid" disabled>🌈 Más color</button>
         <button data-command="bw" disabled>◐ Blanco y negro</button>
       </div>
+    </section>
+
+
+    <section class="panel smart-core-panel">
+      <div class="section-heading">
+        <div><p class="eyebrow">NÚCLEO INTELIGENTE LOCAL 8.4</p><h2>Analiza antes de editar</h2></div>
+        <span id="smart-core-badge" class="smart-core-badge">Iniciando…</span>
+      </div>
+      <p class="smart-core-copy">PHOTO IA analiza luz, contraste, color, temperatura y detalle directamente en el teléfono. También decide si una instrucción se puede resolver localmente o debe guardarse para el Alienware.</p>
+      <div class="smart-core-actions">
+        <button id="smart-analyze" class="primary" type="button">🧠 Analizar fotografía</button>
+        <button id="smart-apply" class="secondary" type="button" disabled>✨ Aplicar recomendación</button>
+      </div>
+      <div id="smart-analysis-result" class="smart-analysis-result"><p>Abre una foto y pulsa <strong>Analizar fotografía</strong>.</p></div>
+      <div class="smart-route-box"><strong>Decisión automática</strong><p id="smart-route-hint">PHOTO IA decidirá si la tarea se hace aquí o se guarda para la PC.</p></div>
+      <details class="smart-queue"><summary>Tareas guardadas para Alienware <span id="smart-queue-count">0</span></summary><div id="smart-queue-list"></div><button id="smart-queue-clear" class="text-btn" type="button">Vaciar lista</button></details>
     </section>
 
     <section class="panel workspace">
@@ -345,7 +361,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 8.2 • Editor local + Alienware AI • <strong>8.3.0-offline-segmentation-core</strong></footer>
+  <footer>PHOTO IA 8.4 • Núcleo local inteligente + Alienware AI • <strong>8.4.0-smart-local-core</strong></footer>
 </div>
 
 <div id="crop-modal" class="crop-modal" hidden>
@@ -356,14 +372,15 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=8.3.0-offline-segmentation-core"></script>
-<script src="creative-tools.js?v=8.3.0-offline-segmentation-core"></script>
-<script src="brain.js?v=8.3.0-offline-segmentation-core"></script>
-<script src="ai-studio.js?v=8.3.0-offline-segmentation-core"></script>
+<script src="app.js?v=8.4.0-smart-local-core"></script>
+<script src="creative-tools.js?v=8.4.0-smart-local-core"></script>
+<script src="brain.js?v=8.4.0-smart-local-core"></script>
+<script src="smart-core.js?v=8.4.0-smart-local-core"></script>
+<script src="ai-studio.js?v=8.4.0-smart-local-core"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-<script src="vision.js?v=8.3.0-offline-segmentation-core"></script>
-<script src="segmentation.js?v=8.3.0-offline-segmentation-core"></script>
+<script src="vision.js?v=8.4.0-smart-local-core"></script>
+<script src="segmentation.js?v=8.4.0-smart-local-core"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 </body>
 </html>
