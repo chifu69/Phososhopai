@@ -1,0 +1,36 @@
+PHOTO IA 9.1.5 — HTTPS PARA HOME SCREEN
+
+ANTES DE REEMPLAZAR:
+1. Guarda una copia de windows-server\config.json
+2. Guarda una copia de windows-server\workflows\photo_ia_v1_api.json
+
+INSTALACIÓN EN EL ALIENWARE:
+1. Reemplaza la carpeta windows-server con la de este ZIP.
+2. Devuelve config.json y photo_ia_v1_api.json a sus lugares.
+3. Ejecuta install_server.bat una vez para instalar cryptography y generar certificados.
+4. Ejecuta configure_firewall.bat como administrador una vez.
+5. Abre ComfyUI Desktop.
+6. Ejecuta start_server.bat. Quedarán dos ventanas: HTTP 8189 y HTTPS 8443.
+
+INSTALAR EL CERTIFICADO EN EL IPHONE (SOLO UNA VEZ):
+1. Con el iPhone en el mismo Wi‑Fi abre Safari:
+   http://192.168.0.172:8189/photoia-ca.cer
+2. Acepta descargar el perfil.
+3. Ve a Ajustes > General > VPN y administración de dispositivos > Perfil descargado.
+4. Instala “PHOTO IA Local CA”.
+5. Ve a Ajustes > General > Información > Configuración de confianza de certificados.
+6. Activa confianza total para “PHOTO IA Local CA”.
+
+ABRIR E INSTALAR PHOTO IA:
+1. En Safari abre:
+   https://192.168.0.172:8443/photoia/?v=9.1.5
+2. Comprueba que no aparece advertencia de certificado.
+3. Compartir > Agregar a pantalla de inicio.
+4. Dentro de la app usa servidor:
+   https://192.168.0.172:8443
+5. Usa el mismo token de config.json.
+
+IMPORTANTE:
+- Esta CA es privada y solo sirve para PHOTO IA en tu red local.
+- No compartas photoia-local-ca.key ni photoia-server.key.
+- Si cambia la IP del Alienware, vuelve a ejecutar cert_setup.py y reinstala el certificado solo si se genera una CA nueva.

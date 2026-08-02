@@ -1,13 +1,13 @@
 {
-  "name": "PHOTO IA 9.1.4",
+  "name": "PHOTO IA 9.1.5 HTTPS",
   "short_name": "PHOTO IA",
   "description": "Editor privado con Photo Brain 2.0, memoria, macros y comandos encadenados.",
-  "start_url": "./?v=9.1.4",
+  "start_url": "./?v=9.1.5",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
   "orientation": "portrait-primary",
   "icons": [],
   "scope": "./",
-  "id": "photo-ia-local-9.1.4"
+  "id": "photo-ia-local-9.1.5-https"
 }

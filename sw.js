@@ -1,5 +1,5 @@
-const CACHE='photo-ia-9.1.1.1-smart-edit-bridge';
-const VERSION='9.1.1';
+const CACHE='photo-ia-9.1.5-https';
+const VERSION='9.1.5';
 const CORE=[
  './','./index.html','./styles.css?v=9.1.1-smart-edit-bridge','./app.js?v=9.1.1-smart-edit-bridge',
  './creative-tools.js?v=9.1.1-smart-edit-bridge','./brain.js?v=9.1.1-smart-edit-bridge',

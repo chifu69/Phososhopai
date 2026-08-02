@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const STORE='photoia-ai-studio-v3';
-const SAME_ORIGIN=(location.protocol==='http:'&&location.port==='8189')?location.origin:'';
+const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(location.protocol==='http:'&&location.port==='8189'))?location.origin:'';
 const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},online:false,mode:'image_edit'};
 function app(){return window.PhotoIA}
 function toast(m){app()?.toast?.(m)}
