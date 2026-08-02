@@ -233,7 +233,7 @@ function init(){
  $('crop-close').onclick=closeCrop;$('crop-apply').onclick=applyCrop;document.querySelectorAll('[data-ratio]').forEach(b=>b.onclick=()=>state.cropper?.setAspectRatio(Number(b.dataset.ratio)));
  $('theme-btn').onclick=()=>{document.documentElement.classList.toggle('dark');localStorage.setItem('photoIATheme',document.documentElement.classList.contains('dark')?'dark':'light')};if(localStorage.getItem('photoIATheme')==='dark')document.documentElement.classList.add('dark');
  document.addEventListener('dragover',e=>e.preventDefault());document.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files?.[0];if(f)loadFile(f)});
- if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v='+VERSION).catch(console.warn);
+ if('serviceWorker' in navigator && window.isSecureContext){navigator.serviceWorker.register('./sw.js?v='+VERSION).catch(console.warn);}
 }
 window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv&&cv.Mat){state.cvReady=true;$('engine-badge').textContent='Fabric + OpenCV listo';$('engine-badge').classList.add('ready')}else setTimeout(wait,250)};wait()});
 

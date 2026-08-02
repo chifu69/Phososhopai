@@ -1,0 +1,22 @@
+PHOTO IA 9.1.4 — HOME SCREEN FIX
+
+Correcciones:
+- Evita el error “navigator.serviceWorker.ready” cuando PHOTO IA se abre desde una IP local HTTP.
+- Fabric.js y las librerías del editor se cargan directamente por HTTPS, por lo que ya no dependen del Service Worker.
+- Configura el modo standalone para el icono de la pantalla de inicio.
+
+INSTALACIÓN
+1. Guarda una copia de:
+   windows-server\config.json
+   windows-server\workflows\photo_ia_v1_api.json
+2. Cierra únicamente la ventana negra PHOTO IA Bridge.
+3. Reemplaza la carpeta windows-server por la de este ZIP.
+4. Devuelve config.json y photo_ia_v1_api.json si se reemplazaron.
+5. Ejecuta start_server.bat.
+6. En el iPhone elimina el icono anterior de PHOTO IA.
+7. En Safari abre:
+   http://192.168.0.172:8189/photoia/?v=9.1.4
+8. Pulsa Compartir > Agregar a pantalla de inicio.
+
+NOTA
+La conexión privada al Alienware sigue usando HTTP dentro de tu Wi‑Fi. Las librerías de la interfaz se cargan por HTTPS. Esto evita el fallo del icono sin instalar certificados en el iPhone.

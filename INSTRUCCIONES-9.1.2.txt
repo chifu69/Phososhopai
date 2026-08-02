@@ -1,0 +1,11 @@
+PHOTO IA 9.1.2 — Same-Origin Fix
+
+1. Guarda una copia de windows-server\workflows\photo_ia_v1_api.json y de tu config.json actual.
+2. Reemplaza los archivos de windows-server con esta versión.
+3. Devuelve photo_ia_v1_api.json a windows-server\workflows.
+4. Abre ComfyUI Desktop.
+5. Ejecuta windows-server\start_server.bat y deja la ventana abierta.
+6. En el iPhone abre: http://192.168.0.172:8189/photoia/
+7. En Conexión privada usa servidor http://192.168.0.172:8189 y token PHOTOIA-LOCAL-2026.
+
+Esta versión sirve la app desde el mismo Bridge para evitar que una página HTTPS de GitHub intente llamar al servidor HTTP local.

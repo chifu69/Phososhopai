@@ -9,8 +9,8 @@
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
   <meta name="description" content="PHOTO IA 8.2 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="assets/vendor/cropper.min.css?v=8.6.0">
-  <link rel="stylesheet" href="styles.css?v=9.1.0-smart-edit-bridge">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
+  <link rel="stylesheet" href="styles.css?v=9.1.4-homescreen-http-fix">
   <title>PHOTO IA 8.5 — Núcleo adaptativo local</title>
 </head>
 <body>
@@ -390,21 +390,21 @@
 <div id="processing" class="processing" hidden><span></span><b>Procesando…</b><button id="processing-cancel" class="processing-cancel" hidden>Cancelar</button></div>
 <div id="toast" class="toast" role="status"></div>
 
-<script src="assets/vendor/fabric.min.js?v=8.6.0"></script>
-<script src="assets/vendor/cropper.min.js?v=8.6.0"></script>
-<script src="app.js?v=9.1.0-smart-edit-bridge"></script>
-<script src="creative-tools.js?v=9.1.0-smart-edit-bridge"></script>
-<script src="brain.js?v=9.1.0-smart-edit-bridge"></script>
-<script src="smart-core.js?v=9.1.0-smart-edit-bridge"></script>
-<script src="ai-studio.js?v=9.1.0-smart-edit-bridge"></script>
-<script src="assets/vendor/tf.min.js?v=8.6.0"></script>
-<script src="assets/vendor/coco-ssd.min.js?v=8.6.0"></script>
-<script src="vision.js?v=9.1.0-smart-edit-bridge"></script>
-<script src="segmentation.js?v=9.1.0-smart-edit-bridge"></script>
-<script async src="assets/vendor/opencv.js?v=8.6.0" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
+<script src="app.js?v=9.1.4-homescreen-http-fix"></script>
+<script src="creative-tools.js?v=9.1.4-homescreen-http-fix"></script>
+<script src="brain.js?v=9.1.4-homescreen-http-fix"></script>
+<script src="smart-core.js?v=9.1.4-homescreen-http-fix"></script>
+<script src="ai-studio.js?v=9.1.4-homescreen-http-fix"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
+<script src="vision.js?v=9.1.4-homescreen-http-fix"></script>
+<script src="segmentation.js?v=9.1.4-homescreen-http-fix"></script>
+<script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 <script>
 (() => {
-  const VERSION='9.1.0';
+  const VERSION='9.1.4';
   const box=document.getElementById('local-install');
   const bar=document.getElementById('local-install-bar');
   const percent=document.getElementById('local-install-percent');
@@ -429,13 +429,24 @@
       setTimeout(()=>box.hidden=true,1800);
     }else setTimeout(()=>box.hidden=true,700);
   };
+  const serviceWorkersAvailable=()=>('serviceWorker' in navigator && navigator.serviceWorker);
   const start=async()=>{
     retry.hidden=true;box.hidden=false;items.clear();if(list)list.innerHTML='';set(0,1,'Comprobando archivos locales…');
+    if(!serviceWorkersAvailable()){
+      text.textContent='Modo local del Alienware activo. La app funciona sin Service Worker.';
+      localStorage.setItem('photoia-local-core-ready',VERSION);
+      setTimeout(()=>box.hidden=true,700);
+      return;
+    }
     try{
       if(navigator.storage?.persist) await navigator.storage.persist();
       const reg=await navigator.serviceWorker.ready;
       (reg.active||reg.waiting||reg.installing)?.postMessage({type:'INSTALL_LOCAL_CORE'});
-    }catch(e){text.textContent='La app puede abrirse, pero no se inició la instalación opcional.';retry.hidden=false;}
+    }catch(e){
+      text.textContent='Modo compatible activo. PHOTO IA puede usarse normalmente.';
+      localStorage.setItem('photoia-local-core-ready',VERSION);
+      setTimeout(()=>box.hidden=true,900);
+    }
   };
   navigator.serviceWorker?.addEventListener('message',e=>{
     const d=e.data||{};
@@ -444,7 +455,7 @@
     if(d.type==='LOCAL_CORE_FATAL'){text.textContent='La instalación adicional falló, pero PHOTO IA puede abrirse.';retry.hidden=false;skip.hidden=false;}
   });
   retry?.addEventListener('click',start);
-  skip?.addEventListener('click',()=>{box.hidden=true;localStorage.setItem('photoia-local-core-ready',VERSION);navigator.serviceWorker.ready.then(r=>(r.active||r.waiting)?.postMessage({type:'SKIP_LOCAL_INSTALL'})).catch(()=>{});});
+  skip?.addEventListener('click',()=>{box.hidden=true;localStorage.setItem('photoia-local-core-ready',VERSION);if(serviceWorkersAvailable())navigator.serviceWorker.ready.then(r=>(r.active||r.waiting)?.postMessage({type:'SKIP_LOCAL_INSTALL'})).catch(()=>{});});
   window.addEventListener('load',()=>{
     const ready=localStorage.getItem('photoia-local-core-ready')===VERSION;
     if(!ready) start();
