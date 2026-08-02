@@ -1,10 +1,10 @@
-const CACHE='photo-ia-9.1.0-smart-edit-bridge';
-const VERSION='9.1.0';
+const CACHE='photo-ia-9.1.1.1-smart-edit-bridge';
+const VERSION='9.1.1';
 const CORE=[
- './','./index.html','./styles.css?v=9.1.0-smart-edit-bridge','./app.js?v=9.1.0-smart-edit-bridge',
- './creative-tools.js?v=9.1.0-smart-edit-bridge','./brain.js?v=9.1.0-smart-edit-bridge',
- './smart-core.js?v=9.1.0-smart-edit-bridge','./ai-studio.js?v=9.1.0-smart-edit-bridge',
- './vision.js?v=9.1.0-smart-edit-bridge','./segmentation.js?v=9.1.0-smart-edit-bridge','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=9.1.1-smart-edit-bridge','./app.js?v=9.1.1-smart-edit-bridge',
+ './creative-tools.js?v=9.1.1-smart-edit-bridge','./brain.js?v=9.1.1-smart-edit-bridge',
+ './smart-core.js?v=9.1.1-smart-edit-bridge','./ai-studio.js?v=9.1.1-smart-edit-bridge',
+ './vision.js?v=9.1.1-smart-edit-bridge','./segmentation.js?v=9.1.1-smart-edit-bridge','./manifest.webmanifest'
 ];
 const ASSETS=[
  {local:'./assets/vendor/fabric.min.js?v=8.6.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},

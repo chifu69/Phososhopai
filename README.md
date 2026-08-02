@@ -1,3 +1,5 @@
+PHOTO IA 9.1.1 — Token Sync Fix
+
 # PHOTO IA 9.1 — Smart Edit Bridge
 
 Esta entrega une el núcleo local del iPhone con el workflow estable `PHOTO-IA-v1` del Alienware.
