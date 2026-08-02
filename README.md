@@ -1,14 +1,18 @@
-# PHOTO IA 8.1 — Phone AI Studio
+# PHOTO IA 8.2 — AI Bridge + Windows Server
 
-Esta versión conserva el editor local y añade **Estudio IA**, preparado para conectarse al Photoshop AI Server del Alienware.
+Esta entrega conecta la interfaz del teléfono con un servidor local para **ComfyUI + FLUX.2 Klein 4B Distilled**.
 
-## Incluye
-- Foto principal y fotografía de referencia.
-- Instrucciones en lenguaje natural.
-- Acciones rápidas para fondo, ropa, personas, objetos, restauración y mejora profesional.
-- Estado del servidor, progreso, cancelación y errores claros.
-- Dirección y token privado guardados localmente en el teléfono.
-- Historial de resultados y colocación automática en el lienzo.
-- API esperada: `GET /health` y `POST /api/v1/edit`.
+## Teléfono
+- Foto principal y referencia.
+- Instrucciones naturales y acciones rápidas.
+- Prueba de conexión, estado real del workflow, progreso y cancelación.
+- Envío multipart y recepción automática del resultado.
+- Historial local y colocación del resultado en el lienzo.
 
-El servidor se construirá en la siguiente fase sobre ComfyUI + FLUX.2 Klein 4B Distilled.
+## Alienware (`windows-server`)
+- FastAPI con `GET /health`, `GET /api/v1/setup`, `POST /api/v1/edit` y `POST /api/v1/interrupt`.
+- Token privado, CORS para GitHub Pages, subida a ComfyUI, ejecución de workflow, espera del resultado y descarga.
+- Instalador, regla de firewall, inicio, datos de conexión, diagnóstico de nodos y registros.
+
+## Paso pendiente en casa
+Exportar desde ComfyUI el workflow instalado usando **Export Workflow (API)** y colocar sus IDs en `windows-server/config.json`. Las instrucciones completas están en `windows-server/README-SERVER.txt`.
