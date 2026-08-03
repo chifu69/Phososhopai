@@ -1,7 +1,7 @@
-const CACHE='photo-ia-9.1.5-https';
-const VERSION='9.1.5';
+const CACHE='photo-ia-10.0-ui-only';
+const VERSION='10.0';
 const CORE=[
- './','./index.html','./styles.css?v=9.1.1-smart-edit-bridge','./app.js?v=9.1.1-smart-edit-bridge',
+ './','./index.html','./styles.css?v=10.0-ui-only','./ui-layout.js?v=10.0-ui-only','./app.js?v=9.1.1-smart-edit-bridge',
  './creative-tools.js?v=9.1.1-smart-edit-bridge','./brain.js?v=9.1.1-smart-edit-bridge',
  './smart-core.js?v=9.1.1-smart-edit-bridge','./ai-studio.js?v=9.1.1-smart-edit-bridge',
  './vision.js?v=9.1.1-smart-edit-bridge','./segmentation.js?v=9.1.1-smart-edit-bridge','./manifest.webmanifest'

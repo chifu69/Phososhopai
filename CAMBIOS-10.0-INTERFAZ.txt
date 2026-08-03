@@ -1,0 +1,12 @@
+PHOTO IA 10.0 — INTERFAZ ORGANIZADA
+
+Cambios realizados:
+- Barra superior de categorías: Inicio, Smart, Ajustes, Crear, Alienware y Guardar.
+- El lienzo/foto permanece visible mientras cambias herramientas.
+- Las opciones aparecen en un panel separado según la categoría seleccionada.
+- Botón Panel para ocultar/mostrar los controles y ver la foto más grande.
+- Diseño de dos columnas en computadora y lienzo fijo arriba en iPhone.
+
+IMPORTANTE:
+- No se modificaron la dirección del Alienware, tokens, puertos, HTTPS, certificados, ComfyUI ni la configuración de Apple.
+- Los cambios son únicamente de organización visual y navegación.

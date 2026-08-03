@@ -10,7 +10,7 @@
   <meta name="description" content="PHOTO IA 8.2 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=9.1.4-homescreen-http-fix">
+  <link rel="stylesheet" href="styles.css?v=10.0-ui-only">
   <title>PHOTO IA 8.5 — Núcleo adaptativo local</title>
 </head>
 <body>
@@ -26,6 +26,16 @@
       <button id="theme-btn" class="icon-btn" aria-label="Cambiar tema">☾</button>
     </div>
   </header>
+
+  <nav id="studio-tabs" class="studio-tabs" aria-label="Categorías de herramientas">
+    <button class="studio-tab active" data-studio-tab="home" type="button"><span>🏠</span><small>Inicio</small></button>
+    <button class="studio-tab" data-studio-tab="smart" type="button"><span>🧠</span><small>Smart</small></button>
+    <button class="studio-tab" data-studio-tab="adjust" type="button"><span>🎚️</span><small>Ajustes</small></button>
+    <button class="studio-tab" data-studio-tab="create" type="button"><span>✏️</span><small>Crear</small></button>
+    <button class="studio-tab" data-studio-tab="ai" type="button"><span>✨</span><small>Alienware</small></button>
+    <button class="studio-tab" data-studio-tab="export" type="button"><span>💾</span><small>Guardar</small></button>
+    <button id="studio-panel-toggle" class="studio-tab studio-toggle" type="button" aria-pressed="false"><span>⌄</span><small>Panel</small></button>
+  </nav>
 
   <main>
     <section class="panel command-panel">
@@ -390,6 +400,7 @@
 <div id="processing" class="processing" hidden><span></span><b>Procesando…</b><button id="processing-cancel" class="processing-cancel" hidden>Cancelar</button></div>
 <div id="toast" class="toast" role="status"></div>
 
+  <script src="ui-layout.js?v=10.0-ui-only"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
 <script src="app.js?v=9.1.4-homescreen-http-fix"></script>

@@ -119,3 +119,59 @@ body.processing-lock{position:fixed!important;left:0;right:0;width:100%;touch-ac
 .smart-recipe-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}.smart-recipe-head small{color:var(--muted);font-weight:700}
 .smart-recipe-values{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.smart-recipe-values div{background:var(--surface);border:1px solid var(--line);border-radius:13px;padding:10px;text-align:center}.smart-recipe-values span,.smart-recipe-values strong{display:block}.smart-recipe-values span{font-size:.72rem;color:var(--muted);font-weight:800}.smart-recipe-values strong{margin-top:3px}
 @media(max-width:650px){.smart-recipe-values{grid-template-columns:repeat(2,1fr)}.smart-recipe-head{align-items:flex-start;flex-direction:column}}
+
+/* PHOTO IA 10.0 — interfaz de estudio organizada. Solo cambia la presentación visual. */
+.studio-tabs{
+  position:sticky;top:max(0px,env(safe-area-inset-top));z-index:120;
+  display:flex;gap:8px;overflow-x:auto;overscroll-behavior-inline:contain;
+  padding:8px;margin:0 0 14px;border:1px solid var(--line);border-radius:20px;
+  background:color-mix(in srgb,var(--surface) 94%,transparent);box-shadow:0 12px 32px rgba(15,23,42,.12);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);scrollbar-width:none
+}
+.studio-tabs::-webkit-scrollbar{display:none}
+.studio-tab{flex:0 0 auto;min-width:72px;min-height:58px;border:0;border-radius:14px;background:transparent;color:var(--muted);font:inherit;font-weight:850;display:grid;place-items:center;gap:2px;padding:7px 10px;touch-action:manipulation}
+.studio-tab span{font-size:1.15rem;line-height:1}.studio-tab small{font-size:.68rem;white-space:nowrap}
+.studio-tab.active{background:var(--text);color:var(--surface);box-shadow:0 7px 18px rgba(15,23,42,.2)}
+.studio-toggle{margin-left:auto;border-left:1px solid var(--line)}
+.studio-layout{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(310px,.85fr);gap:18px;align-items:start}
+.studio-editor-column,.studio-tools-column{min-width:0}
+.studio-editor-column{position:sticky;top:90px;z-index:5}
+.studio-editor-column .workspace{margin-bottom:0;padding:18px}
+.studio-tools-column{min-height:180px}
+.studio-tools-column.collapsed{display:none}
+.studio-tool-panel{animation:studioPanelIn .18s ease-out}
+@keyframes studioPanelIn{from{opacity:.3;transform:translateY(8px)}to{opacity:1;transform:none}}
+.studio-layout .workspace .canvas-wrap{min-height:clamp(420px,68vh,760px);max-height:calc(100vh - 235px)}
+.studio-layout .workspace canvas{max-height:calc(100vh - 250px)}
+.studio-layout .workspace .canvas-toolbar h2{font-size:1.25rem}
+.studio-layout .workspace .mode-toolbar{overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
+.studio-layout .workspace .mode-tool{flex:0 0 auto}
+.studio-tools-column .panel{margin-bottom:14px;border-radius:22px;padding:20px;box-shadow:0 10px 28px rgba(34,49,66,.09)}
+.studio-tools-column .panel h2{font-size:1.35rem}
+
+@media(max-width:760px){
+  .app-shell{padding-left:10px;padding-right:10px;padding-top:calc(9px + env(safe-area-inset-top))}
+  .topbar{margin-bottom:9px}.brand p{display:none}.brand h1{font-size:1.18rem}.robot{transform:scale(.75);transform-origin:left center;width:45px}
+  .top-actions .icon-btn{width:40px;height:40px;border-radius:13px}
+  .studio-tabs{top:env(safe-area-inset-top);margin-inline:-2px;padding:6px;border-radius:16px}
+  .studio-tab{min-width:64px;min-height:52px;padding:6px 8px}.studio-tab small{font-size:.62rem}
+  .studio-layout{display:block}
+  .studio-editor-column{position:sticky;top:calc(env(safe-area-inset-top) + 70px);z-index:20;margin-bottom:12px}
+  .studio-editor-column .workspace{padding:10px;border-radius:18px;box-shadow:0 12px 34px rgba(15,23,42,.18)}
+  .studio-layout .workspace .canvas-toolbar{gap:8px}.studio-layout .workspace .canvas-toolbar .eyebrow{display:none}
+  .studio-layout .workspace .canvas-toolbar h2{font-size:1rem}.studio-layout .workspace .canvas-toolbar .secondary{padding:9px 10px;font-size:.75rem}
+  .studio-layout .workspace .mode-toolbar{margin-top:7px;gap:5px}.studio-layout .workspace .mode-tool{padding:7px 9px;min-width:57px}.studio-layout .workspace .mode-tool small{font-size:.62rem}
+  .studio-layout .workspace .mode-help{display:none}
+  .studio-layout .workspace .canvas-wrap{margin-top:8px;min-height:300px;height:46vh;max-height:480px;border-radius:16px}
+  .studio-layout .workspace canvas{max-height:46vh}
+  .studio-layout .workspace .status-row{font-size:.7rem;margin-top:5px}
+  .studio-tools-column{scroll-margin-top:calc(env(safe-area-inset-top) + 72px)}
+  .studio-tools-column .panel{padding:16px;border-radius:19px;margin-bottom:10px;box-shadow:none}
+  .studio-tools-column .panel h2{font-size:1.22rem}
+  .command-row{grid-template-columns:1fr}.command-row .primary{width:100%}
+}
+
+@media(min-width:761px) and (max-width:1050px){
+  .app-shell{max-width:100%;padding-inline:14px}
+  .studio-layout{grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr)}
+}
