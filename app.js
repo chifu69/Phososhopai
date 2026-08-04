@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.5.1-canvas-auto-fit';
+const VERSION='11.5.2-compact-tool-dock';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
