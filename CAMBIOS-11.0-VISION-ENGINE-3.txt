@@ -1,0 +1,8 @@
+PHOTO IA 11.0 — Vision Engine 3.0
+
+- Mejora automática de un toque con procesamiento real de píxeles.
+- Ajusta exposición, sombras, altas luces, contraste, vibrance, temperatura y claridad.
+- Compara cuatro recetas profesionales antes de elegir la mejor.
+- OpenCV aporta detalle y ruido; Fabric conserva lienzo, capas y objetos.
+- La edición usa la fotografía original, no el fondo del lienzo.
+- Mantiene la conexión Alienware, HTTPS, certificados, token y puertos sin cambios.

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='8.4.0-smart-local-core';
+const VERSION='11.0.0-vision-engine-3';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -138,6 +138,64 @@ function applyAdaptiveAdjustments(values={}, commit=true){
  if(commit)snapshot();
  return normalized;
 }
+
+async function applySmartPixelRecipe(recipe={}, commit=true){
+ if(!state.photo||!state.originalDataUrl)throw new Error('Abre una foto primero.');
+ processing(true,'Aplicando mejora profesional…');
+ try{
+  const img=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=state.originalDataUrl});
+  const max=1800,ratio=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
+  const w=Math.max(1,Math.round((img.naturalWidth||img.width)*ratio)),h=Math.max(1,Math.round((img.naturalHeight||img.height)*ratio));
+  const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{alpha:false,willReadFrequently:true});
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,w,h);
+  const im=ctx.getImageData(0,0,w,h),d=im.data;
+  const exposure=Math.pow(2,Number(recipe.exposure||0));
+  const shadows=Number(recipe.shadows||0)/100,highlights=Number(recipe.highlights||0)/100;
+  const contrast=Number(recipe.contrast||0)/100,vibrance=Number(recipe.vibrance||0)/100;
+  const warmth=Number(recipe.warmth||0)/100,clarity=Number(recipe.clarity||0)/100;
+  const clamp8=v=>v<0?0:v>255?255:v;
+  for(let i=0;i<d.length;i+=4){
+   let r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255;
+   r*=exposure;g*=exposure;b*=exposure;
+   let l=.2126*r+.7152*g+.0722*b;
+   const sw=(1-Math.min(1,l))**2,hw=Math.min(1,l)**2;
+   const lift=shadows*.34*sw,rec=highlights*.30*hw;
+   r=r+lift-rec;g=g+lift-rec;b=b+lift-rec;
+   // smooth S-curve contrast around mid gray
+   const cf=1+contrast*.9;r=.5+(r-.5)*cf;g=.5+(g-.5)*cf;b=.5+(b-.5)*cf;
+   l=.2126*r+.7152*g+.0722*b;
+   const mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx>0?(mx-mn)/mx:0;
+   const vf=1+vibrance*(1-sat)*1.35;
+   r=l+(r-l)*vf;g=l+(g-l)*vf;b=l+(b-l)*vf;
+   r+=warmth*.055;g+=warmth*.012;b-=warmth*.055;
+   d[i]=clamp8(r*255);d[i+1]=clamp8(g*255);d[i+2]=clamp8(b*255);
+  }
+  ctx.putImageData(im,0,0);
+  // modest local clarity/sharpening after tone and color processing
+  if(clarity>0.01){
+   const src=ctx.getImageData(0,0,w,h),out=ctx.createImageData(w,h),sd=src.data,od=out.data;
+   const amount=Math.min(.55,clarity*.55);
+   od.set(sd);
+   for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    const p=(y*w+x)*4;
+    for(let ch=0;ch<3;ch++){
+     const blur=(sd[p-4+ch]+sd[p+4+ch]+sd[p-w*4+ch]+sd[p+w*4+ch]+sd[p+ch]*4)/8;
+     od[p+ch]=clamp8(sd[p+ch]+(sd[p+ch]-blur)*amount);
+    }
+    od[p+3]=255;
+   }
+   ctx.putImageData(out,0,0);
+  }
+  const data=c.toDataURL('image/jpeg',.95);
+  const old=state.photo;
+  const props={left:old.left,top:old.top,scaleX:old.scaleX,scaleY:old.scaleY,angle:old.angle,flipX:old.flipX,flipY:old.flipY,originX:old.originX,originY:old.originY};
+  const next=await fabricImageFromURL(data);next.photoRole='main';next.layerId='layer-photo';next.layerName='Fotografía';next.layerType='photo';next.set({...props,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
+  state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();state.canvas.requestRenderAll();
+  resetSliderUI();normalizePhotoVisualState();if(commit)snapshot();
+  return recipe;
+ }finally{processing(false)}
+}
+
 function applyPreset(name){if(!state.photo)return;resetSliderUI();state.photo.filters=[];const F=fabric.Image.filters;
  const add=(key,f)=>{f.__key=key;state.photo.filters.push(f)};
  if(name==='bw')add('preset',new F.Grayscale());
@@ -276,7 +334,7 @@ window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv
 window.PhotoIA={
   get state(){return state},
   snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,
-  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
+  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
 };
 document.addEventListener('DOMContentLoaded',()=>{init();window.dispatchEvent(new CustomEvent('photoia-ready'))});
 })();
