@@ -494,3 +494,82 @@ body.photoia-pro-ui{overflow-x:hidden}
   from{opacity:0;transform:translateY(22px)}
   to{opacity:1;transform:translateY(0)}
 }
+
+/* PHOTO IA 12.2 — Edge Docks + Expanded Bottom Workspace
+   Keeps the persistent photo/canvas exactly in place. Only the side docks
+   and the floating lower tool workspace are resized. */
+@media(max-width:900px){
+  .pro-dock{
+    gap:4px!important;
+    padding:5px 2px!important;
+    border-radius:14px!important;
+    max-height:70dvh!important;
+  }
+  .pro-dock-left{left:max(0px,env(safe-area-inset-left))!important}
+  .pro-dock-right{right:max(0px,env(safe-area-inset-right))!important}
+
+  .pro-dock-item{
+    width:31px!important;
+    min-width:31px!important;
+    height:31px!important;
+    min-height:31px!important;
+    border-radius:10px!important;
+  }
+  .pro-dock-item>span{
+    flex-basis:29px!important;
+    font-size:.94rem!important;
+  }
+  .pro-dock-item.expanded,.pro-dock-item.active{
+    width:74px!important;
+    transform:scale(1.02)!important;
+  }
+  .pro-dock-item.expanded .pro-dock-label,
+  .pro-dock-item.active .pro-dock-label{
+    max-width:43px!important;
+    padding-right:5px!important;
+    font-size:.56rem!important;
+  }
+  .pro-dock-utility{
+    gap:4px!important;
+    padding-top:5px!important;
+  }
+
+  /* Wider and taller lower workspace, while the photo remains fixed. */
+  .pro-tool-sheet{
+    left:34px!important;
+    right:34px!important;
+    bottom:max(5px,env(safe-area-inset-bottom))!important;
+    height:clamp(390px,55dvh,620px)!important;
+    max-height:55dvh!important;
+    border-radius:20px 20px 15px 15px!important;
+  }
+  .pro-sheet-head{
+    height:48px!important;
+    padding:10px 10px 7px!important;
+  }
+  .pro-sheet-content{
+    height:calc(100% - 48px)!important;
+    padding:8px!important;
+  }
+}
+@media(max-width:430px){
+  .pro-dock-item{
+    width:29px!important;
+    min-width:29px!important;
+    height:29px!important;
+    min-height:29px!important;
+  }
+  .pro-dock-item>span{
+    flex-basis:27px!important;
+    font-size:.88rem!important;
+  }
+  .pro-dock-item.expanded,.pro-dock-item.active{
+    width:69px!important;
+  }
+  .pro-tool-sheet{
+    left:31px!important;
+    right:31px!important;
+    height:clamp(370px,54dvh,590px)!important;
+    max-height:54dvh!important;
+  }
+}

@@ -1,4 +1,4 @@
-PHOTO IA 12.1 — Persistent Canvas UI
+PHOTO IA 12.2 — Persistent Canvas UI
 
 Cambios principales:
 - La fotografía permanece visible mientras Smart, Ajustes, Crear, Alienware o Guardar están abiertos.

@@ -1,18 +1,18 @@
-const CACHE='photo-ia-12-1-persistent-canvas';
-const VERSION='12.1';
+const CACHE='photo-ia-12-2-edge-docks-workspace';
+const VERSION='12.2';
 const CORE=[
- './','./index.html','./styles.css?v=12.1-persistent-canvas','./ui-layout.js?v=12.1-persistent-canvas','./app.js?v=12.1-persistent-canvas',
- './creative-tools.js?v=12.1-persistent-canvas','./brain.js?v=12.1-persistent-canvas',
- './opencv-engine.js?v=12.1-persistent-canvas','./smart-core.js?v=12.1-persistent-canvas','./ai-studio.js?v=12.1-persistent-canvas',
- './vision.js?v=12.1-persistent-canvas','./segmentation.js?v=12.1-persistent-canvas','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=12.2-edge-docks-expanded-workspace','./ui-layout.js?v=12.2-edge-docks-expanded-workspace','./app.js?v=12.2-edge-docks-expanded-workspace',
+ './creative-tools.js?v=12.2-edge-docks-expanded-workspace','./brain.js?v=12.2-edge-docks-expanded-workspace',
+ './opencv-engine.js?v=12.2-edge-docks-expanded-workspace','./smart-core.js?v=12.2-edge-docks-expanded-workspace','./ai-studio.js?v=12.2-edge-docks-expanded-workspace',
+ './vision.js?v=12.2-edge-docks-expanded-workspace','./segmentation.js?v=12.2-edge-docks-expanded-workspace','./manifest.webmanifest'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=12.1-persistent-canvas',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=12.1-persistent-canvas',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=12.1-persistent-canvas',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=12.1-persistent-canvas',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=12.1-persistent-canvas',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=12.1-persistent-canvas',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/vendor/fabric.min.js?v=12.2-edge-docks-expanded-workspace',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=12.2-edge-docks-expanded-workspace',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=12.2-edge-docks-expanded-workspace',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=12.2-edge-docks-expanded-workspace',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=12.2-edge-docks-expanded-workspace',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=12.2-edge-docks-expanded-workspace',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
  {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe opcional',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},

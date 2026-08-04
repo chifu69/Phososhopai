@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 12.1",
+  "name": "PHOTO IA 12.2",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con interfaz Mobile Pro, Fabric, OpenCV y conexión opcional al Alienware.",
-  "start_url": "./?v=12.1-persistent-canvas",
+  "start_url": "./?v=12.2-edge-docks-expanded-workspace",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
