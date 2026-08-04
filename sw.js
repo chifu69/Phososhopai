@@ -1,18 +1,18 @@
-const CACHE='photo-ia-11-3-1-portrait-natural';
+const CACHE='photo-ia-11-4-portrait-beauty';
 const VERSION='11.3';
 const CORE=[
- './','./index.html','./styles.css?v=11.3.1-portrait-natural-tuning','./ui-layout.js?v=11.3.1-portrait-natural-tuning','./app.js?v=11.3.1-portrait-natural-tuning',
- './creative-tools.js?v=11.3.1-portrait-natural-tuning','./brain.js?v=11.3.1-portrait-natural-tuning',
- './opencv-engine.js?v=11.3.1-portrait-natural-tuning','./smart-core.js?v=11.3.1-portrait-natural-tuning','./ai-studio.js?v=11.3.1-portrait-natural-tuning',
- './vision.js?v=11.3.1-portrait-natural-tuning','./segmentation.js?v=11.3.1-portrait-natural-tuning','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=11.4-portrait-beauty-engine','./ui-layout.js?v=11.4-portrait-beauty-engine','./app.js?v=11.4-portrait-beauty-engine',
+ './creative-tools.js?v=11.4-portrait-beauty-engine','./brain.js?v=11.4-portrait-beauty-engine',
+ './opencv-engine.js?v=11.4-portrait-beauty-engine','./smart-core.js?v=11.4-portrait-beauty-engine','./ai-studio.js?v=11.4-portrait-beauty-engine',
+ './vision.js?v=11.4-portrait-beauty-engine','./segmentation.js?v=11.4-portrait-beauty-engine','./manifest.webmanifest'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=11.3.1-portrait-natural-tuning',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=11.3.1-portrait-natural-tuning',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=11.3.1-portrait-natural-tuning',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=11.3.1-portrait-natural-tuning',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=11.3.1-portrait-natural-tuning',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=11.3.1-portrait-natural-tuning',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/vendor/fabric.min.js?v=11.4-portrait-beauty-engine',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=11.4-portrait-beauty-engine',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=11.4-portrait-beauty-engine',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=11.4-portrait-beauty-engine',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=11.4-portrait-beauty-engine',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=11.4-portrait-beauty-engine',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
  {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe opcional',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},

@@ -1,14 +1,9 @@
-# PHOTO IA 11.3.1
+# PHOTO IA 11.4 — Portrait Beauty Engine
 
-Base limpia y unificada del editor PHOTO IA.
-
-## Motores
-- Fabric.js: lienzo, capas, texto, stickers y transformaciones.
-- OpenCV.js: análisis local de nitidez, bordes y ruido cuando está disponible.
-- Regional Vision Engine: mejora automática de exposición, rango tonal, sombras, altas luces, color, temperatura, ruido y detalle.
-- Alienware / ComfyUI: tareas generativas avanzadas mediante la conexión privada existente.
-
-## Publicación
-Reemplaza todos los archivos del repositorio por los de esta carpeta. No combines archivos con versiones anteriores. Después espera a que GitHub Pages termine el despliegue y abre la página en Safari.
-
-La conexión HTTPS, token, puertos y certificados del Alienware no fueron modificados.
+Mejoras:
+- Suavizado adaptativo de microtextura sin borrar rasgos.
+- Menos enfoque sobre poros y piel; detalle reservado para ojos, cejas, labios, barba y cabello.
+- Botón opcional **Eliminar pecas y lunares** con detección local y retoque selectivo.
+- Fabric.js conserva lienzo, capas e historial.
+- OpenCV procesa la mejora y el retoque local.
+- No modifica Alienware, HTTPS, certificados, token, puertos ni ComfyUI.

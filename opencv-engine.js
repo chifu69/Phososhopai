@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='3.1.1-portrait-natural-tuning';
+const VERSION='4.0-portrait-beauty-engine';
 let ready=false;
 const api=()=>window.PhotoIA;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -52,19 +52,41 @@ function faceEdgeMask(src,faceMask){
 function sharpenCopy(src,amount=.2,sigma=1.0){const blur=new cv.Mat(),out=new cv.Mat();cv.GaussianBlur(src,blur,new cv.Size(0,0),sigma);cv.addWeighted(src,1+amount,blur,-amount,0,out);safeDelete(blur);return out;}
 function denoiseCopy(src,strength=5){const out=src.clone();if(strength>0)bilateralRGBA(out,5,16+strength*1.7,16+strength*1.7);return out;}
 function globalColor(src,recipe){const rgb=new cv.Mat(),hsv=new cv.Mat(),ch=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);cv.split(hsv,ch);const h=ch.get(0),s=ch.get(1),v=ch.get(2),factor=1+clamp(Number(recipe.vibrance||0)/155,-.10,.18);s.convertTo(s,-1,factor,0);if(recipe.warmth)h.convertTo(h,-1,1,-clamp(Number(recipe.warmth),-4,4)*.22);cv.merge(ch,hsv);cv.cvtColor(hsv,rgb,cv.COLOR_HSV2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);safeDelete(h,s,v,ch,hsv,rgb);}
+function skinTextureMask(src,skinMask){
+ const gray=new cv.Mat(),edges=new cv.Mat(),soft=new cv.Mat(),invEdges=new cv.Mat(),out=new cv.Mat(),k=cv.Mat.ones(3,3,cv.CV_8U);
+ try{cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);cv.Canny(gray,edges,42,108);cv.dilate(edges,edges,k);cv.bitwise_not(edges,invEdges);cv.bitwise_and(skinMask,invEdges,out);cv.GaussianBlur(out,soft,new cv.Size(17,17),0);return soft.clone();}
+ finally{safeDelete(gray,edges,soft,invEdges,out,k)}
+}
+function buildSpotMask(src,skinMask){
+ const gray=new cv.Mat(),blackhat=new cv.Mat(),binary=new cv.Mat(),masked=new cv.Mat(),labels=new cv.Mat(),stats=new cv.Mat(),centroids=new cv.Mat(),out=cv.Mat.zeros(src.rows,src.cols,cv.CV_8U);
+ const size=Math.max(5,Math.round(Math.min(src.rows,src.cols)/110)|1),kernel=cv.getStructuringElement(cv.MORPH_ELLIPSE,new cv.Size(size,size));
+ try{
+  cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);cv.morphologyEx(gray,blackhat,cv.MORPH_BLACKHAT,kernel);cv.threshold(blackhat,binary,10,255,cv.THRESH_BINARY);cv.bitwise_and(binary,skinMask,masked);
+  const n=cv.connectedComponentsWithStats(masked,labels,stats,centroids,8,cv.CV_32S),scale=(src.rows*src.cols)/(1800*1800),minA=Math.max(2,Math.round(4*scale)),maxA=Math.max(30,Math.round(240*scale));
+  for(let i=1;i<n;i++){const x=stats.intAt(i,cv.CC_STAT_LEFT),y=stats.intAt(i,cv.CC_STAT_TOP),w=stats.intAt(i,cv.CC_STAT_WIDTH),h=stats.intAt(i,cv.CC_STAT_HEIGHT),a=stats.intAt(i,cv.CC_STAT_AREA);const ratio=w/Math.max(1,h);if(a<minA||a>maxA||ratio<.35||ratio>2.8)continue;cv.ellipse(out,new cv.Point(Math.round(x+w/2),Math.round(y+h/2)),new cv.Size(Math.max(2,Math.round(w*.8)),Math.max(2,Math.round(h*.8))),0,0,360,new cv.Scalar(255),-1,cv.LINE_AA);}
+  const dk=cv.Mat.ones(3,3,cv.CV_8U);cv.dilate(out,out,dk);dk.delete();return out.clone();
+ }finally{safeDelete(gray,blackhat,binary,masked,labels,stats,centroids,out,kernel)}
+}
+async function removeSkinSpots(){
+ if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks,spotMask,rgb,result;
+ try{src=cv.imread(canvas);masks=buildRegionMasks(src);if(maskRatio(masks.skin)<.012)throw new Error('No detecté suficiente piel para hacer el retoque.');spotMask=buildSpotMask(src,masks.skin);if(cv.countNonZero(spotMask)<3)throw new Error('No detecté pecas o lunares pequeños para retirar.');rgb=new cv.Mat();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);result=new cv.Mat();
+  if(typeof cv.inpaint==='function'){cv.inpaint(rgb,spotMask,result,3,cv.INPAINT_TELEA);}else{const softened=new cv.Mat();cv.medianBlur(rgb,softened,5);result=rgb.clone();const soft4=new cv.Mat(),base4=new cv.Mat();cv.cvtColor(softened,soft4,cv.COLOR_RGB2RGBA);cv.cvtColor(result,base4,cv.COLOR_RGB2RGBA);blendMasked(base4,soft4,spotMask,.88);cv.cvtColor(base4,result,cv.COLOR_RGBA2RGB);safeDelete(softened,soft4,base4);}
+  const rgba=new cv.Mat();cv.cvtColor(result,rgba,cv.COLOR_RGB2RGBA);const out=document.createElement('canvas');out.width=rgba.cols;out.height=rgba.rows;cv.imshow(out,rgba);rgba.delete();return out.toDataURL('image/jpeg',.97);
+ }finally{deleteMasks(masks);safeDelete(src,spotMask,rgb,result)}
+}
 function regionalEnhance(src,recipe,analysis,masks){const r=analysis?.regions||{},strength=clamp(Number(recipe.adaptiveStrength||.65),.25,1),blur=analysis?.blurRisk||'low';
  if(r.sky>.025){const sky=hsvAdjusted(src,1.045+strength*.035,-clamp((recipe.highlights||10)*.22,1,9),0);blendMasked(src,sky,masks.sky,clamp(.30+r.sky+strength*.08,0,.66));sky.delete();}
  if(r.green>.03){const green=hsvAdjusted(src,1+clamp((recipe.vibrance||12)/190,.035,.12),1+strength*1.2,0);blendMasked(src,green,masks.green,clamp(.27+r.green+strength*.07,0,.62));green.delete();}
  // Skin receives gentle tonal/color correction and mild edge-preserving smoothing only.
- if(r.skin>.015){const skin=hsvAdjusted(src,1.006,clamp((recipe.shadows||10)*.14,1,6),-clamp(Number(recipe.warmth||2),0,4)*.12);bilateralRGBA(skin,5,12+strength*5,12+strength*5);blendMasked(src,skin,masks.skin,clamp(.24+r.skin*.65+strength*.06,0,.52));skin.delete();}
+ if(r.skin>.015){const skin=hsvAdjusted(src,1.003,clamp((recipe.shadows||10)*.11,1,5),-clamp(Number(recipe.warmth||2),0,4)*.08);bilateralRGBA(skin,7,18+strength*8,18+strength*8);const smoothMask=skinTextureMask(src,masks.skin);blendMasked(src,skin,smoothMask,clamp(.28+r.skin*.52+strength*.08,0,.56));safeDelete(skin,smoothMask);}
  // Sharpen only meaningful facial edges (eyes, brows, lips, beard), never the full skin mask.
- if(r.face>.02){const edgeMask=faceEdgeMask(src,masks.face);const amount=blur==='high'?.14:blur==='medium'?.10:.055;const detail=sharpenCopy(src,amount,.95);blendMasked(src,detail,edgeMask,blur==='high'?.44:blur==='medium'?.34:.24);safeDelete(detail,edgeMask);}
+ if(r.face>.02){const edgeMask=faceEdgeMask(src,masks.face);const amount=blur==='high'?.10:blur==='medium'?.072:.038;const detail=sharpenCopy(src,amount,.95);blendMasked(src,detail,edgeMask,blur==='high'?.34:blur==='medium'?.27:.18);safeDelete(detail,edgeMask);}
  // Reduce noise mainly in dark areas. Keep the blend conservative to preserve texture.
  if(r.dark>.08&&Number(recipe.denoise||0)>0){const smooth=denoiseCopy(src,clamp(Number(recipe.denoise),2,8));blendMasked(src,smooth,masks.dark,clamp(.20+strength*.10,0,.36));smooth.delete();}
 }
 async function enhanceCurrent(recipe={},analysis=null){if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks;const stage=(name,fn)=>{try{fn()}catch(err){console.warn('[OpenCV Portrait Natural]',name,err)}};try{src=cv.imread(canvas);masks=buildRegionMasks(src);const strength=clamp(Number(recipe.adaptiveStrength||.65),.25,1);stage('balance de blancos',()=>grayWorld(src,.48+strength*.30));stage('curva tonal',()=>toneCurve(src,recipe,analysis));stage('contraste local',()=>claheLuminance(src,(analysis?.regions?.face||0)>.02?1.08+strength*.22:1.10+strength*.34));stage('color global',()=>globalColor(src,recipe));stage('ajustes regionales',()=>regionalEnhance(src,recipe,analysis,masks));if(analysis?.blurRisk==='high'){const globalDetail=sharpenCopy(src,.075,1.2);blendMasked(src,globalDetail,masks.dark,.06);globalDetail.delete();}const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.96);}catch(err){console.error('[OpenCV Portrait Natural] apply failed',err);throw new Error('No se pudo procesar la foto: '+(err?.message||String(err)))}finally{deleteMasks(masks);safeDelete(src)}}
-function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;const regs=r.detectedRegions?.length?r.detectedRegions.join(' · '):'General';el.innerHTML=`<strong>OpenCV Portrait Natural activo</strong><span>Regiones: ${regs}</span><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Ruido: ${r.noiseEstimate}</span><span>Horizonte: ${Math.abs(r.horizon.angle).toFixed(1)}°</span>`;}
-function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Portrait Natural activo';badge.classList.add('ready')}}
+function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;const regs=r.detectedRegions?.length?r.detectedRegions.join(' · '):'General';el.innerHTML=`<strong>OpenCV Portrait Beauty activo</strong><span>Regiones: ${regs}</span><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Ruido: ${r.noiseEstimate}</span><span>Horizonte: ${Math.abs(r.horizon.angle).toFixed(1)}°</span>`;}
+function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Portrait Beauty activo';badge.classList.add('ready')}}
 window.addEventListener('opencv-script-loaded',()=>{const wait=()=>window.cv?.Mat?markReady():setTimeout(wait,200);wait()});
-window.PhotoOpenCV={version:VERSION,get ready(){return ready},analyzeCurrent,enhanceCurrent};
+window.PhotoOpenCV={version:VERSION,get ready(){return ready},analyzeCurrent,enhanceCurrent,removeSkinSpots};
 })();
