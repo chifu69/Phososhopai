@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='12.0-mobile-pro-ui';
+const VERSION='12.1-persistent-canvas';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];

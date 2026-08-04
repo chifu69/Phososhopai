@@ -1,4 +1,4 @@
-PHOTO IA 12.0 — MOBILE PRO UI
+PHOTO IA 12.1 — MOBILE PRO UI
 
 CAMBIOS PRINCIPALES
 - Dock vertical izquierdo: Inicio, Smart, Ajustes, Crear, Alienware y Guardar.
@@ -11,4 +11,4 @@ CAMBIOS PRINCIPALES
 
 PUBLICACIÓN
 Reemplaza todos los archivos del repositorio. No mezcles con versiones anteriores.
-La caché nueva se llama photo-ia-12-0-mobile-pro-ui.
+La caché nueva se llama photo-ia-12-1-persistent-canvas.
