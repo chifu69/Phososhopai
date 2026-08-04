@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.2.1-regional-fix';
+const VERSION='11.3-adaptive-regional-pro';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];

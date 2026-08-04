@@ -1,90 +1,55 @@
 (() => {
 'use strict';
-const VERSION='3.0.1-regional-vision-fix';
+const VERSION='3.1.0-adaptive-regional-pro';
 let ready=false;
 const api=()=>window.PhotoIA;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-function getSourceCanvas(max=1200){const c=api()?.getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('Abre una foto primero.');return c;}
-function matMeanStd(mat){const mean=new cv.Mat(),std=new cv.Mat();cv.meanStdDev(mat,mean,std);const out={mean:mean.doubleAt(0,0),std:std.doubleAt(0,0)};mean.delete();std.delete();return out;}
+function getSourceCanvas(max=1600){const c=api()?.getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('Abre una foto primero.');return c;}
+function safeDelete(...items){items.flat().forEach(m=>{try{m?.delete?.()}catch{}})}
+function matMeanStd(mat){const mean=new cv.Mat(),std=new cv.Mat();cv.meanStdDev(mat,mean,std);const out={mean:mean.doubleAt(0,0),std:std.doubleAt(0,0)};safeDelete(mean,std);return out;}
 function percentileFromHist(hist,p,total){let acc=0;for(let i=0;i<256;i++){acc+=hist.data32F[i];if(acc>=total*p)return i;}return 0;}
-function histogram(gray){const srcVec=new cv.MatVector();srcVec.push_back(gray);const hist=new cv.Mat(),mask=new cv.Mat();cv.calcHist(srcVec,[0],mask,hist,[256],[0,256],false);srcVec.delete();mask.delete();const total=gray.rows*gray.cols;const out={p01:percentileFromHist(hist,.01,total),p05:percentileFromHist(hist,.05,total),p50:percentileFromHist(hist,.5,total),p95:percentileFromHist(hist,.95,total),p99:percentileFromHist(hist,.99,total)};hist.delete();return out;}
+function histogram(gray){const vec=new cv.MatVector(),hist=new cv.Mat(),mask=new cv.Mat();vec.push_back(gray);cv.calcHist(vec,[0],mask,hist,[256],[0,256],false);const total=gray.rows*gray.cols;const out={p01:percentileFromHist(hist,.01,total),p05:percentileFromHist(hist,.05,total),p25:percentileFromHist(hist,.25,total),p50:percentileFromHist(hist,.5,total),p75:percentileFromHist(hist,.75,total),p95:percentileFromHist(hist,.95,total),p99:percentileFromHist(hist,.99,total)};safeDelete(vec,hist,mask);return out;}
 function morphFeather(mask,closeSize=7,blurSize=15){const k=cv.Mat.ones(closeSize,closeSize,cv.CV_8U);cv.morphologyEx(mask,mask,cv.MORPH_CLOSE,k);cv.morphologyEx(mask,mask,cv.MORPH_OPEN,k);k.delete();const b=blurSize%2?blurSize:blurSize+1;cv.GaussianBlur(mask,mask,new cv.Size(b,b),0);}
-function hsvMask(hsv,lo,hi){const low=new cv.Mat(hsv.rows,hsv.cols,hsv.type(),lo),high=new cv.Mat(hsv.rows,hsv.cols,hsv.type(),hi),m=new cv.Mat();cv.inRange(hsv,low,high,m);low.delete();high.delete();return m;}
+function hsvMask(hsv,lo,hi){const low=new cv.Mat(hsv.rows,hsv.cols,hsv.type(),lo),high=new cv.Mat(hsv.rows,hsv.cols,hsv.type(),hi),m=new cv.Mat();cv.inRange(hsv,low,high,m);safeDelete(low,high);return m;}
+function largestComponentRect(mask,minAreaRatio=.004){const binary=new cv.Mat(),labels=new cv.Mat(),stats=new cv.Mat(),centroids=new cv.Mat();cv.threshold(mask,binary,32,255,cv.THRESH_BINARY);let best=null;try{const count=cv.connectedComponentsWithStats(binary,labels,stats,centroids,8,cv.CV_32S);const minArea=mask.rows*mask.cols*minAreaRatio;for(let i=1;i<count;i++){const x=stats.intAt(i,cv.CC_STAT_LEFT),y=stats.intAt(i,cv.CC_STAT_TOP),w=stats.intAt(i,cv.CC_STAT_WIDTH),h=stats.intAt(i,cv.CC_STAT_HEIGHT),area=stats.intAt(i,cv.CC_STAT_AREA);if(area>=minArea&&(!best||area>best.area))best={x,y,w,h,area};}}catch{}finally{safeDelete(binary,labels,stats,centroids)}return best;}
+function ellipseMask(rows,cols,rect){const m=cv.Mat.zeros(rows,cols,cv.CV_8U);if(!rect)return m;const cx=Math.round(rect.x+rect.w/2),cy=Math.round(rect.y+rect.h*.48),ax=Math.max(8,Math.round(rect.w*.78)),ay=Math.max(8,Math.round(rect.h*.78));cv.ellipse(m,new cv.Point(cx,cy),new cv.Size(ax,ay),0,0,360,new cv.Scalar(255),-1,cv.LINE_AA);cv.GaussianBlur(m,m,new cv.Size(31,31),0);return m;}
 function buildRegionMasks(src){const rgb=new cv.Mat(),hsv=new cv.Mat();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);
- const sky=hsvMask(hsv,[88,28,55,0],[138,255,255,255]);
- const green=hsvMask(hsv,[30,28,28,0],[92,255,255,255]);
- const skin1=hsvMask(hsv,[0,18,45,0],[24,185,255,255]);
- const skin2=hsvMask(hsv,[168,18,45,0],[179,185,255,255]);
- const skin=new cv.Mat();cv.bitwise_or(skin1,skin2,skin);
- // Bias sky toward upper 70% to avoid blue clothing near the bottom.
- const upper=new cv.Mat.zeros(src.rows,src.cols,cv.CV_8U);upper.roi(new cv.Rect(0,0,src.cols,Math.max(1,Math.round(src.rows*.72)))).setTo(new cv.Scalar(255));cv.bitwise_and(sky,upper,sky);upper.delete();
- morphFeather(sky,5,17);morphFeather(green,5,13);morphFeather(skin,5,17);
- skin1.delete();skin2.delete();hsv.delete();rgb.delete();
- return{sky,green,skin};
+ const sky=hsvMask(hsv,[88,24,45,0],[138,255,255,255]);
+ const green=hsvMask(hsv,[28,24,24,0],[96,255,255,255]);
+ const skin1=hsvMask(hsv,[0,14,35,0],[27,190,255,255]),skin2=hsvMask(hsv,[168,14,35,0],[179,190,255,255]),skin=new cv.Mat();cv.bitwise_or(skin1,skin2,skin);
+ const upper=cv.Mat.zeros(src.rows,src.cols,cv.CV_8U);upper.roi(new cv.Rect(0,0,src.cols,Math.max(1,Math.round(src.rows*.76)))).setTo(new cv.Scalar(255));cv.bitwise_and(sky,upper,sky);
+ morphFeather(sky,5,17);morphFeather(green,5,13);morphFeather(skin,5,15);
+ const skinRect=largestComponentRect(skin,.0035);const face=ellipseMask(src.rows,src.cols,skinRect);
+ // Keep face mask mostly where skin exists, but allow a soft halo for eyes/hair detail.
+ const expandedSkin=new cv.Mat();cv.max(face,skin,expandedSkin);
+ const gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);const dark=new cv.Mat();cv.threshold(gray,dark,92,255,cv.THRESH_BINARY_INV);cv.GaussianBlur(dark,dark,new cv.Size(21,21),0);
+ safeDelete(skin1,skin2,hsv,rgb,upper,gray,face);
+ return{sky,green,skin,face:expandedSkin,dark};
 }
 function maskRatio(mask){return cv.mean(mask)[0]/255;}
-function deleteMasks(masks){Object.values(masks||{}).forEach(m=>{try{m?.delete()}catch{}});}
-function regionRatios(src){const m=buildRegionMasks(src);const out={sky:+maskRatio(m.sky).toFixed(3),green:+maskRatio(m.green).toFixed(3),skin:+maskRatio(m.skin).toFixed(3)};deleteMasks(m);return out;}
-function horizon(gray,edges){const lines=new cv.Mat();cv.HoughLinesP(edges,lines,1,Math.PI/180,Math.max(35,gray.cols*.08),Math.max(40,gray.cols*.18),18);let sum=0,w=0,count=0;for(let i=0;i<lines.rows;i++){const x1=lines.data32S[i*4],y1=lines.data32S[i*4+1],x2=lines.data32S[i*4+2],y2=lines.data32S[i*4+3];const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);if(len<30)continue;let a=Math.atan2(dy,dx)*180/Math.PI;while(a>90)a-=180;while(a<-90)a+=180;if(Math.abs(a)<18){sum+=a*len;w+=len;count++;}}lines.delete();return{angle:w?sum/w:0,confidence:clamp(count/12,0,1)};}
-async function analyzeCurrent(){if(!ready||!window.cv?.Mat)throw new Error('OpenCV todavía no está listo.');const canvas=getSourceCanvas();let src,gray,lab,lap,edges,blurred,diff;
- try{src=cv.imread(canvas);gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);lab=new cv.Mat();cv.cvtColor(src,lab,cv.COLOR_RGBA2RGB);cv.cvtColor(lab,lab,cv.COLOR_RGB2Lab);
-  lap=new cv.Mat();cv.Laplacian(gray,lap,cv.CV_64F);const ls=matMeanStd(lap),lapVar=ls.std*ls.std;
-  edges=new cv.Mat();cv.Canny(gray,edges,55,145);const edgeDensity=cv.countNonZero(edges)/(edges.rows*edges.cols);
-  blurred=new cv.Mat();cv.GaussianBlur(gray,blurred,new cv.Size(5,5),0);diff=new cv.Mat();cv.absdiff(gray,blurred,diff);const noise=cv.mean(diff)[0];
-  const stats=matMeanStd(gray),hist=histogram(gray),regions=regionRatios(src),hz=horizon(gray,edges);
-  const blurRisk=lapVar<45?'high':lapVar<120?'medium':'low';const dynamic=hist.p95-hist.p05;
-  const detectedRegions=[regions.skin>.035?'Piel':null,regions.sky>.07?'Cielo':null,regions.green>.08?'Vegetación':null].filter(Boolean);
-  const report={version:VERSION,width:src.cols,height:src.rows,brightness:Math.round(stats.mean),contrast:Math.round(stats.std),histogram:hist,dynamicRange:dynamic,laplacianVariance:Math.round(lapVar),edgeDensity:+edgeDensity.toFixed(4),noiseEstimate:+noise.toFixed(2),blurRisk,regions,detectedRegions,horizon:hz,clipping:{black:hist.p01<3,white:hist.p99>252}};render(report);return report;
- }finally{[src,gray,lab,lap,edges,blurred,diff].forEach(m=>{try{m?.delete()}catch{}})}}
-function grayWorld(src){const rgb=new cv.Mat();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);const ch=new cv.MatVector();cv.split(rgb,ch);const means=[0,1,2].map(i=>cv.mean(ch.get(i))[0]);const target=(means[0]+means[1]+means[2])/3;for(let i=0;i<3;i++){const m=ch.get(i);m.convertTo(m,-1,clamp(target/Math.max(1,means[i]),.88,1.12),0);}cv.merge(ch,rgb);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)ch.get(i).delete();ch.delete();rgb.delete();}
-function claheLuminance(src,clip=1.55){
- const rgb=new cv.Mat(),lab=new cv.Mat(),channels=new cv.MatVector();
- let l=null,a=null,b=null,out=null,clahe=null,merged=null;
- try{
-  cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);cv.split(lab,channels);
-  l=channels.get(0);a=channels.get(1);b=channels.get(2);out=new cv.Mat();
-  clahe=new cv.CLAHE(clip,new cv.Size(8,8));clahe.apply(l,out);
-  const rebuilt=new cv.MatVector();rebuilt.push_back(out);rebuilt.push_back(a);rebuilt.push_back(b);
-  merged=new cv.Mat();cv.merge(rebuilt,merged);rebuilt.delete();
-  cv.cvtColor(merged,rgb,cv.COLOR_Lab2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);
- }finally{try{clahe?.delete()}catch{};[l,a,b,out,merged,channels,lab,rgb].forEach(m=>{try{m?.delete()}catch{}})}
+function deleteMasks(m){Object.values(m||{}).forEach(x=>safeDelete(x));}
+function horizon(gray,edges){const lines=new cv.Mat();cv.HoughLinesP(edges,lines,1,Math.PI/180,Math.max(35,gray.cols*.08),Math.max(40,gray.cols*.18),18);let sum=0,w=0,count=0;for(let i=0;i<lines.rows;i++){const x1=lines.data32S[i*4],y1=lines.data32S[i*4+1],x2=lines.data32S[i*4+2],y2=lines.data32S[i*4+3],dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);if(len<30)continue;let a=Math.atan2(dy,dx)*180/Math.PI;while(a>90)a-=180;while(a<-90)a+=180;if(Math.abs(a)<18){sum+=a*len;w+=len;count++;}}lines.delete();return{angle:w?sum/w:0,confidence:clamp(count/12,0,1)};}
+async function analyzeCurrent(){if(!ready||!window.cv?.Mat)throw new Error('OpenCV todavía no está listo.');const canvas=getSourceCanvas();let src,gray,lap,edges,blurred,diff,masks;try{src=cv.imread(canvas);gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);lap=new cv.Mat();cv.Laplacian(gray,lap,cv.CV_64F);const ls=matMeanStd(lap),lapVar=ls.std*ls.std;edges=new cv.Mat();cv.Canny(gray,edges,52,142);const edgeDensity=cv.countNonZero(edges)/(edges.rows*edges.cols);blurred=new cv.Mat();cv.GaussianBlur(gray,blurred,new cv.Size(5,5),0);diff=new cv.Mat();cv.absdiff(gray,blurred,diff);const noise=cv.mean(diff)[0];const stats=matMeanStd(gray),hist=histogram(gray);masks=buildRegionMasks(src);const regions={sky:+maskRatio(masks.sky).toFixed(3),green:+maskRatio(masks.green).toFixed(3),skin:+maskRatio(masks.skin).toFixed(3),face:+maskRatio(masks.face).toFixed(3),dark:+maskRatio(masks.dark).toFixed(3)};const hz=horizon(gray,edges),blurRisk=lapVar<45?'high':lapVar<120?'medium':'low';const detectedRegions=[regions.face>.025?'Rostro':null,regions.skin>.035?'Piel':null,regions.sky>.07?'Cielo':null,regions.green>.08?'Vegetación':null].filter(Boolean);const report={version:VERSION,width:src.cols,height:src.rows,brightness:Math.round(stats.mean),contrast:Math.round(stats.std),histogram:hist,dynamicRange:hist.p95-hist.p05,laplacianVariance:Math.round(lapVar),edgeDensity:+edgeDensity.toFixed(4),noiseEstimate:+noise.toFixed(2),blurRisk,regions,detectedRegions,horizon:hz,clipping:{black:hist.p01<3,white:hist.p99>252}};render(report);return report;}finally{deleteMasks(masks);safeDelete(src,gray,lap,edges,blurred,diff)}}
+function grayWorld(src,strength=.72){const rgb=new cv.Mat();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);const ch=new cv.MatVector();cv.split(rgb,ch);const means=[0,1,2].map(i=>cv.mean(ch.get(i))[0]),target=(means[0]+means[1]+means[2])/3;for(let i=0;i<3;i++){const m=ch.get(i),raw=target/Math.max(1,means[i]),factor=1+(clamp(raw,.86,1.14)-1)*strength;m.convertTo(m,-1,factor,0);}cv.merge(ch,rgb);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)safeDelete(ch.get(i));safeDelete(ch,rgb);}
+function toneCurve(src,recipe,analysis){const rgb=new cv.Mat(),lab=new cv.Mat(),ch=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);cv.split(lab,ch);const l=ch.get(0),lut=new cv.Mat(1,256,cv.CV_8U);const exp=Number(recipe.exposure||0),sh=Number(recipe.shadows||0)/100,hi=Number(recipe.highlights||0)/100,ct=Number(recipe.contrast||0)/100,black=Number(recipe.blackPoint||0);for(let x=0;x<256;x++){let y=x*Math.pow(2,exp);const n=clamp(y/255,0,1);y+=sh*38*Math.pow(1-n,2.15);y-=hi*34*Math.pow(n,2.35);y=128+(y-128)*(1+ct*.62);y-=black*Math.pow(1-n,2.5)*.7;lut.data[x]=Math.round(clamp(y,0,255));}cv.LUT(l,lut,l);cv.merge(ch,lab);cv.cvtColor(lab,rgb,cv.COLOR_Lab2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)safeDelete(ch.get(i));safeDelete(lut,ch,lab,rgb);}
+function claheLuminance(src,clip=1.35){const rgb=new cv.Mat(),lab=new cv.Mat(),channels=new cv.MatVector();let l,a,b,out,clahe,merged;try{cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);cv.split(lab,channels);l=channels.get(0);a=channels.get(1);b=channels.get(2);out=new cv.Mat();clahe=new cv.CLAHE(clip,new cv.Size(8,8));clahe.apply(l,out);const rebuilt=new cv.MatVector();rebuilt.push_back(out);rebuilt.push_back(a);rebuilt.push_back(b);merged=new cv.Mat();cv.merge(rebuilt,merged);rebuilt.delete();cv.cvtColor(merged,rgb,cv.COLOR_Lab2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);}finally{safeDelete(clahe,l,a,b,out,merged,channels,lab,rgb)}}
+function bilateralRGBA(src,d,sigmaColor,sigmaSpace){const rgb=new cv.Mat(),filtered=new cv.Mat();try{cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.bilateralFilter(rgb,filtered,d,sigmaColor,sigmaSpace,cv.BORDER_DEFAULT);cv.cvtColor(filtered,src,cv.COLOR_RGB2RGBA)}finally{safeDelete(rgb,filtered)}}
+function blendMasked(base,adjusted,mask,strength=1){if(!mask||strength<=0)return;const alpha=new cv.Mat(),baseF=new cv.Mat(),adjF=new cv.Mat(),a4=new cv.Mat(),inv=new cv.Mat(),ones=new cv.Mat(base.rows,base.cols,cv.CV_32FC4,new cv.Scalar(1,1,1,1)),vec=new cv.MatVector();mask.convertTo(alpha,cv.CV_32F,clamp(strength,0,1)/255);base.convertTo(baseF,cv.CV_32F);adjusted.convertTo(adjF,cv.CV_32F);for(let i=0;i<4;i++)vec.push_back(alpha);cv.merge(vec,a4);cv.subtract(ones,a4,inv);cv.multiply(baseF,inv,baseF);cv.multiply(adjF,a4,adjF);cv.add(baseF,adjF,baseF);baseF.convertTo(base,cv.CV_8U);for(let i=0;i<4;i++)safeDelete(vec.get(i));safeDelete(alpha,baseF,adjF,a4,inv,ones,vec);}
+function hsvAdjusted(src,satFactor=1,valDelta=0,hueDelta=0){const rgb=new cv.Mat(),hsv=new cv.Mat(),ch=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);cv.split(hsv,ch);const h=ch.get(0),s=ch.get(1),v=ch.get(2);if(hueDelta)h.convertTo(h,-1,1,hueDelta);if(satFactor!==1)s.convertTo(s,-1,satFactor,0);if(valDelta)v.convertTo(v,-1,1,valDelta);cv.merge(ch,hsv);cv.cvtColor(hsv,rgb,cv.COLOR_HSV2RGB);const out=new cv.Mat();cv.cvtColor(rgb,out,cv.COLOR_RGB2RGBA);safeDelete(h,s,v,ch,hsv,rgb);return out;}
+function sharpenCopy(src,amount=.2,sigma=1.0){const blur=new cv.Mat(),out=new cv.Mat();cv.GaussianBlur(src,blur,new cv.Size(0,0),sigma);cv.addWeighted(src,1+amount,blur,-amount,0,out);safeDelete(blur);return out;}
+function denoiseCopy(src,strength=5){const out=src.clone();if(strength>0)bilateralRGBA(out,5,16+strength*1.7,16+strength*1.7);return out;}
+function globalColor(src,recipe){const rgb=new cv.Mat(),hsv=new cv.Mat(),ch=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);cv.split(hsv,ch);const h=ch.get(0),s=ch.get(1),v=ch.get(2),factor=1+clamp(Number(recipe.vibrance||0)/155,-.10,.18);s.convertTo(s,-1,factor,0);if(recipe.warmth)h.convertTo(h,-1,1,-clamp(Number(recipe.warmth),-4,4)*.22);cv.merge(ch,hsv);cv.cvtColor(hsv,rgb,cv.COLOR_HSV2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);safeDelete(h,s,v,ch,hsv,rgb);}
+function regionalEnhance(src,recipe,analysis,masks){const r=analysis?.regions||{},strength=clamp(Number(recipe.adaptiveStrength||.65),.25,1);
+ if(r.sky>.025){const sky=hsvAdjusted(src,1.06+strength*.05,-clamp((recipe.highlights||10)*.28,2,12),0);blendMasked(src,sky,masks.sky,clamp(.38+r.sky+strength*.12,0,.78));sky.delete();}
+ if(r.green>.03){const green=hsvAdjusted(src,1+clamp((recipe.vibrance||12)/145,.05,.18),2+strength*2,0);blendMasked(src,green,masks.green,clamp(.32+r.green+strength*.10,0,.74));green.delete();}
+ if(r.skin>.015){const skin=hsvAdjusted(src,1.012,clamp((recipe.shadows||10)*.23,2,10),-clamp(Number(recipe.warmth||2),0,4)*.20);bilateralRGBA(skin,5,18+strength*8,18+strength*8);blendMasked(src,skin,masks.skin,clamp(.38+r.skin+strength*.12,0,.76));skin.delete();}
+ if(r.face>.02){const detail=sharpenCopy(src,clamp(.15+strength*.14,.16,.32),.85);blendMasked(src,detail,masks.face,clamp(.34+strength*.18,0,.58));detail.delete();}
+ // Reduce noise only in dark regions, retaining facial texture elsewhere.
+ if(r.dark>.08&&Number(recipe.denoise||0)>0){const smooth=denoiseCopy(src,clamp(Number(recipe.denoise),2,10));blendMasked(src,smooth,masks.dark,clamp(.28+strength*.18,0,.52));smooth.delete();}
 }
-function bilateralRGBA(src,d,sigmaColor,sigmaSpace){
- const rgb=new cv.Mat(),filtered=new cv.Mat();
- try{cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.bilateralFilter(rgb,filtered,d,sigmaColor,sigmaSpace,cv.BORDER_DEFAULT);cv.cvtColor(filtered,src,cv.COLOR_RGB2RGBA)}
- finally{rgb.delete();filtered.delete()}
-}
-function blendMasked(base,adjusted,mask,strength=1){if(!mask||strength<=0)return;const alpha=new cv.Mat();mask.convertTo(alpha,cv.CV_32F,clamp(strength,0,1)/255);const baseF=new cv.Mat(),adjF=new cv.Mat();base.convertTo(baseF,cv.CV_32F);adjusted.convertTo(adjF,cv.CV_32F);const alpha4=new cv.MatVector();for(let i=0;i<4;i++)alpha4.push_back(alpha);const a4=new cv.Mat();cv.merge(alpha4,a4);const inv=new cv.Mat();cv.subtract(new cv.Mat(a4.rows,a4.cols,a4.type(),new cv.Scalar(1,1,1,1)),a4,inv);cv.multiply(baseF,inv,baseF);cv.multiply(adjF,a4,adjF);cv.add(baseF,adjF,baseF);baseF.convertTo(base,cv.CV_8U);alpha.delete();baseF.delete();adjF.delete();a4.delete();inv.delete();for(let i=0;i<4;i++)alpha4.get(i).delete();alpha4.delete();}
-function hsvAdjusted(src,satFactor=1,valDelta=0,hueDelta=0){const rgb=new cv.Mat(),hsv=new cv.Mat(),ch=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);cv.split(hsv,ch);const h=ch.get(0),s=ch.get(1),v=ch.get(2);if(hueDelta)h.convertTo(h,-1,1,hueDelta);if(satFactor!==1)s.convertTo(s,-1,satFactor,0);if(valDelta)v.convertTo(v,-1,1,valDelta);cv.merge(ch,hsv);cv.cvtColor(hsv,rgb,cv.COLOR_HSV2RGB);const out=new cv.Mat();cv.cvtColor(rgb,out,cv.COLOR_RGB2RGBA);h.delete();s.delete();v.delete();ch.delete();hsv.delete();rgb.delete();return out;}
-function regionalEnhance(src,recipe,analysis,masks){const r=analysis?.regions||{};
- // Sky: recover brightness and add restrained color.
- if(r.sky>.035){const sky=hsvAdjusted(src,1.08,-clamp((recipe.highlights||10)*.25,2,10),0);blendMasked(src,sky,masks.sky,clamp(.45+r.sky,0,.72));sky.delete();}
- // Vegetation: vibrance and gentle luminance lift.
- if(r.green>.04){const green=hsvAdjusted(src,1+clamp((recipe.vibrance||12)/180,.04,.13),2,0);blendMasked(src,green,masks.green,clamp(.38+r.green,0,.68));green.delete();}
- // Skin: protect saturation, lift shadows, slight warmth; avoid harsh CLAHE appearance.
- if(r.skin>.02){const skin=hsvAdjusted(src,1.015,clamp((recipe.shadows||10)*.18,2,7),1);bilateralRGBA(skin,5,22,22);blendMasked(src,skin,masks.skin,clamp(.42+r.skin,0,.70));skin.delete();}
-}
-function globalColor(src,recipe){const rgb=new cv.Mat(),hsv=new cv.Mat(),channels=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);cv.split(hsv,channels);const s=channels.get(1);const factor=1+clamp(Number(recipe.vibrance||0)/180,-.10,.13);s.convertTo(s,-1,factor,0);cv.merge(channels,hsv);cv.cvtColor(hsv,rgb,cv.COLOR_HSV2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)channels.get(i).delete();channels.delete();hsv.delete();rgb.delete();}
-function sharpen(src,amount=.24){const blur=new cv.Mat(),out=new cv.Mat();cv.GaussianBlur(src,blur,new cv.Size(0,0),1.05);cv.addWeighted(src,1+amount,blur,-amount,0,out);out.copyTo(src);blur.delete();out.delete();}
-function denoise(src,strength=5){if(strength<=0)return;bilateralRGBA(src,5,16+strength*1.6,16+strength*1.6);}
-async function enhanceCurrent(recipe={},analysis=null){
- if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks;
- const stage=(name,fn)=>{try{fn()}catch(err){console.warn('[OpenCV Regional]',name,err)}};
- try{
-  src=cv.imread(canvas);masks=buildRegionMasks(src);
-  stage('balance de blancos',()=>grayWorld(src));
-  const clip=clamp(1.18+Math.max(0,Number(recipe.contrast||0))/52,1.18,1.85);
-  stage('contraste local',()=>claheLuminance(src,clip));
-  stage('reducción de ruido',()=>denoise(src,clamp(Number(recipe.denoise||0),0,10)));
-  stage('color global',()=>globalColor(src,recipe));
-  stage('ajustes regionales',()=>regionalEnhance(src,recipe,analysis,masks));
-  stage('enfoque',()=>sharpen(src,clamp(Number(recipe.clarity||8)/70,.10,.34)));
-  const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.96);
- }catch(err){console.error('[OpenCV Regional] apply failed',err);throw new Error('No se pudo procesar la foto: '+(err?.message||String(err)))}
- finally{deleteMasks(masks);src?.delete()}
-}
-function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;const regs=r.detectedRegions?.length?r.detectedRegions.join(' · '):'General';el.innerHTML=`<strong>OpenCV Regional Vision activo</strong><span>Regiones: ${regs}</span><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Ruido: ${r.noiseEstimate}</span><span>Horizonte: ${Math.abs(r.horizon.angle).toFixed(1)}°</span>`;}
-function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Regional Vision activo';badge.classList.add('ready')}}
+async function enhanceCurrent(recipe={},analysis=null){if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks;const stage=(name,fn)=>{try{fn()}catch(err){console.warn('[OpenCV Adaptive Pro]',name,err)}};try{src=cv.imread(canvas);masks=buildRegionMasks(src);const strength=clamp(Number(recipe.adaptiveStrength||.65),.25,1);stage('balance de blancos',()=>grayWorld(src,.48+strength*.30));stage('curva tonal',()=>toneCurve(src,recipe,analysis));stage('contraste local',()=>claheLuminance(src,1.10+strength*.42));stage('color global',()=>globalColor(src,recipe));stage('ajustes regionales',()=>regionalEnhance(src,recipe,analysis,masks));const globalDetail=sharpenCopy(src,clamp(.07+strength*.09,.08,.18),1.12);blendMasked(src,globalDetail,masks.dark,.10);globalDetail.delete();const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.96);}catch(err){console.error('[OpenCV Adaptive Pro] apply failed',err);throw new Error('No se pudo procesar la foto: '+(err?.message||String(err)))}finally{deleteMasks(masks);safeDelete(src)}}
+function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;const regs=r.detectedRegions?.length?r.detectedRegions.join(' · '):'General';el.innerHTML=`<strong>OpenCV Adaptive Regional Pro activo</strong><span>Regiones: ${regs}</span><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Ruido: ${r.noiseEstimate}</span><span>Horizonte: ${Math.abs(r.horizon.angle).toFixed(1)}°</span>`;}
+function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Adaptive Pro activo';badge.classList.add('ready')}}
 window.addEventListener('opencv-script-loaded',()=>{const wait=()=>window.cv?.Mat?markReady():setTimeout(wait,200);wait()});
 window.PhotoOpenCV={version:VERSION,get ready(){return ready},analyzeCurrent,enhanceCurrent};
 })();

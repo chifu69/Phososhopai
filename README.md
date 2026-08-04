@@ -1,4 +1,4 @@
-# PHOTO IA 11.2.1
+# PHOTO IA 11.3
 
 Base limpia y unificada del editor PHOTO IA.
 
