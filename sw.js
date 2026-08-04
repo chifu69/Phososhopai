@@ -1,9 +1,9 @@
-const CACHE='photo-ia-10.2.1-smart-recommendation-fix';
+const CACHE='photo-ia-10.3-smart-engine-2';
 const VERSION='10.2.1';
 const CORE=[
- './','./index.html','./styles.css?v=10.2.1-smart-fix','./ui-layout.js?v=10.2.1-smart-fix','./app.js?v=10.2.1-smart-fix',
+ './','./index.html','./styles.css?v=10.3-smart-engine-2','./ui-layout.js?v=10.3-smart-engine-2','./app.js?v=10.3-smart-engine-2',
  './creative-tools.js?v=9.1.1-smart-edit-bridge','./brain.js?v=9.1.1-smart-edit-bridge',
- './opencv-engine.js?v=10.2.1-smart-fix','./smart-core.js?v=10.2.1-smart-fix','./ai-studio.js?v=10.2.1-smart-fix',
+ './opencv-engine.js?v=10.3-smart-engine-2','./smart-core.js?v=10.3-smart-engine-2','./ai-studio.js?v=10.3-smart-engine-2',
  './vision.js?v=9.1.1-smart-edit-bridge','./segmentation.js?v=9.1.1-smart-edit-bridge','./manifest.webmanifest'
 ];
 const ASSETS=[
