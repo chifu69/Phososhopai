@@ -279,3 +279,13 @@ body.processing-lock{position:fixed!important;left:0;right:0;width:100%;touch-ac
 
 /* PHOTO IA 11.4 — Portrait Beauty */
 .portrait-clean-btn{border-color:#d8b4fe!important;background:linear-gradient(135deg,#fff7ed,#faf5ff)!important;color:#6b21a8!important}.portrait-clean-btn:not(:disabled){box-shadow:0 8px 22px rgba(126,34,206,.10)}
+
+
+/* PHOTO IA 11.5 portrait retouch */
+.portrait-retouch-box{margin-top:16px;padding:18px;border:1px solid var(--line,#d8e0eb);border-radius:24px;background:linear-gradient(145deg,rgba(255,248,241,.92),rgba(247,250,255,.96))}
+.portrait-retouch-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}.portrait-retouch-heading strong{display:block;font-size:1.05rem}.portrait-retouch-heading small{display:block;margin-top:3px;color:var(--muted,#667085)}
+.portrait-retouch-heading output{font-weight:900;color:#d97706;background:#fff3dc;border-radius:999px;padding:7px 12px}.portrait-strength-label{display:block;margin:14px 0 7px;font-weight:800;color:var(--muted,#667085)}
+.portrait-strength{width:100%;accent-color:#ff9f0a}.portrait-retouch-actions{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:14px}.portrait-retouch-actions button{min-height:54px;padding:10px;font-weight:800}
+.portrait-retouch-note{margin:12px 0 0;color:var(--muted,#667085);font-size:.88rem;line-height:1.4}
+@media(max-width:680px){.portrait-retouch-actions{grid-template-columns:1fr}.portrait-retouch-box{padding:14px}}
+@media(prefers-color-scheme:dark){.portrait-retouch-box{background:linear-gradient(145deg,rgba(35,31,29,.96),rgba(24,31,41,.96))}}

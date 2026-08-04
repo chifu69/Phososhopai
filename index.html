@@ -10,8 +10,8 @@
   <meta name="description" content="PHOTO IA 8.2 con editor local y Estudio IA conectado al servidor privado del Alienware.">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
-  <link rel="stylesheet" href="styles.css?v=11.4-portrait-beauty-engine">
-  <title>PHOTO IA 11.4 — Portrait Beauty Engine</title>
+  <link rel="stylesheet" href="styles.css?v=11.5-portrait-retouch-engine">
+  <title>PHOTO IA 11.5 — Portrait Retouch Engine</title>
 </head>
 <body>
 <div class="app-shell">
@@ -55,14 +55,24 @@
 
     <section class="panel smart-core-panel">
       <div class="section-heading">
-        <div><p class="eyebrow">NÚCLEO ADAPTATIVO LOCAL 11.4</p><h2>Analiza antes de editar</h2></div>
+        <div><p class="eyebrow">NÚCLEO ADAPTATIVO LOCAL 11.5</p><h2>Analiza antes de editar</h2></div>
         <span id="smart-core-badge" class="smart-core-badge">Iniciando…</span>
       </div>
       <p class="smart-core-copy">PHOTO IA identifica piel, cielo y vegetación, además de analizar luz, color, ruido y detalle. Después aplica ajustes diferentes a cada región sin afectar toda la foto por igual.</p>
       <div class="smart-core-actions">
         <button id="smart-analyze" class="primary" type="button">🧠 Analizar fotografía</button>
         <button id="smart-apply" class="secondary" type="button" disabled>✨ Aplicar recomendación</button>
-        <button id="smart-remove-spots" class="secondary portrait-clean-btn" type="button" disabled>🪄 Eliminar pecas y lunares</button>
+      </div>
+      <div class="portrait-retouch-box">
+        <div class="portrait-retouch-heading"><div><strong>🙂 Retoque de retrato</strong><small>Controles separados para no deformar la cara</small></div><output id="portrait-strength-value">35%</output></div>
+        <label class="portrait-strength-label" for="portrait-strength">Suavizado natural de piel</label>
+        <input id="portrait-strength" class="portrait-strength" type="range" min="0" max="70" value="35" step="5">
+        <div class="portrait-retouch-actions">
+          <button id="smart-smooth-skin" class="secondary portrait-clean-btn" type="button" disabled>✨ Suavizar piel</button>
+          <button id="smart-remove-blemishes" class="secondary portrait-clean-btn" type="button" disabled>🪄 Quitar granitos/manchas</button>
+          <button id="smart-remove-moles" class="secondary portrait-clean-btn" type="button" disabled>🟤 Quitar lunares pequeños</button>
+        </div>
+        <p class="portrait-retouch-note">Los retoques usan máscaras pequeñas y conservan ojos, cejas, labios, barba y textura natural.</p>
       </div>
       <div id="smart-analysis-result" class="smart-analysis-result"><p>Abre una foto y pulsa <strong>Analizar fotografía</strong>.</p></div>
       <div class="smart-mode-grid" aria-label="Modos adaptativos locales">
@@ -377,7 +387,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 11.4 • Portrait Beauty Engine + Fabric + OpenCV</footer>
+  <footer>PHOTO IA 11.5 • Portrait Retouch Engine + Fabric + OpenCV</footer>
 </div>
 
 <div id="local-install" class="local-install" hidden>
@@ -398,19 +408,19 @@
 <div id="processing" class="processing" hidden><span></span><b>Procesando…</b><button id="processing-cancel" class="processing-cancel" hidden>Cancelar</button></div>
 <div id="toast" class="toast" role="status"></div>
 
-  <script src="ui-layout.js?v=11.4-portrait-beauty-engine"></script>
+  <script src="ui-layout.js?v=11.5-portrait-retouch-engine"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js"></script>
-<script src="app.js?v=11.4-portrait-beauty-engine"></script>
-<script src="creative-tools.js?v=11.4-portrait-beauty-engine"></script>
-<script src="brain.js?v=11.4-portrait-beauty-engine"></script>
-<script src="opencv-engine.js?v=11.4-portrait-beauty-engine"></script>
-<script src="smart-core.js?v=11.4-portrait-beauty-engine"></script>
-<script src="ai-studio.js?v=11.4-portrait-beauty-engine"></script>
+<script src="app.js?v=11.5-portrait-retouch-engine"></script>
+<script src="creative-tools.js?v=11.5-portrait-retouch-engine"></script>
+<script src="brain.js?v=11.5-portrait-retouch-engine"></script>
+<script src="opencv-engine.js?v=11.5-portrait-retouch-engine"></script>
+<script src="smart-core.js?v=11.5-portrait-retouch-engine"></script>
+<script src="ai-studio.js?v=11.5-portrait-retouch-engine"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js"></script>
-<script src="vision.js?v=11.4-portrait-beauty-engine"></script>
-<script src="segmentation.js?v=11.4-portrait-beauty-engine"></script>
+<script src="vision.js?v=11.5-portrait-retouch-engine"></script>
+<script src="segmentation.js?v=11.5-portrait-retouch-engine"></script>
 <script async src="https://docs.opencv.org/4.x/opencv.js" onload="window.dispatchEvent(new Event('opencv-script-loaded'))"></script>
 <script>
 (() => {

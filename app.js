@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.4-portrait-beauty-engine';
+const VERSION='11.5-portrait-retouch-engine';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
