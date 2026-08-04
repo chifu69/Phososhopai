@@ -716,3 +716,55 @@ body.photoia-pro-ui{overflow-x:hidden}
   .photoia-modern-ui .pro-dock-label{left:32px!important}
   .photoia-modern-ui .pro-tool-sheet{left:28px!important;right:4px!important}
 }
+
+/* PHOTO IA 12.4 — Full Canvas Layout
+   Uses the full mobile width to the right of the compact dock and lets the
+   contextual sheet occupy the same usable workspace. The document/canvas
+   position and editor engines are unchanged. */
+.photoia-modern-ui .app-shell{
+  width:100%!important;
+  max-width:none!important;
+  margin:0!important;
+  padding-left:34px!important;
+  padding-right:3px!important;
+}
+.photoia-modern-ui .pro-stage,
+.photoia-modern-ui .pro-editor-stage,
+.photoia-modern-ui .workspace{
+  width:100%!important;
+  max-width:none!important;
+}
+.photoia-modern-ui .workspace .canvas-wrap{
+  width:100%!important;
+  max-width:none!important;
+}
+.photoia-modern-ui .workspace .canvas-container{
+  max-width:100%!important;
+}
+.photoia-modern-ui .pro-dock-left{
+  left:max(0px,env(safe-area-inset-left))!important;
+}
+.photoia-modern-ui .pro-tool-sheet{
+  left:33px!important;
+  right:3px!important;
+  width:auto!important;
+  max-width:none!important;
+}
+.photoia-modern-ui .pro-sheet-content,
+.photoia-modern-ui .pro-tool-panel{
+  width:100%!important;
+  max-width:none!important;
+}
+.photoia-modern-ui.pro-sheet-open .pro-editor-stage{
+  padding-left:0!important;
+}
+@media(max-width:430px){
+  .photoia-modern-ui .app-shell{
+    padding-left:31px!important;
+    padding-right:1px!important;
+  }
+  .photoia-modern-ui .pro-tool-sheet{
+    left:30px!important;
+    right:1px!important;
+  }
+}

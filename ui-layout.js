@@ -34,7 +34,7 @@
     sheet.hidden = true;
     sheet.innerHTML = `
       <div class="pro-sheet-head">
-        <div><small>PHOTO IA 12.3</small><strong id="pro-sheet-title">Herramientas</strong></div>
+        <div><small>PHOTO IA 12.4</small><strong id="pro-sheet-title">Herramientas</strong></div>
         <button id="pro-sheet-close" type="button" aria-label="Cerrar panel">×</button>
       </div>
       <div id="pro-create-tools" class="pro-create-tools" hidden>
