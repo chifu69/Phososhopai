@@ -1,4 +1,4 @@
-# PHOTO IA 11.5.2 — Compact Tool Dock
+# PHOTO IA 12.0 —  Mobile Pro UI
 
 - La foto adapta automáticamente el alto del lienzo a su proporción.
 - Ocupa prácticamente todo el cuadro sin deformarse ni recortarse.
@@ -6,7 +6,7 @@
 - Doble toque en el lienzo vuelve a centrar y ajustar la foto.
 - Conserva Portrait Retouch 11.5 y la conexión Alienware sin cambios.
 
-## Nuevo en 11.5.2
+## Nuevo en 12.0
 - Barra superior de herramientas convertida en Dock compacto estilo macOS.
 - Los botones inactivos permanecen pequeños.
 - La herramienta seleccionada se agranda y muestra su nombre.

@@ -290,7 +290,7 @@ body.processing-lock{position:fixed!important;left:0;right:0;width:100%;touch-ac
 @media(max-width:680px){.portrait-retouch-actions{grid-template-columns:1fr}.portrait-retouch-box{padding:14px}}
 @media(prefers-color-scheme:dark){.portrait-retouch-box{background:linear-gradient(145deg,rgba(35,31,29,.96),rgba(24,31,41,.96))}}
 
-/* PHOTO IA 11.5.2 — Compact Mac-style tool dock */
+/* PHOTO IA 12.0 — Compact Mac-style tool dock */
 .mode-toolbar{
   display:flex;
   align-items:center;
@@ -372,3 +372,67 @@ body.processing-lock{position:fixed!important;left:0;right:0;width:100%;touch-ac
   .mode-tool.active small{font-size:.68rem}
   .mode-help{display:none}
 }
+
+/* PHOTO IA 12.0 — Mobile Pro UI with left/right macOS-style docks */
+body.photoia-pro-ui{overflow-x:hidden}
+.photoia-pro-ui .app-shell{max-width:none;padding:10px 62px 18px;min-height:100dvh}
+.photoia-pro-ui .topbar{position:relative;z-index:45;margin:0 auto 8px;max-width:1500px;padding:8px 10px;border-radius:18px;background:color-mix(in srgb,var(--surface) 90%,transparent);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.photoia-pro-ui .topbar .brand p{display:none}
+.photoia-pro-ui .topbar .brand h1{font-size:1.05rem}
+.photoia-pro-ui .topbar .robot{transform:scale(.72);transform-origin:left center;width:44px}
+.photoia-pro-ui .topbar .icon-btn{width:38px;height:38px;border-radius:13px}
+.photoia-pro-ui .pro-stage{display:block;max-width:1500px;margin:auto}
+.photoia-pro-ui .pro-editor-stage{position:relative;min-height:calc(100dvh - 88px)}
+.photoia-pro-ui .workspace{margin:0!important;padding:10px!important;border-radius:20px!important;box-shadow:0 12px 36px rgba(15,23,42,.16)!important}
+.photoia-pro-ui .workspace .canvas-toolbar{min-height:40px;margin-bottom:4px}
+.photoia-pro-ui .workspace .canvas-toolbar .eyebrow{display:none}
+.photoia-pro-ui .workspace .canvas-toolbar h2{font-size:1rem}
+.photoia-pro-ui .workspace .canvas-actions{display:none!important}
+.photoia-pro-ui .workspace .mode-help{display:none!important}
+.photoia-pro-ui .workspace .canvas-wrap{height:calc(100dvh - 160px)!important;min-height:420px!important;max-height:none!important;margin-top:4px!important;border-radius:16px!important;overflow:hidden!important}
+.photoia-pro-ui .workspace .canvas-container,.photoia-pro-ui .workspace canvas{max-height:calc(100dvh - 160px)!important;max-width:100%!important}
+.photoia-pro-ui .workspace .status-row{font-size:.7rem;margin-top:4px}
+.photoia-pro-ui footer{font-size:.68rem;padding:6px}
+
+.pro-dock{position:fixed;top:50%;transform:translateY(-50%);z-index:80;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px 6px;border:1px solid color-mix(in srgb,var(--line) 78%,transparent);border-radius:22px;background:color-mix(in srgb,var(--surface) 82%,transparent);box-shadow:0 14px 36px rgba(15,23,42,.20);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);max-height:76dvh;overflow-y:auto;overflow-x:visible;scrollbar-width:none}
+.pro-dock::-webkit-scrollbar{display:none}.pro-dock-left{left:max(6px,env(safe-area-inset-left))}.pro-dock-right{right:max(6px,env(safe-area-inset-right))}
+.pro-dock-item{position:relative;flex:0 0 auto;width:42px;min-width:42px;height:42px;min-height:42px;padding:0;border:1px solid transparent;border-radius:14px;background:transparent;color:var(--text);display:flex;align-items:center;justify-content:center;gap:0;font-weight:850;overflow:hidden;transition:width .22s cubic-bezier(.2,.8,.2,1),transform .18s ease,background .18s ease,box-shadow .18s ease,border-color .18s ease}
+.pro-dock-item>span{flex:0 0 40px;font-size:1.25rem;line-height:1}.pro-dock-label{max-width:0;opacity:0;white-space:nowrap;font-size:.72rem;transition:max-width .2s ease,opacity .18s ease;margin:0}
+.pro-dock-item.expanded,.pro-dock-item.active{width:112px;justify-content:flex-start;background:var(--surface);border-color:var(--line);box-shadow:0 8px 22px rgba(15,23,42,.16);transform:scale(1.04)}
+.pro-dock-item.expanded .pro-dock-label,.pro-dock-item.active .pro-dock-label{max-width:68px;opacity:1;padding-right:10px}
+.pro-dock-item:disabled{opacity:.35}.pro-dock-utility{display:grid;gap:8px;padding-top:8px;margin-top:2px;border-top:1px solid var(--line)}
+
+.pro-tool-sheet{position:fixed;z-index:75;left:68px;top:max(72px,calc(env(safe-area-inset-top) + 58px));bottom:max(12px,env(safe-area-inset-bottom));width:min(430px,calc(100vw - 136px));border:1px solid var(--line);border-radius:24px;background:color-mix(in srgb,var(--surface) 96%,transparent);box-shadow:0 24px 70px rgba(15,23,42,.30);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);overflow:hidden}
+.pro-tool-sheet[hidden]{display:none!important}.pro-sheet-head{height:58px;display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+.pro-sheet-head small{display:block;color:var(--accent);font-weight:900;letter-spacing:.14em;font-size:.62rem}.pro-sheet-head strong{display:block;font-size:1rem;margin-top:2px}.pro-sheet-head button{width:38px;height:38px;border:1px solid var(--line);border-radius:13px;background:var(--surface2);color:var(--text);font-size:1.45rem}
+.pro-sheet-content{height:calc(100% - 58px);overflow:auto;padding:10px}.pro-tool-panel{margin:0 0 10px!important;padding:15px!important;border-radius:20px!important;box-shadow:none!important}.pro-tool-panel:last-child{margin-bottom:0!important}
+
+@media(min-width:901px){
+ .photoia-pro-ui.pro-sheet-open .pro-editor-stage{padding-left:448px;transition:padding-left .25s ease}
+ .photoia-pro-ui .pro-editor-stage{transition:padding-left .25s ease}
+}
+@media(max-width:900px){
+ .photoia-pro-ui .app-shell{padding:4px 54px 12px}
+ .photoia-pro-ui .topbar{margin-bottom:4px;padding:5px 7px}.photoia-pro-ui .topbar .brand h1{font-size:.94rem}.photoia-pro-ui .topbar .robot{display:none}
+ .photoia-pro-ui .workspace{padding:6px!important;border-radius:14px!important}
+ .photoia-pro-ui .workspace .canvas-toolbar{min-height:30px}.photoia-pro-ui .workspace .canvas-toolbar h2{font-size:.82rem;max-width:70vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+ .photoia-pro-ui .workspace .canvas-wrap{height:calc(100dvh - 116px)!important;min-height:360px!important;border-radius:12px!important}
+ .photoia-pro-ui .workspace .canvas-container,.photoia-pro-ui .workspace canvas{max-height:calc(100dvh - 116px)!important}
+ .photoia-pro-ui .workspace .status-row{display:none}
+ .photoia-pro-ui footer{display:none}
+ .pro-dock{gap:5px;padding:6px 4px;border-radius:18px;max-height:72dvh}
+ .pro-dock-left{left:max(3px,env(safe-area-inset-left))}.pro-dock-right{right:max(3px,env(safe-area-inset-right))}
+ .pro-dock-item{width:38px;min-width:38px;height:38px;min-height:38px;border-radius:12px}.pro-dock-item>span{flex-basis:36px;font-size:1.08rem}
+ .pro-dock-item.expanded,.pro-dock-item.active{width:96px}.pro-dock-item.expanded .pro-dock-label,.pro-dock-item.active .pro-dock-label{max-width:57px;font-size:.64rem;padding-right:7px}
+ .pro-tool-sheet{left:51px;right:51px;top:max(58px,calc(env(safe-area-inset-top) + 48px));bottom:max(7px,env(safe-area-inset-bottom));width:auto;border-radius:20px}
+ .pro-sheet-content{padding:7px}.pro-tool-panel{padding:12px!important;border-radius:17px!important}
+}
+@media(max-width:430px){
+ .photoia-pro-ui .app-shell{padding-left:49px;padding-right:49px}
+ .photoia-pro-ui .workspace .canvas-wrap{height:calc(100dvh - 104px)!important;min-height:330px!important}
+ .photoia-pro-ui .workspace .canvas-container,.photoia-pro-ui .workspace canvas{max-height:calc(100dvh - 104px)!important}
+ .pro-dock-item{width:36px;min-width:36px;height:36px;min-height:36px}.pro-dock-item>span{flex-basis:34px;font-size:1rem}
+ .pro-dock-item.expanded,.pro-dock-item.active{width:88px}
+ .pro-tool-sheet{left:46px;right:46px}
+}
+@media(prefers-reduced-motion:reduce){.pro-dock-item,.photoia-pro-ui .pro-editor-stage{transition:none!important}}
