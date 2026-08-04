@@ -1,13 +1,13 @@
 {
-  "name": "PHOTO IA 11.0",
+  "name": "PHOTO IA 11.1",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con Fabric, OpenCV, mejora inteligente y conexión opcional al Alienware.",
-  "start_url": "./?v=11.0-clean-vision-4",
+  "start_url": "./?v=11.1-clean-vision-4",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
   "orientation": "portrait-primary",
   "icons": [],
   "scope": "./",
-  "id": "photo-ia-11-clean-vision-4"
+  "id": "photo-ia-11-1-opencv-photo-core"
 }

@@ -1,27 +1,34 @@
 (() => {
 'use strict';
-const VERSION='1.0.0-pro';
+const VERSION='2.0.0-photo-core-90';
 let ready=false;
 const api=()=>window.PhotoIA;
-function getSourceCanvas(max=900){
- const c=api()?.getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('Abre una foto primero.');return Promise.resolve(c);
-}
-function matMeanStd(mat){const mean=new cv.Mat(),std=new cv.Mat();cv.meanStdDev(mat,mean,std);const out={mean:mean.doubleAt(0,0),std:std.doubleAt(0,0)};mean.delete();std.delete();return out}
-async function analyzeCurrent(){
- if(!ready||!window.cv?.Mat)throw new Error('OpenCV todavía no está listo.');
- const canvas=await getSourceCanvas();let src,gray,lap,edges,blurred,diff;
- try{
-  src=cv.imread(canvas);gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);
-  lap=new cv.Mat();cv.Laplacian(gray,lap,cv.CV_64F);const lapStats=matMeanStd(lap);const laplacianVariance=lapStats.std*lapStats.std;
-  edges=new cv.Mat();cv.Canny(gray,edges,70,150);const edgeDensity=cv.countNonZero(edges)/(edges.rows*edges.cols);
-  blurred=new cv.Mat();cv.GaussianBlur(gray,blurred,new cv.Size(3,3),0);diff=new cv.Mat();cv.absdiff(gray,blurred,diff);const noiseEstimate=cv.mean(diff)[0];
-  const stats=matMeanStd(gray);const blurRisk=laplacianVariance<45?'high':laplacianVariance<110?'medium':'low';
-  const report={version:VERSION,width:src.cols,height:src.rows,brightness:Math.round(stats.mean),contrast:Math.round(stats.std),laplacianVariance:Math.round(laplacianVariance),edgeDensity:Number(edgeDensity.toFixed(3)),noiseEstimate:Number(noiseEstimate.toFixed(2)),blurRisk};
-  render(report);return report;
- }finally{[src,gray,lap,edges,blurred,diff].forEach(m=>{try{m?.delete()}catch{}})}
-}
-function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;el.innerHTML=`<strong>OpenCV activo</strong><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Bordes: ${Math.round(r.edgeDensity*100)}%</span><span>Ruido: ${r.noiseEstimate}</span>`}
-function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV activo';badge.classList.add('ready')}}
-window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv?.Mat){markReady()}else setTimeout(wait,200)};wait()});
-window.PhotoOpenCV={version:VERSION,get ready(){return ready},analyzeCurrent};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function getSourceCanvas(max=1200){const c=api()?.getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('Abre una foto primero.');return c;}
+function matMeanStd(mat){const mean=new cv.Mat(),std=new cv.Mat();cv.meanStdDev(mat,mean,std);const out={mean:mean.doubleAt(0,0),std:std.doubleAt(0,0)};mean.delete();std.delete();return out;}
+function percentileFromHist(hist,p,total){let acc=0;for(let i=0;i<256;i++){acc+=hist.data32F[i];if(acc>=total*p)return i;}return 0;}
+function histogram(gray){const srcVec=new cv.MatVector();srcVec.push_back(gray);const hist=new cv.Mat();cv.calcHist(srcVec,[0],new cv.Mat(),hist,[256],[0,256],false);srcVec.delete();const total=gray.rows*gray.cols;const out={p01:percentileFromHist(hist,.01,total),p05:percentileFromHist(hist,.05,total),p50:percentileFromHist(hist,.5,total),p95:percentileFromHist(hist,.95,total),p99:percentileFromHist(hist,.99,total)};hist.delete();return out;}
+function regionRatios(src){const hsv=new cv.Mat();cv.cvtColor(src,hsv,cv.COLOR_RGBA2RGB);cv.cvtColor(hsv,hsv,cv.COLOR_RGB2HSV);const masks={};
+ const make=(name,lo,hi)=>{const low=new cv.Mat(hsv.rows,hsv.cols,hsv.type(),lo),high=new cv.Mat(hsv.rows,hsv.cols,hsv.type(),hi),m=new cv.Mat();cv.inRange(hsv,low,high,m);const k=cv.Mat.ones(3,3,cv.CV_8U);cv.morphologyEx(m,m,cv.MORPH_OPEN,k);masks[name]=cv.countNonZero(m)/(m.rows*m.cols);low.delete();high.delete();k.delete();m.delete();};
+ make('sky',[90,35,45,0],[135,255,255,255]);make('green',[32,35,35,0],[90,255,255,255]);make('skin',[0,25,45,0],[25,190,255,255]);hsv.delete();return masks;}
+function horizon(gray,edges){const lines=new cv.Mat();cv.HoughLinesP(edges,lines,1,Math.PI/180,Math.max(35,gray.cols*.08),Math.max(40,gray.cols*.18),18);let sum=0,w=0,count=0;for(let i=0;i<lines.rows;i++){const x1=lines.data32S[i*4],y1=lines.data32S[i*4+1],x2=lines.data32S[i*4+2],y2=lines.data32S[i*4+3];const dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);if(len<30)continue;let a=Math.atan2(dy,dx)*180/Math.PI;while(a>90)a-=180;while(a<-90)a+=180;if(Math.abs(a)<18){sum+=a*len;w+=len;count++;}}lines.delete();return{angle:w?sum/w:0,confidence:clamp(count/12,0,1)};}
+async function analyzeCurrent(){if(!ready||!window.cv?.Mat)throw new Error('OpenCV todavía no está listo.');const canvas=getSourceCanvas();let src,gray,lab,lap,edges,blurred,diff;
+ try{src=cv.imread(canvas);gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);lab=new cv.Mat();cv.cvtColor(src,lab,cv.COLOR_RGBA2RGB);cv.cvtColor(lab,lab,cv.COLOR_RGB2Lab);
+  lap=new cv.Mat();cv.Laplacian(gray,lap,cv.CV_64F);const ls=matMeanStd(lap),lapVar=ls.std*ls.std;
+  edges=new cv.Mat();cv.Canny(gray,edges,55,145);const edgeDensity=cv.countNonZero(edges)/(edges.rows*edges.cols);
+  blurred=new cv.Mat();cv.GaussianBlur(gray,blurred,new cv.Size(5,5),0);diff=new cv.Mat();cv.absdiff(gray,blurred,diff);const noise=cv.mean(diff)[0];
+  const stats=matMeanStd(gray),hist=histogram(gray),regions=regionRatios(src),hz=horizon(gray,edges);
+  const blurRisk=lapVar<45?'high':lapVar<120?'medium':'low';const dynamic=hist.p95-hist.p05;
+  const report={version:VERSION,width:src.cols,height:src.rows,brightness:Math.round(stats.mean),contrast:Math.round(stats.std),histogram:hist,dynamicRange:dynamic,laplacianVariance:Math.round(lapVar),edgeDensity:+edgeDensity.toFixed(4),noiseEstimate:+noise.toFixed(2),blurRisk,regions,horizon:hz,clipping:{black:hist.p01<3,white:hist.p99>252}};render(report);return report;
+ }finally{[src,gray,lab,lap,edges,blurred,diff].forEach(m=>{try{m?.delete()}catch{}})}}
+function grayWorld(src){const rgb=new cv.Mat();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);const ch=new cv.MatVector();cv.split(rgb,ch);const means=[0,1,2].map(i=>cv.mean(ch.get(i))[0]);const target=(means[0]+means[1]+means[2])/3;for(let i=0;i<3;i++){const m=ch.get(i);m.convertTo(m,-1,clamp(target/Math.max(1,means[i]),.82,1.18),0);}cv.merge(ch,rgb);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)ch.get(i).delete();ch.delete();rgb.delete();}
+function claheLuminance(src,clip=1.8){const rgb=new cv.Mat(),lab=new cv.Mat(),channels=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);cv.split(lab,channels);const l=channels.get(0),out=new cv.Mat();const clahe=new cv.CLAHE(clip,new cv.Size(8,8));clahe.apply(l,out);channels.set(0,out);cv.merge(channels,lab);cv.cvtColor(lab,rgb,cv.COLOR_Lab2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);clahe.delete();out.delete();l.delete();for(let i=1;i<3;i++)channels.get(i).delete();channels.delete();lab.delete();rgb.delete();}
+function regionalColor(src,recipe,regions){const rgb=new cv.Mat(),hsv=new cv.Mat();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);const channels=new cv.MatVector();cv.split(hsv,channels);const s=channels.get(1);const factor=1+clamp(Number(recipe.vibrance||0)/100,-.18,.28);s.convertTo(s,-1,factor,0);cv.merge(channels,hsv);cv.cvtColor(hsv,rgb,cv.COLOR_HSV2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)channels.get(i).delete();channels.delete();hsv.delete();rgb.delete();}
+function sharpen(src,amount=.35){const blur=new cv.Mat(),out=new cv.Mat();cv.GaussianBlur(src,blur,new cv.Size(0,0),1.1);cv.addWeighted(src,1+amount,blur,-amount,0,out);out.copyTo(src);blur.delete();out.delete();}
+function denoise(src,strength=5){if(strength<=0)return;const out=new cv.Mat();cv.bilateralFilter(src,out,5,18+strength*2,18+strength*2,cv.BORDER_DEFAULT);out.copyTo(src);out.delete();}
+async function enhanceCurrent(recipe={},analysis=null){if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src;try{src=cv.imread(canvas);grayWorld(src);const clip=clamp(1.2+Math.max(0,Number(recipe.contrast||0))/28,1.2,2.5);claheLuminance(src,clip);denoise(src,clamp(Number(recipe.denoise||0),0,12));regionalColor(src,recipe,analysis?.regions);sharpen(src,clamp(Number(recipe.clarity||8)/45,.12,.58));const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.96);}finally{src?.delete();}}
+function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;el.innerHTML=`<strong>OpenCV Photo Core activo</strong><span>Rango: ${r.dynamicRange}</span><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Ruido: ${r.noiseEstimate}</span><span>Horizonte: ${Math.abs(r.horizon.angle).toFixed(1)}°</span>`;}
+function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Photo Core activo';badge.classList.add('ready')}}
+window.addEventListener('opencv-script-loaded',()=>{const wait=()=>window.cv?.Mat?markReady():setTimeout(wait,200);wait()});
+window.PhotoOpenCV={version:VERSION,get ready(){return ready},analyzeCurrent,enhanceCurrent};
 })();

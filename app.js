@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.0.0-clean-vision-4';
+const VERSION='11.1.0-opencv-photo-core';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -217,6 +217,14 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
  }finally{processing(false)}
 }
 
+
+async function applyProcessedImageDataUrl(dataUrl,commit=true){
+ if(!state.photo)throw new Error('Abre una foto primero.');
+ const old=state.photo;const props={left:old.left,top:old.top,scaleX:old.scaleX,scaleY:old.scaleY,angle:old.angle,flipX:old.flipX,flipY:old.flipY,originX:old.originX,originY:old.originY};
+ const next=await fabricImageFromURL(dataUrl);next.photoRole='main';next.layerId='layer-photo';next.layerName='Fotografía';next.layerType='photo';next.set({...props,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
+ state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();resetSliderUI();normalizePhotoVisualState();state.canvas.requestRenderAll();if(commit)snapshot();return true;
+}
+
 function applyPreset(name){if(!state.photo)return;resetSliderUI();state.photo.filters=[];const F=fabric.Image.filters;
  const add=(key,f)=>{f.__key=key;state.photo.filters.push(f)};
  if(name==='bw')add('preset',new F.Grayscale());
@@ -355,7 +363,7 @@ window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv
 window.PhotoIA={
   get state(){return state},
   snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,
-  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
+  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
 };
 document.addEventListener('DOMContentLoaded',()=>{init();window.dispatchEvent(new CustomEvent('photoia-ready'))});
 })();

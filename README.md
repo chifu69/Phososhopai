@@ -1,11 +1,11 @@
-# PHOTO IA 11.0
+# PHOTO IA 11.1
 
 Base limpia y unificada del editor PHOTO IA.
 
 ## Motores
 - Fabric.js: lienzo, capas, texto, stickers y transformaciones.
 - OpenCV.js: análisis local de nitidez, bordes y ruido cuando está disponible.
-- Vision Engine 4.0: mejora automática de exposición, rango tonal, sombras, altas luces, color, temperatura, ruido y detalle.
+- OpenCV Photo Core 2.0: mejora automática de exposición, rango tonal, sombras, altas luces, color, temperatura, ruido y detalle.
 - Alienware / ComfyUI: tareas generativas avanzadas mediante la conexión privada existente.
 
 ## Publicación
