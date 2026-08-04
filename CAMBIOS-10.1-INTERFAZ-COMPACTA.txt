@@ -1,0 +1,17 @@
+PHOTO IA 10.1 — INTERFAZ COMPACTA PARA IPHONE
+
+Cambios visuales:
+- El lienzo móvil ahora ocupa aproximadamente 34–38% de la altura visible.
+- La foto permanece dentro de un área fija; el zoom ya no agranda la página.
+- Las herramientas Mover, Dibujar, Borrar, Sticker y Texto permanecen accesibles.
+- El editor ya no queda pegado cubriendo el resto de los controles al desplazarse.
+- El estado inicial para Elegir foto / Usar cámara es más compacto.
+- Se actualizó la caché de la PWA a 10.1 para forzar la nueva interfaz.
+
+NO SE MODIFICÓ:
+- Alienware / ComfyUI
+- HTTPS
+- Puertos
+- Token
+- Certificados de Apple
+- Lógica de generación o edición

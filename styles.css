@@ -175,3 +175,89 @@ body.processing-lock{position:fixed!important;left:0;right:0;width:100%;touch-ac
   .app-shell{max-width:100%;padding-inline:14px}
   .studio-layout{grid-template-columns:minmax(0,1.15fr) minmax(300px,.85fr)}
 }
+
+/* PHOTO IA 10.1 — Mobile compact workspace. Visual layout only. */
+@media(max-width:760px){
+  /* The category bar stays available; the editor itself no longer traps the page. */
+  .studio-editor-column{
+    position:relative!important;
+    top:auto!important;
+    z-index:1!important;
+    margin-bottom:10px!important;
+  }
+  .studio-editor-column .workspace{
+    padding:9px!important;
+    border-radius:17px!important;
+  }
+  .studio-layout .workspace .canvas-toolbar{
+    margin-bottom:2px!important;
+  }
+  .studio-layout .workspace .mode-toolbar{
+    position:sticky;
+    top:calc(env(safe-area-inset-top) + 66px);
+    z-index:35;
+    background:color-mix(in srgb,var(--surface) 96%,transparent);
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:5px!important;
+    margin:6px 0 0!important;
+    box-shadow:0 7px 20px rgba(15,23,42,.10);
+    backdrop-filter:blur(14px);
+    -webkit-backdrop-filter:blur(14px);
+  }
+  .studio-layout .workspace .canvas-wrap{
+    margin-top:7px!important;
+    width:100%!important;
+    height:clamp(245px,38vh,360px)!important;
+    min-height:245px!important;
+    max-height:360px!important;
+    overflow:hidden!important;
+    border-radius:15px!important;
+  }
+  .studio-layout .workspace .canvas-container,
+  .studio-layout .workspace canvas{
+    max-width:100%!important;
+    max-height:clamp(245px,38vh,360px)!important;
+  }
+  .studio-layout .workspace .empty-state{
+    padding:14px 18px!important;
+  }
+  .studio-layout .workspace .empty-state .camera-mark{
+    font-size:2rem!important;
+  }
+  .studio-layout .workspace .empty-state h3{
+    font-size:1.35rem!important;
+    margin:5px 0!important;
+  }
+  .studio-layout .workspace .empty-state p{
+    font-size:.82rem!important;
+    margin:0 0 10px!important;
+  }
+  .studio-layout .workspace .open-actions{
+    width:min(420px,92%);
+    margin:auto;
+    gap:7px!important;
+  }
+  .studio-layout .workspace .open-actions .file-label{
+    min-height:44px;
+    padding:11px 14px!important;
+  }
+  .studio-layout .workspace .status-row{
+    margin-top:4px!important;
+  }
+  .studio-tools-column{
+    scroll-margin-top:calc(env(safe-area-inset-top) + 72px)!important;
+  }
+}
+
+@media(max-width:430px){
+  .studio-layout .workspace .canvas-wrap{
+    height:34vh!important;
+    min-height:230px!important;
+    max-height:330px!important;
+  }
+  .studio-layout .workspace .canvas-container,
+  .studio-layout .workspace canvas{
+    max-height:330px!important;
+  }
+}
