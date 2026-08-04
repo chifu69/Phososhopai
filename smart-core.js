@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.2.0-regional-vision';
+const VERSION='11.2.1-regional-fix';
 const $=id=>document.getElementById(id),api=()=>window.PhotoIA,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));let lastAnalysis=null;
 function status(t,c='ready'){const b=$('smart-core-badge');if(b){b.textContent=t;b.className=`smart-core-badge ${c}`}}
 function ensure(){if(!api()?.state?.photo)throw new Error('Abre una foto primero.');}

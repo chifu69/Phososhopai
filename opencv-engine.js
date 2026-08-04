@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='3.0.0-regional-vision';
+const VERSION='3.0.1-regional-vision-fix';
 let ready=false;
 const api=()=>window.PhotoIA;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -37,7 +37,23 @@ async function analyzeCurrent(){if(!ready||!window.cv?.Mat)throw new Error('Open
   const report={version:VERSION,width:src.cols,height:src.rows,brightness:Math.round(stats.mean),contrast:Math.round(stats.std),histogram:hist,dynamicRange:dynamic,laplacianVariance:Math.round(lapVar),edgeDensity:+edgeDensity.toFixed(4),noiseEstimate:+noise.toFixed(2),blurRisk,regions,detectedRegions,horizon:hz,clipping:{black:hist.p01<3,white:hist.p99>252}};render(report);return report;
  }finally{[src,gray,lab,lap,edges,blurred,diff].forEach(m=>{try{m?.delete()}catch{}})}}
 function grayWorld(src){const rgb=new cv.Mat();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);const ch=new cv.MatVector();cv.split(rgb,ch);const means=[0,1,2].map(i=>cv.mean(ch.get(i))[0]);const target=(means[0]+means[1]+means[2])/3;for(let i=0;i<3;i++){const m=ch.get(i);m.convertTo(m,-1,clamp(target/Math.max(1,means[i]),.88,1.12),0);}cv.merge(ch,rgb);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)ch.get(i).delete();ch.delete();rgb.delete();}
-function claheLuminance(src,clip=1.55){const rgb=new cv.Mat(),lab=new cv.Mat(),channels=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);cv.split(lab,channels);const l=channels.get(0),out=new cv.Mat();const clahe=new cv.CLAHE(clip,new cv.Size(8,8));clahe.apply(l,out);channels.set(0,out);cv.merge(channels,lab);cv.cvtColor(lab,rgb,cv.COLOR_Lab2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);clahe.delete();out.delete();l.delete();for(let i=1;i<3;i++)channels.get(i).delete();channels.delete();lab.delete();rgb.delete();}
+function claheLuminance(src,clip=1.55){
+ const rgb=new cv.Mat(),lab=new cv.Mat(),channels=new cv.MatVector();
+ let l=null,a=null,b=null,out=null,clahe=null,merged=null;
+ try{
+  cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);cv.split(lab,channels);
+  l=channels.get(0);a=channels.get(1);b=channels.get(2);out=new cv.Mat();
+  clahe=new cv.CLAHE(clip,new cv.Size(8,8));clahe.apply(l,out);
+  const rebuilt=new cv.MatVector();rebuilt.push_back(out);rebuilt.push_back(a);rebuilt.push_back(b);
+  merged=new cv.Mat();cv.merge(rebuilt,merged);rebuilt.delete();
+  cv.cvtColor(merged,rgb,cv.COLOR_Lab2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);
+ }finally{try{clahe?.delete()}catch{};[l,a,b,out,merged,channels,lab,rgb].forEach(m=>{try{m?.delete()}catch{}})}
+}
+function bilateralRGBA(src,d,sigmaColor,sigmaSpace){
+ const rgb=new cv.Mat(),filtered=new cv.Mat();
+ try{cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.bilateralFilter(rgb,filtered,d,sigmaColor,sigmaSpace,cv.BORDER_DEFAULT);cv.cvtColor(filtered,src,cv.COLOR_RGB2RGBA)}
+ finally{rgb.delete();filtered.delete()}
+}
 function blendMasked(base,adjusted,mask,strength=1){if(!mask||strength<=0)return;const alpha=new cv.Mat();mask.convertTo(alpha,cv.CV_32F,clamp(strength,0,1)/255);const baseF=new cv.Mat(),adjF=new cv.Mat();base.convertTo(baseF,cv.CV_32F);adjusted.convertTo(adjF,cv.CV_32F);const alpha4=new cv.MatVector();for(let i=0;i<4;i++)alpha4.push_back(alpha);const a4=new cv.Mat();cv.merge(alpha4,a4);const inv=new cv.Mat();cv.subtract(new cv.Mat(a4.rows,a4.cols,a4.type(),new cv.Scalar(1,1,1,1)),a4,inv);cv.multiply(baseF,inv,baseF);cv.multiply(adjF,a4,adjF);cv.add(baseF,adjF,baseF);baseF.convertTo(base,cv.CV_8U);alpha.delete();baseF.delete();adjF.delete();a4.delete();inv.delete();for(let i=0;i<4;i++)alpha4.get(i).delete();alpha4.delete();}
 function hsvAdjusted(src,satFactor=1,valDelta=0,hueDelta=0){const rgb=new cv.Mat(),hsv=new cv.Mat(),ch=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);cv.split(hsv,ch);const h=ch.get(0),s=ch.get(1),v=ch.get(2);if(hueDelta)h.convertTo(h,-1,1,hueDelta);if(satFactor!==1)s.convertTo(s,-1,satFactor,0);if(valDelta)v.convertTo(v,-1,1,valDelta);cv.merge(ch,hsv);cv.cvtColor(hsv,rgb,cv.COLOR_HSV2RGB);const out=new cv.Mat();cv.cvtColor(rgb,out,cv.COLOR_RGB2RGBA);h.delete();s.delete();v.delete();ch.delete();hsv.delete();rgb.delete();return out;}
 function regionalEnhance(src,recipe,analysis,masks){const r=analysis?.regions||{};
@@ -46,12 +62,27 @@ function regionalEnhance(src,recipe,analysis,masks){const r=analysis?.regions||{
  // Vegetation: vibrance and gentle luminance lift.
  if(r.green>.04){const green=hsvAdjusted(src,1+clamp((recipe.vibrance||12)/180,.04,.13),2,0);blendMasked(src,green,masks.green,clamp(.38+r.green,0,.68));green.delete();}
  // Skin: protect saturation, lift shadows, slight warmth; avoid harsh CLAHE appearance.
- if(r.skin>.02){const skin=hsvAdjusted(src,1.015,clamp((recipe.shadows||10)*.18,2,7),1);const smooth=new cv.Mat();cv.bilateralFilter(skin,smooth,5,22,22,cv.BORDER_DEFAULT);blendMasked(src,smooth,masks.skin,clamp(.42+r.skin,0,.70));skin.delete();smooth.delete();}
+ if(r.skin>.02){const skin=hsvAdjusted(src,1.015,clamp((recipe.shadows||10)*.18,2,7),1);bilateralRGBA(skin,5,22,22);blendMasked(src,skin,masks.skin,clamp(.42+r.skin,0,.70));skin.delete();}
 }
 function globalColor(src,recipe){const rgb=new cv.Mat(),hsv=new cv.Mat(),channels=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,hsv,cv.COLOR_RGB2HSV);cv.split(hsv,channels);const s=channels.get(1);const factor=1+clamp(Number(recipe.vibrance||0)/180,-.10,.13);s.convertTo(s,-1,factor,0);cv.merge(channels,hsv);cv.cvtColor(hsv,rgb,cv.COLOR_HSV2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)channels.get(i).delete();channels.delete();hsv.delete();rgb.delete();}
 function sharpen(src,amount=.24){const blur=new cv.Mat(),out=new cv.Mat();cv.GaussianBlur(src,blur,new cv.Size(0,0),1.05);cv.addWeighted(src,1+amount,blur,-amount,0,out);out.copyTo(src);blur.delete();out.delete();}
-function denoise(src,strength=5){if(strength<=0)return;const out=new cv.Mat();cv.bilateralFilter(src,out,5,16+strength*1.6,16+strength*1.6,cv.BORDER_DEFAULT);out.copyTo(src);out.delete();}
-async function enhanceCurrent(recipe={},analysis=null){if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks;try{src=cv.imread(canvas);masks=buildRegionMasks(src);grayWorld(src);const clip=clamp(1.18+Math.max(0,Number(recipe.contrast||0))/52,1.18,1.85);claheLuminance(src,clip);denoise(src,clamp(Number(recipe.denoise||0),0,10));globalColor(src,recipe);regionalEnhance(src,recipe,analysis,masks);sharpen(src,clamp(Number(recipe.clarity||8)/70,.10,.34));const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.96);}finally{deleteMasks(masks);src?.delete();}}
+function denoise(src,strength=5){if(strength<=0)return;bilateralRGBA(src,5,16+strength*1.6,16+strength*1.6);}
+async function enhanceCurrent(recipe={},analysis=null){
+ if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks;
+ const stage=(name,fn)=>{try{fn()}catch(err){console.warn('[OpenCV Regional]',name,err)}};
+ try{
+  src=cv.imread(canvas);masks=buildRegionMasks(src);
+  stage('balance de blancos',()=>grayWorld(src));
+  const clip=clamp(1.18+Math.max(0,Number(recipe.contrast||0))/52,1.18,1.85);
+  stage('contraste local',()=>claheLuminance(src,clip));
+  stage('reducción de ruido',()=>denoise(src,clamp(Number(recipe.denoise||0),0,10)));
+  stage('color global',()=>globalColor(src,recipe));
+  stage('ajustes regionales',()=>regionalEnhance(src,recipe,analysis,masks));
+  stage('enfoque',()=>sharpen(src,clamp(Number(recipe.clarity||8)/70,.10,.34)));
+  const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.96);
+ }catch(err){console.error('[OpenCV Regional] apply failed',err);throw new Error('No se pudo procesar la foto: '+(err?.message||String(err)))}
+ finally{deleteMasks(masks);src?.delete()}
+}
 function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;const regs=r.detectedRegions?.length?r.detectedRegions.join(' · '):'General';el.innerHTML=`<strong>OpenCV Regional Vision activo</strong><span>Regiones: ${regs}</span><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Ruido: ${r.noiseEstimate}</span><span>Horizonte: ${Math.abs(r.horizon.angle).toFixed(1)}°</span>`;}
 function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Regional Vision activo';badge.classList.add('ready')}}
 window.addEventListener('opencv-script-loaded',()=>{const wait=()=>window.cv?.Mat?markReady():setTimeout(wait,200);wait()});

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.2.0-regional-vision';
+const VERSION='11.2.1-regional-fix';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];

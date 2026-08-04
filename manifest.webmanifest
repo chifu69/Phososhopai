@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 11.2",
+  "name": "PHOTO IA 11.2.1",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con Fabric, OpenCV, mejora inteligente y conexión opcional al Alienware.",
-  "start_url": "./?v=11.2-regional-vision",
+  "start_url": "./?v=11.2.1-regional-fix",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
