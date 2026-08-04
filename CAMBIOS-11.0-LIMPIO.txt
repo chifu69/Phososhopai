@@ -1,0 +1,10 @@
+PHOTO IA 11.0 — BASE LIMPIA
+
+- Versión unificada en todos los archivos.
+- Caché nueva para evitar mezclar 9.x, 10.3 y 11.x.
+- Manifest actualizado a PHOTO IA 11.0.
+- Vision Engine 4.0 con normalización tonal por histograma, medios tonos, sombras, luces, color, ruido y detalle.
+- Fabric mantiene el lienzo, capas y edición no destructiva.
+- OpenCV aporta métricas de nitidez, bordes y ruido cuando está disponible.
+- Alienware conserva la misma configuración, HTTPS, token, puertos y flujo.
+- Nueva foto limpia el proyecto actual.

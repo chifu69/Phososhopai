@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.0.0-vision-engine-3';
+const VERSION='11.0.0-clean-vision-4';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -153,16 +153,22 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
   const shadows=Number(recipe.shadows||0)/100,highlights=Number(recipe.highlights||0)/100;
   const contrast=Number(recipe.contrast||0)/100,vibrance=Number(recipe.vibrance||0)/100;
   const warmth=Number(recipe.warmth||0)/100,clarity=Number(recipe.clarity||0)/100;
+  const blackPoint=Number(recipe.blackPoint||0)/255,whitePoint=Number(recipe.whitePoint||255)/255,gamma=Math.max(.75,Math.min(1.3,Number(recipe.gamma||1))),denoise=Math.max(0,Number(recipe.denoise||0))/100;
   const clamp8=v=>v<0?0:v>255?255:v;
   for(let i=0;i<d.length;i+=4){
    let r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255;
-   r*=exposure;g*=exposure;b*=exposure;
+   // Adaptive black/white normalization from the actual photo histogram.
+   const span=Math.max(.18,whitePoint-blackPoint);
+   r=Math.max(0,Math.min(1,(r-blackPoint)/span));
+   g=Math.max(0,Math.min(1,(g-blackPoint)/span));
+   b=Math.max(0,Math.min(1,(b-blackPoint)/span));
+   r=Math.pow(r,1/gamma)*exposure;g=Math.pow(g,1/gamma)*exposure;b=Math.pow(b,1/gamma)*exposure;
    let l=.2126*r+.7152*g+.0722*b;
    const sw=(1-Math.min(1,l))**2,hw=Math.min(1,l)**2;
-   const lift=shadows*.34*sw,rec=highlights*.30*hw;
+   const lift=shadows*.30*sw,rec=highlights*.26*hw;
    r=r+lift-rec;g=g+lift-rec;b=b+lift-rec;
-   // smooth S-curve contrast around mid gray
-   const cf=1+contrast*.9;r=.5+(r-.5)*cf;g=.5+(g-.5)*cf;b=.5+(b-.5)*cf;
+   // Smooth S-curve contrast around perceptual mid gray.
+   const cf=1+contrast*.82;r=.5+(r-.5)*cf;g=.5+(g-.5)*cf;b=.5+(b-.5)*cf;
    l=.2126*r+.7152*g+.0722*b;
    const mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx>0?(mx-mn)/mx:0;
    const vf=1+vibrance*(1-sat)*1.35;
@@ -171,6 +177,21 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
    d[i]=clamp8(r*255);d[i+1]=clamp8(g*255);d[i+2]=clamp8(b*255);
   }
   ctx.putImageData(im,0,0);
+  // Lightweight edge-preserving noise cleanup. It is intentionally modest on iPhone.
+  if(denoise>0.01){
+   const src=ctx.getImageData(0,0,w,h),out=ctx.createImageData(w,h),sd=src.data,od=out.data;od.set(sd);
+   const mix=Math.min(.24,denoise*.55);
+   for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+    const p=(y*w+x)*4;
+    for(let ch=0;ch<3;ch++){
+     const avg=(sd[p-4+ch]+sd[p+4+ch]+sd[p-w*4+ch]+sd[p+w*4+ch])/4;
+     const diff=Math.abs(sd[p+ch]-avg);
+     od[p+ch]=diff<22?clamp8(sd[p+ch]*(1-mix)+avg*mix):sd[p+ch];
+    }
+    od[p+3]=255;
+   }
+   ctx.putImageData(out,0,0);
+  }
   // modest local clarity/sharpening after tone and color processing
   if(clarity>0.01){
    const src=ctx.getImageData(0,0,w,h),out=ctx.createImageData(w,h),sd=src.data,od=out.data;

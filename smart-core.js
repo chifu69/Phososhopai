@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.0.0-vision-engine-3';
+const VERSION='11.0.0-clean-vision-4';
 const $=id=>document.getElementById(id),api=()=>window.PhotoIA,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 let lastAnalysis=null;
 const percentile=(arr,p)=>{const a=Array.from(arr).sort((x,y)=>x-y);return a[Math.min(a.length-1,Math.max(0,Math.round((a.length-1)*p)))]||0};
@@ -14,16 +14,21 @@ function metrics(data,w,h){const n=w*h,gray=new Float32Array(n),sample=[];let su
  return{mean,p05,p50,p95,dynamic:p95-p05,contrast:Math.sqrt(Math.max(0,sum2/n-mean*mean)),saturation:sat/n,warmth:(r-b)/n,blackClip:black/n,whiteClip:white/n,sharpness:edge/Math.max(1,q),noise:noise/Math.max(1,q),skin:skin/n,green:green/n,sky:sky/n};}
 function scene(m){if(m.skin>.10)return m.green>.15?'Retrato en naturaleza':'Retrato';if(m.green>.22)return'Naturaleza';if(m.sky>.22)return'Exterior';if(m.p50<85)return'Poca luz';return'General';}
 function buildRecipe(m,s){
- const target=s.includes('Retrato')?132:s==='Poca luz'?118:136;
- const exposure=clamp(Math.log2(target/Math.max(45,m.p50)), -.35,.55);
- const shadows=clamp(Math.round((105-m.p05)*.48),0,s.includes('Retrato')?34:42);
- const highlights=clamp(Math.round((m.p95-215)*.55),0,38);
- const contrast=clamp(Math.round((64-m.contrast)*.38),-8,18);
- let vibrance=clamp(Math.round((.39-m.saturation)*55),2,s.includes('Retrato')?17:24);
- if(m.saturation>.52)vibrance=-clamp(Math.round((m.saturation-.5)*35),2,10);
- const warmth=clamp(Math.round(-m.warmth*.18),-10,10)+(s.includes('Retrato')?3:0);
- const clarity=clamp(Math.round((62-m.sharpness)*.45),5,m.noise>18?16:28);
- return{exposure:+exposure.toFixed(2),shadows,highlights,contrast,vibrance,warmth,clarity};
+ const portrait=s.includes('Retrato');
+ const target=portrait?138:s==='Poca luz'?128:142;
+ const exposure=clamp(Math.log2(target/Math.max(42,m.p50)),-.28,.62);
+ const shadows=clamp(Math.round((92-m.p05)*.62),0,portrait?42:50);
+ const highlights=clamp(Math.round((m.p95-212)*.72),0,48);
+ const contrast=clamp(Math.round((61-m.contrast)*.48),-10,24);
+ let vibrance=clamp(Math.round((.42-m.saturation)*68),3,portrait?19:30);
+ if(m.saturation>.54)vibrance=-clamp(Math.round((m.saturation-.52)*45),2,12);
+ const warmth=clamp(Math.round(-m.warmth*.22),-12,12)+(portrait?3:0);
+ const clarity=clamp(Math.round((58-m.sharpness)*.52),4,m.noise>20?14:26);
+ const blackPoint=clamp(Math.round(m.p05*.55),0,18);
+ const whitePoint=clamp(Math.round(255-(255-m.p95)*.38),232,255);
+ const gamma=clamp(1+(128-m.p50)/520,.90,1.12);
+ const denoise=clamp(Math.round((m.noise-10)*.65),0,18);
+ return{exposure:+exposure.toFixed(2),shadows,highlights,contrast,vibrance,warmth,clarity,blackPoint,whitePoint,gamma:+gamma.toFixed(3),denoise};
 }
 function variants(base,s){const arr=[{name:s.includes('Retrato')?'Portrait Landscape':'Professional Natural',recipe:base}];
  arr.push({name:'Natural Clean',recipe:{...base,exposure:+(base.exposure*.8).toFixed(2),shadows:Math.round(base.shadows*.8),contrast:Math.round(base.contrast*.8),vibrance:Math.round(base.vibrance*.75),clarity:Math.round(base.clarity*.75)}});
@@ -38,9 +43,9 @@ async function analyze(){setStatus('Analizando escena…','working');const el=$(
  lastAnalysis={metrics:m,scene:sc,recipeName:best.name,recommendation:best.recipe,candidates:cands,confidence,opencv:cv,at:Date.now()};render(lastAnalysis);setStatus('Receta profesional lista','ready');return lastAnalysis;}
 function render(a){const el=$('smart-analysis-result');if(!el)return;const m=a.metrics;const items=[['Escena',a.scene],['Luz',m.p50<95?'Baja':m.p50>175?'Alta':'Equilibrada'],['Sombras',m.p05<30?'Cerradas':'Buenas'],['Altas luces',m.p95>230?'Fuertes':'Controladas'],['Color',m.saturation<.2?'Apagado':m.saturation>.52?'Intenso':'Natural'],['Detalle',m.sharpness<42?'Suave':'Bueno']];el.innerHTML=`<div class="smart-pro-result"><div class="smart-pro-title"><strong>⭐ ${a.recipeName}</strong><small>${a.confidence}% confianza</small></div><div class="smart-metrics smart-metrics-six">${items.map(([k,v])=>`<div><small>${k}</small><strong>${v}</strong></div>`).join('')}</div><p>PHOTO IA preparó una edición completa de luz, sombras, altas luces, color, temperatura y detalle. La receta fue elegida entre ${a.candidates.length} versiones.</p><small class="smart-confidence">${a.opencv?'OpenCV activo':'Análisis local'} · Fabric mantiene capas y edición no destructiva</small></div>`;$('smart-apply').disabled=false;}
 function busy(btn,on,text){if(!btn)return;if(on){btn.dataset.txt=btn.textContent;btn.textContent=text;btn.disabled=true}else{btn.textContent=btn.dataset.txt||btn.textContent;btn.disabled=false}}
-async function applyRecommendations(btn){busy(btn,true,'Aplicando mejora profesional…');setStatus('Aplicando…','working');try{const a=lastAnalysis||await analyze();if(typeof api()?.applySmartPixelRecipe!=='function')throw new Error('Recarga la aplicación para activar Vision Engine 3.0.');await api().applySmartPixelRecipe(a.recommendation,true);renderRecipe(a);api().toast('Mejora profesional aplicada');setStatus('Mejora aplicada','ready')}finally{busy(btn,false)}}
-function renderRecipe(a){const el=$('smart-recipe-result');if(!el)return;const labels={exposure:'Exposición',shadows:'Sombras',highlights:'Altas luces',contrast:'Contraste',vibrance:'Color inteligente',warmth:'Temperatura',clarity:'Detalle'};el.hidden=false;el.innerHTML=`<div class="smart-recipe-head"><strong>${a.recipeName}</strong><small>${a.scene} · ${a.confidence}% confianza</small></div><div class="smart-recipe-values">${Object.entries(a.recommendation).map(([k,v])=>`<div><span>${labels[k]}</span><strong>${v>0?'+':''}${v}</strong></div>`).join('')}</div>`;}
+async function applyRecommendations(btn){busy(btn,true,'Aplicando mejora profesional…');setStatus('Aplicando…','working');try{const a=lastAnalysis||await analyze();if(typeof api()?.applySmartPixelRecipe!=='function')throw new Error('Recarga la aplicación para activar Vision Engine 4.0.');await api().applySmartPixelRecipe(a.recommendation,true);renderRecipe(a);api().toast('Mejora profesional aplicada');setStatus('Mejora aplicada','ready')}finally{busy(btn,false)}}
+function renderRecipe(a){const el=$('smart-recipe-result');if(!el)return;const labels={exposure:'Exposición',shadows:'Sombras',highlights:'Altas luces',contrast:'Contraste',vibrance:'Color inteligente',warmth:'Temperatura',clarity:'Detalle',blackPoint:'Punto negro',whitePoint:'Punto blanco',gamma:'Medios tonos',denoise:'Ruido'};el.hidden=false;el.innerHTML=`<div class="smart-recipe-head"><strong>${a.recipeName}</strong><small>${a.scene} · ${a.confidence}% confianza</small></div><div class="smart-recipe-values">${Object.entries(a.recommendation).map(([k,v])=>`<div><span>${labels[k]}</span><strong>${v>0?'+':''}${v}</strong></div>`).join('')}</div>`;}
 function bind(){const a=$('smart-analyze'),b=$('smart-apply');if(a)a.onclick=()=>analyze().catch(e=>{console.error(e);setStatus('No se pudo analizar','error');api()?.toast(e.message)});if(b)b.onclick=()=>applyRecommendations(b).catch(e=>{console.error(e);setStatus('Error al aplicar','error');api()?.toast(e.message)});document.addEventListener('photoia:image-loaded',()=>{lastAnalysis=null;setStatus('Lista para analizar','ready');if(b)b.disabled=true});document.addEventListener('photoia:image-cleared',()=>{lastAnalysis=null;if(b)b.disabled=true;setStatus('Esperando foto…','ready')});}
-function boot(){bind();window.PhotoSmartCore={version:VERSION,analyze,applyRecommendations};setStatus('Vision Engine 3.0 listo','ready')}
+function boot(){bind();window.PhotoSmartCore={version:VERSION,analyze,applyRecommendations};setStatus('Vision Engine 4.0 listo','ready')}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

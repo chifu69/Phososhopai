@@ -1,33 +1,14 @@
-PHOTO IA 9.1.1 — Token Sync Fix
+# PHOTO IA 11.0
 
-# PHOTO IA 9.1 — Smart Edit Bridge
+Base limpia y unificada del editor PHOTO IA.
 
-Esta entrega une el núcleo local del iPhone con el workflow estable `PHOTO-IA-v1` del Alienware.
+## Motores
+- Fabric.js: lienzo, capas, texto, stickers y transformaciones.
+- OpenCV.js: análisis local de nitidez, bordes y ruido cuando está disponible.
+- Vision Engine 4.0: mejora automática de exposición, rango tonal, sombras, altas luces, color, temperatura, ruido y detalle.
+- Alienware / ComfyUI: tareas generativas avanzadas mediante la conexión privada existente.
 
-## Incluye
-- Editor local y recetas adaptativas del teléfono.
-- Estudio IA con foto principal, referencia, instrucciones y acciones rápidas.
-- PHOTO IA Bridge 1.1 para Windows.
-- Prompt inteligente que protege identidad, pose, iluminación y composición.
-- Asistente web para mapear los nodos del workflow API sin editar JSON manualmente.
-- Token privado, diagnóstico, cancelación, logs y conexión con ComfyUI en el puerto 8188.
+## Publicación
+Reemplaza todos los archivos del repositorio por los de esta carpeta. No combines archivos con versiones anteriores. Después espera a que GitHub Pages termine el despliegue y abre la página en Safari.
 
-## Carpetas
-- Los archivos de la raíz se publican en GitHub Pages.
-- `windows-server` se copia al Alienware y no se publica como parte de la PWA.
-
-Consulta `windows-server/README-SERVER.txt` para la instalación.
-
-
-## PHOTO IA 10.2
-- OpenCV ahora analiza enfoque, bordes y ruido.
-- Fabric mantiene el lienzo, capas y objetos.
-- Nueva foto elimina el proyecto visual actual.
-- Alienware usa automáticamente el lienzo, sin duplicar la foto.
-- Corrección de opacidad después de recomendaciones.
-
-
-## PHOTO IA 10.2.1
-- Corrige el análisis para usar únicamente los píxeles de la fotografía, sin incluir el fondo negro o transparente del lienzo.
-- Evita clasificar fotografías normales como documentos y aplicar blanco y negro por error.
-- Limita las recomendaciones automáticas a ajustes conservadores y reversibles.
+La conexión HTTPS, token, puertos y certificados del Alienware no fueron modificados.

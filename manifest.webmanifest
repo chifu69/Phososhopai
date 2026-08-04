@@ -1,13 +1,13 @@
 {
-  "name": "PHOTO IA 9.1.5 HTTPS",
+  "name": "PHOTO IA 11.0",
   "short_name": "PHOTO IA",
-  "description": "Editor privado con Photo Brain 2.0, memoria, macros y comandos encadenados.",
-  "start_url": "./?v=9.1.5",
+  "description": "Editor fotográfico privado con Fabric, OpenCV, mejora inteligente y conexión opcional al Alienware.",
+  "start_url": "./?v=11.0-clean-vision-4",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
   "orientation": "portrait-primary",
   "icons": [],
   "scope": "./",
-  "id": "photo-ia-local-9.1.5-https"
+  "id": "photo-ia-11-clean-vision-4"
 }
