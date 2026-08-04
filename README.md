@@ -17,3 +17,11 @@ Esta entrega une el núcleo local del iPhone con el workflow estable `PHOTO-IA-v
 - `windows-server` se copia al Alienware y no se publica como parte de la PWA.
 
 Consulta `windows-server/README-SERVER.txt` para la instalación.
+
+
+## PHOTO IA 10.2
+- OpenCV ahora analiza enfoque, bordes y ruido.
+- Fabric mantiene el lienzo, capas y objetos.
+- Nueva foto elimina el proyecto visual actual.
+- Alienware usa automáticamente el lienzo, sin duplicar la foto.
+- Corrección de opacidad después de recomendaciones.

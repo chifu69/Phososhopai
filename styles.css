@@ -261,3 +261,11 @@ body.processing-lock{position:fixed!important;left:0;right:0;width:100%;touch-ac
     max-height:330px!important;
   }
 }
+
+/* PHOTO IA 10.2 — Fabric + OpenCV Pro */
+.canvas-actions{display:flex;gap:8px;align-items:center}.canvas-actions .danger{color:#c9363e;border-color:#ef9ca1}
+.ai-canvas-source{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;margin:14px 0;border:1px solid var(--line);border-radius:18px;background:var(--surface2)}
+.ai-canvas-source span{font-weight:900}.ai-canvas-source strong{font-size:.82rem;color:var(--muted);text-align:right}
+.ai-reference-only{grid-template-columns:minmax(0,1fr)!important}.ai-reference-only .reference-photo{max-width:none!important}
+.opencv-diagnostics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:10px 0;padding:10px;border:1px solid #b9e8cf;border-radius:15px;background:#effcf5;color:#12653d;font-size:.76rem}.opencv-diagnostics strong,.opencv-diagnostics span{display:block;text-align:center}
+@media(max-width:620px){.opencv-diagnostics{grid-template-columns:repeat(2,minmax(0,1fr))}.canvas-toolbar{align-items:flex-start}.canvas-actions{flex-direction:column-reverse;align-items:stretch}.canvas-actions button{padding:9px 10px}.ai-canvas-source{align-items:flex-start;flex-direction:column}.ai-canvas-source strong{text-align:left}}

@@ -19,6 +19,7 @@ function capabilities(){return {webgpu:!!navigator.gpu,wasm:typeof WebAssembly==
 async function analyze(){
  setStatus('Analizando…','working');
  const {data,width,height}=await canvasPixels();
+ const cvReport=window.PhotoOpenCV?.ready?await window.PhotoOpenCV.analyzeCurrent().catch(()=>null):null;
  const n=width*height,gray=new Float32Array(n),samples=[],chroma=[];let lum=0,lum2=0,sat=0,r=0,g=0,b=0,edges=0,noise=0,skin=0,sky=0,green=0,clippedBlack=0,clippedWhite=0;
  for(let i=0,p=0;i<data.length;i+=4,p++){
   const R=data[i],G=data[i+1],B=data[i+2],L=.2126*R+.7152*G+.0722*B;gray[p]=L;lum+=L;lum2+=L*L;r+=R;g+=G;b+=B;
@@ -35,7 +36,7 @@ async function analyze(){
  const ratios={skin:skin/n,sky:sky/n,green:green/n};
  const scene=ratios.skin>.13?'Retrato':ratios.sky>.25?'Exterior / cielo':ratios.green>.22?'Naturaleza':dynamicRange<55&&mean<105?'Noche / poca luz':edges>80&&saturation<.12?'Documento / texto':'General';
  const rec={brightness:0,contrast:0,saturation:0,temperature:0,sharpness:0,blur:0};
- if(p50<92)rec.brightness=clamp(Math.round((108-p50)*.38),8,30);else if(p50>176)rec.brightness=-clamp(Math.round((p50-168)*.3),6,20);
+ if(p50<92)rec.brightness=clamp(Math.round((108-p50)*.28),6,18);else if(p50>176)rec.brightness=-clamp(Math.round((p50-168)*.25),5,16);
  if(dynamicRange<78)rec.contrast=clamp(Math.round((88-dynamicRange)*.35),8,24);else if(blackClip>.035||whiteClip>.035)rec.contrast=-clamp(Math.round((blackClip+whiteClip)*180),5,18);
  if(saturation<.16)rec.saturation=scene==='Retrato'?8:18;else if(saturation>.58)rec.saturation=-12;
  if(warmth<-18)rec.temperature=12;else if(warmth>32)rec.temperature=-10;
@@ -44,11 +45,17 @@ async function analyze(){
  if(scene==='Retrato'){rec.contrast=clamp(rec.contrast,-8,10);rec.saturation=clamp(rec.saturation,-6,10);rec.sharpness=clamp(rec.sharpness,0,12)}
  if(scene==='Documento / texto'){rec.saturation=-100;rec.contrast=Math.max(rec.contrast,24);rec.sharpness=Math.max(rec.sharpness,20)}
  const confidence=clamp(Math.round(55+Math.min(25,dynamicRange/5)+Math.min(15,n/8000)),55,95);
- lastAnalysis={mean,contrast,saturation,warmth,sharpness,noiseLevel,p05,p50,p95,dynamicRange,blackClip,whiteClip,ratios,scene,confidence,recommendation:rec,detections,width,height,capabilities:capabilities(),at:Date.now()};
+ if(cvReport){
+   sharpness=cvReport.laplacianVariance||sharpness;
+   noiseLevel=cvReport.noiseEstimate||noiseLevel;
+   if(cvReport.blurRisk==='high')rec.sharpness=Math.max(rec.sharpness,10);
+   if(cvReport.edgeDensity>.18&&scene==='Documento / texto')rec.contrast=Math.max(rec.contrast,28);
+ }
+ lastAnalysis={mean,contrast,saturation,warmth,sharpness,noiseLevel,p05,p50,p95,dynamicRange,blackClip,whiteClip,ratios,scene,confidence,recommendation:rec,detections,width,height,opencv:cvReport,capabilities:capabilities(),at:Date.now()};
  renderAnalysis(lastAnalysis);setStatus('Análisis listo','ready');return lastAnalysis;
 }
 function scoreLabel(v,low,high,labels){return v<low?labels[0]:v>high?labels[2]:labels[1]}
-function renderAnalysis(a){const el=$('smart-analysis-result');if(!el)return;const items=[['Escena',a.scene],['Luz',scoreLabel(a.p50,92,176,['Baja','Equilibrada','Alta'])],['Rango',scoreLabel(a.dynamicRange,65,125,['Corto','Bueno','Amplio'])],['Color',scoreLabel(a.saturation,.16,.58,['Apagado','Natural','Intenso'])],['Detalle',scoreLabel(a.sharpness,42,90,['Suave','Bueno','Marcado'])],['Ruido',scoreLabel(a.noiseLevel,9,20,['Bajo','Medio','Alto'])]];el.innerHTML=`<div class="smart-metrics smart-metrics-six">${items.map(([k,v])=>`<div><small>${k}</small><strong>${v}</strong></div>`).join('')}</div><p>${advice(a)}</p><small class="smart-confidence">Confianza del análisis: ${a.confidence}% · ${a.capabilities.webgpu?'WebGPU disponible':'Modo compatible'}</small>`;$('smart-apply').disabled=false;}
+function renderAnalysis(a){const el=$('smart-analysis-result');if(!el)return;const items=[['Escena',a.scene],['Luz',scoreLabel(a.p50,92,176,['Baja','Equilibrada','Alta'])],['Rango',scoreLabel(a.dynamicRange,65,125,['Corto','Bueno','Amplio'])],['Color',scoreLabel(a.saturation,.16,.58,['Apagado','Natural','Intenso'])],['Detalle',scoreLabel(a.sharpness,42,90,['Suave','Bueno','Marcado'])],['Ruido',scoreLabel(a.noiseLevel,9,20,['Bajo','Medio','Alto'])]];el.innerHTML=`<div class="smart-metrics smart-metrics-six">${items.map(([k,v])=>`<div><small>${k}</small><strong>${v}</strong></div>`).join('')}</div><p>${advice(a)}</p><small class="smart-confidence">Confianza del análisis: ${a.confidence}% · ${a.opencv?'OpenCV activo':'Análisis compatible'} · ${a.capabilities.webgpu?'WebGPU disponible':'CPU/WASM'}</small>`;$('smart-apply').disabled=false;}
 function advice(a){const r=a.recommendation,changes=[];if(r.brightness)changes.push(r.brightness>0?'abrir sombras y aclarar':'proteger zonas claras');if(r.contrast)changes.push(r.contrast>0?'dar profundidad':'recuperar extremos');if(r.saturation)changes.push(r.saturation>0?'recuperar color':'naturalizar color');if(r.temperature)changes.push(r.temperature>0?'corregir tono frío':'corregir tono cálido');if(r.sharpness)changes.push('mejorar detalle');if(r.blur)changes.push('suavizar ruido');return `Detecté ${a.scene.toLowerCase()}. ${changes.length?`Recomiendo ${changes.join(', ')}.`:'La imagen está bastante equilibrada.'} El ajuste es adaptativo para esta fotografía.`}
 function setButtonBusy(button,busy,label){
  if(!button)return;
@@ -63,7 +70,7 @@ function applyValues(values){
 async function applyRecommendations(button){
  setButtonBusy(button,true,'Aplicando…');setStatus('Aplicando…','working');
  try{
-  const a=lastAnalysis||await analyze();applyValues(a.recommendation);api().toast(`Mejora adaptativa aplicada: ${a.scene}`);setStatus('Mejora aplicada','ready');
+  const a=lastAnalysis||await analyze();applyValues(a.recommendation);api().normalizePhotoVisualState?.();api().toast(`Mejora adaptativa aplicada: ${a.scene}`);setStatus('Mejora aplicada','ready');
  }finally{setButtonBusy(button,false)}
 }
 async function applyMode(mode,button){

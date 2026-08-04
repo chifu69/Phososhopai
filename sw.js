@@ -1,9 +1,9 @@
-const CACHE='photo-ia-10.1-compact-canvas';
-const VERSION='10.1';
+const CACHE='photo-ia-10.2-fabric-opencv-pro';
+const VERSION='10.2';
 const CORE=[
- './','./index.html','./styles.css?v=10.1-compact-canvas','./ui-layout.js?v=10.1-compact-canvas','./app.js?v=9.1.1-smart-edit-bridge',
+ './','./index.html','./styles.css?v=10.2-pro-engine','./ui-layout.js?v=10.2-pro-engine','./app.js?v=10.2-pro-engine',
  './creative-tools.js?v=9.1.1-smart-edit-bridge','./brain.js?v=9.1.1-smart-edit-bridge',
- './smart-core.js?v=9.1.1-smart-edit-bridge','./ai-studio.js?v=9.1.1-smart-edit-bridge',
+ './opencv-engine.js?v=10.2-pro','./smart-core.js?v=10.2-pro-engine','./ai-studio.js?v=10.2-pro-engine',
  './vision.js?v=9.1.1-smart-edit-bridge','./segmentation.js?v=9.1.1-smart-edit-bridge','./manifest.webmanifest'
 ];
 const ASSETS=[
