@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.3-adaptive-regional-pro';
+const VERSION='11.3.1-portrait-natural-tuning';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
