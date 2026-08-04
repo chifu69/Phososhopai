@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='11.5-portrait-retouch-engine';
+const VERSION='11.5.1-canvas-auto-fit';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -26,8 +26,45 @@ function processing(on,label='Procesando…'){
 }
 function setEnabled(enabled){document.querySelectorAll('[data-command],[data-preset],#command-input,#command-btn,#compare-btn,#reset-btn,#new-photo-btn,#rotate-left,#rotate-right,#flip-x,#crop-btn,#add-text,#add-sticker,#download-btn,.slider-list input,#create-text,#draw-pencil,#draw-marker,#draw-off,#clear-drawing,[data-add-shape],[data-sticker],[data-text-preset],[data-canvas-mode]').forEach(el=>el.disabled=!enabled)}
 function normalize(text){return String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()}
-function fitCanvas(){const wrap=$('canvas-wrap');const w=Math.max(280,wrap.clientWidth);const h=Math.max(360,Math.min(window.innerHeight*.62,650));state.canvas.setDimensions({width:w,height:h});if(state.photo) fitPhoto();state.canvas.requestRenderAll()}
-function fitPhoto(){const p=state.photo;if(!p)return;const pad=20;const scale=Math.min((state.canvas.width-pad*2)/p.width,(state.canvas.height-pad*2)/p.height);p.scale(scale);p.set({left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center'});p.setCoords()}
+function getPhotoDisplayRatio(){
+ const p=state.photo;
+ if(!p)return 1;
+ const angle=((p.angle||0)%360+360)%360;
+ const swap=angle===90||angle===270;
+ const w=swap?p.height:p.width;
+ const h=swap?p.width:p.height;
+ return Math.max(.15,Math.min(6,w/Math.max(1,h)));
+}
+function fitCanvas(){
+ const wrap=$('canvas-wrap');
+ const w=Math.max(280,Math.round(wrap.clientWidth));
+ let h;
+ if(state.photo){
+   const ratio=getPhotoDisplayRatio();
+   const ideal=Math.round(w/ratio);
+   const maxH=Math.max(360,Math.min(window.innerHeight*.72,760));
+   const minH=Math.min(300,Math.max(220,window.innerHeight*.28));
+   h=Math.round(Math.max(minH,Math.min(ideal,maxH)));
+ }else{
+   h=Math.max(360,Math.min(window.innerHeight*.52,620));
+ }
+ state.canvas.setDimensions({width:w,height:h});
+ if(state.photo)fitPhoto();
+ state.canvas.calcOffset();
+ state.canvas.requestRenderAll();
+}
+function fitPhoto(){
+ const p=state.photo;if(!p)return;
+ const pad=Math.max(4,Math.min(10,Math.round(Math.min(state.canvas.width,state.canvas.height)*.012)));
+ const angle=((p.angle||0)%360+360)%360;
+ const swap=angle===90||angle===270;
+ const displayW=swap?p.height:p.width;
+ const displayH=swap?p.width:p.height;
+ const scale=Math.min((state.canvas.width-pad*2)/displayW,(state.canvas.height-pad*2)/displayH);
+ p.scale(Math.max(.01,scale));
+ p.set({left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center'});
+ p.setCoords();
+}
 function snapshot(){if(!state.photo)return;state.history.push(state.canvas.toJSON(['photoRole','layerId','layerName','layerType']));if(state.history.length>30)state.history.shift();state.future=[];updateHistoryButtons();renderLayers()}
 function updateHistoryButtons(){$('undo-btn').disabled=state.history.length<2;$('redo-btn').disabled=!state.future.length}
 function restoreJSON(json){state.canvas.loadFromJSON(json,()=>{state.photo=state.canvas.getObjects().find(o=>o.photoRole==='main')||null;state.canvas.requestRenderAll();updateHistoryButtons();renderLayers()})}
@@ -58,7 +95,7 @@ async function loadFile(file){
 function fabricImageFromURL(url){return new Promise((resolve,reject)=>fabric.Image.fromURL(url,img=>img?resolve(img):reject(new Error('Fabric no cargó la imagen')),{crossOrigin:'anonymous'}))}
 async function setMainImage(dataUrl,name='image.jpg'){
  const img=await fabricImageFromURL(dataUrl);
- state.canvas.clear();img.photoRole='main';img.layerId='layer-photo';img.layerName='Fotografía';img.layerType='photo';img.set({selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});img.globalCompositeOperation='source-over';state.photo=img;state.canvas.add(img);state.canvas.sendToBack(img);fitPhoto();state.canvas.requestRenderAll();
+ state.canvas.clear();img.photoRole='main';img.layerId='layer-photo';img.layerName='Fotografía';img.layerType='photo';img.set({selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});img.globalCompositeOperation='source-over';state.photo=img;state.canvas.add(img);state.canvas.sendToBack(img);fitCanvas();
  $('empty-state').hidden=true;$('project-title').textContent=name;$('image-info').textContent=`${img.width} × ${img.height}px`;setEnabled(true);resetSliderUI();state.history=[];state.future=[];snapshot();normalizePhotoVisualState();document.dispatchEvent(new CustomEvent('photoia:image-loaded',{detail:{name,width:img.width,height:img.height}}));
 }
 
@@ -326,13 +363,13 @@ function duplicateLayer(){const obj=selectedLayer();if(!obj||obj.photoRole==='ma
 function deleteLayer(){const obj=selectedLayer();if(!obj||obj.photoRole==='main')return;state.canvas.remove(obj);state.canvas.discardActiveObject();state.canvas.requestRenderAll();snapshot();toast('Capa eliminada')}
 function escapeHTML(value){return String(value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]))}
 
-function rotate(deg){if(!state.photo)return;state.photo.rotate((state.photo.angle||0)+deg);fitPhoto();state.canvas.requestRenderAll();snapshot()}
+function rotate(deg){if(!state.photo)return;state.photo.rotate((state.photo.angle||0)+deg);fitCanvas();snapshot()}
 function flip(){if(!state.photo)return;state.photo.set('flipX',!state.photo.flipX);state.canvas.requestRenderAll();snapshot()}
 function addText(){const text=new fabric.IText('Tu texto',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:42,fontWeight:'bold',fill:'#ffffff',stroke:'#111111',strokeWidth:1});text.layerId=nextLayerId();text.layerName='Texto';text.layerType='text';state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
 function addSticker(){const text=new fabric.Text('⭐',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:72});text.layerId=nextLayerId();text.layerName='Sticker';text.layerType='sticker';state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
 function exportDataUrl(){state.canvas.discardActiveObject();const vision=state.canvas.getObjects().filter(o=>o.layerType==='vision-detection'||o.layerType==='vision-mask'||o.excludeFromExport===true);const vis=vision.map(o=>o.visible);vision.forEach(o=>o.visible=false);state.canvas.requestRenderAll();const format=$('format').value;const quality=Number($('quality').value)/100;const out=state.canvas.toDataURL({format:format.split('/')[1],quality,multiplier:2});vision.forEach((o,i)=>o.visible=vis[i]);state.canvas.requestRenderAll();return out}
 function download(){const url=exportDataUrl();const a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${$('format').value.split('/')[1].replace('jpeg','jpg')}`;a.click();toast('Imagen preparada para guardar')}
-function compare(showOriginal){if(!state.photo)return;if(showOriginal){state.photo.setSrc(state.originalDataUrl,()=>{fitPhoto();state.canvas.requestRenderAll()})}else restoreJSON(state.history[state.history.length-1])}
+function compare(showOriginal){if(!state.photo)return;if(showOriginal){state.photo.setSrc(state.originalDataUrl,()=>fitCanvas())}else restoreJSON(state.history[state.history.length-1])}
 function reset(){if(!state.originalDataUrl)return;processing(true,'Restableciendo…');setMainImage(state.originalDataUrl,$('project-title').textContent).finally(()=>{processing(false);toast('Foto restablecida')})}
 
 function openCrop(ratio=NaN){if(!state.photo)return;const modal=$('crop-modal');$('crop-image').src=exportDataUrl();modal.hidden=false;setTimeout(()=>{state.cropper?.destroy();state.cropper=new Cropper($('crop-image'),{viewMode:1,autoCropArea:1,responsive:true,background:false,aspectRatio:ratio})},50)}
@@ -345,6 +382,12 @@ function init(){
  document.body.classList.remove('modal-open');
  if(!window.fabric){toast('No se pudo cargar Fabric.js. Revisa la conexión.');return}
  state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));state.canvas.on('selection:created',renderLayers);state.canvas.on('selection:updated',renderLayers);state.canvas.on('selection:cleared',renderLayers);state.canvas.on('object:modified',()=>snapshot());
+ let lastCanvasTap=0;
+ state.canvas.on('mouse:down',()=>{
+   const now=Date.now();
+   if(now-lastCanvasTap<340&&state.photo){fitCanvas();toast('Foto ajustada al lienzo');lastCanvasTap=0;return;}
+   lastCanvasTap=now;
+ });
  $('file-input').addEventListener('change',e=>loadFile(e.target.files[0]));$('camera-input').addEventListener('change',e=>loadFile(e.target.files[0]));
  sliders.forEach(id=>{$(id).addEventListener('input',e=>applySlider(id,e.target.value,false));$(id).addEventListener('change',()=>snapshot())});
  document.querySelectorAll('[data-preset]').forEach(b=>b.onclick=()=>applyPreset(b.dataset.preset));document.querySelectorAll('[data-command]').forEach(b=>b.onclick=()=>{const command=b.dataset.command;const presetMap={professional:'professional',portrait:'portrait',vivid:'vivid',bw:'bw'};if(presetMap[command])applyPreset(presetMap[command]);else executeCommand(command)});

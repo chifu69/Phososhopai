@@ -1,5 +1,7 @@
-# PHOTO IA 11.5 — Portrait Retouch Engine
+# PHOTO IA 11.5.1 — Canvas Auto Fit
 
-Mejora el flujo de retrato y reemplaza la eliminación agresiva de lunares por máscaras mínimas, inpainting de radio pequeño y restauración parcial de textura. Incluye controles separados para suavizar piel, reducir granitos/manchas y retirar lunares pequeños.
-
-La conexión con Alienware, HTTPS, certificados, token, puertos y ComfyUI no fue modificada.
+- La foto adapta automáticamente el alto del lienzo a su proporción.
+- Ocupa prácticamente todo el cuadro sin deformarse ni recortarse.
+- Fotos cuadradas, verticales y horizontales usan un tamaño distinto.
+- Doble toque en el lienzo vuelve a centrar y ajustar la foto.
+- Conserva Portrait Retouch 11.5 y la conexión Alienware sin cambios.
