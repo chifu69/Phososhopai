@@ -4,8 +4,7 @@ const VERSION='1.0.0-pro';
 let ready=false;
 const api=()=>window.PhotoIA;
 function getSourceCanvas(max=900){
- const data=api()?.exportDataUrl?.();if(!data)throw new Error('Abre una foto primero.');
- return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{const r=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*r));c.height=Math.max(1,Math.round(img.height*r));c.getContext('2d').drawImage(img,0,0,c.width,c.height);resolve(c)};img.onerror=reject;img.src=data});
+ const c=api()?.getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('Abre una foto primero.');return Promise.resolve(c);
 }
 function matMeanStd(mat){const mean=new cv.Mat(),std=new cv.Mat();cv.meanStdDev(mat,mean,std);const out={mean:mean.doubleAt(0,0),std:std.doubleAt(0,0)};mean.delete();std.delete();return out}
 async function analyzeCurrent(){

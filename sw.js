@@ -1,9 +1,9 @@
-const CACHE='photo-ia-10.2-fabric-opencv-pro';
-const VERSION='10.2';
+const CACHE='photo-ia-10.2.1-smart-recommendation-fix';
+const VERSION='10.2.1';
 const CORE=[
- './','./index.html','./styles.css?v=10.2-pro-engine','./ui-layout.js?v=10.2-pro-engine','./app.js?v=10.2-pro-engine',
+ './','./index.html','./styles.css?v=10.2.1-smart-fix','./ui-layout.js?v=10.2.1-smart-fix','./app.js?v=10.2.1-smart-fix',
  './creative-tools.js?v=9.1.1-smart-edit-bridge','./brain.js?v=9.1.1-smart-edit-bridge',
- './opencv-engine.js?v=10.2-pro','./smart-core.js?v=10.2-pro-engine','./ai-studio.js?v=10.2-pro-engine',
+ './opencv-engine.js?v=10.2.1-smart-fix','./smart-core.js?v=10.2.1-smart-fix','./ai-studio.js?v=10.2.1-smart-fix',
  './vision.js?v=9.1.1-smart-edit-bridge','./segmentation.js?v=9.1.1-smart-edit-bridge','./manifest.webmanifest'
 ];
 const ASSETS=[

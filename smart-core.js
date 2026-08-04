@@ -14,27 +14,28 @@ function saveQueue(q){localStorage.setItem(storeKey,JSON.stringify(q.slice(-20))
 function renderQueue(){const el=$('smart-queue-list');if(!el)return;const q=loadQueue();$('smart-queue-count').textContent=String(q.length);el.innerHTML=q.length?q.slice().reverse().map((x,i)=>`<div class="smart-queue-item"><div><strong>${escapeHTML(x.title)}</strong><small>${new Date(x.createdAt).toLocaleString()}</small></div><button data-remove-smart="${q.length-1-i}" type="button">×</button></div>`).join(''):'<p class="smart-empty">No hay tareas pendientes para la PC.</p>';el.querySelectorAll('[data-remove-smart]').forEach(b=>b.onclick=()=>{const next=loadQueue();next.splice(Number(b.dataset.removeSmart),1);saveQueue(next)});}
 function setStatus(text,type='ready'){const b=$('smart-core-badge');if(!b)return;b.textContent=text;b.className=`smart-core-badge ${type}`}
 function ensurePhoto(){if(!api()?.state?.photo)throw new Error('Abre una foto primero.');}
-function canvasPixels(max=512){ensurePhoto();const dataUrl=api().exportDataUrl();return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>{const ratio=Math.min(1,max/Math.max(img.width,img.height));const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.width*ratio));c.height=Math.max(1,Math.round(img.height*ratio));const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0,c.width,c.height);resolve({data:ctx.getImageData(0,0,c.width,c.height).data,width:c.width,height:c.height})};img.onerror=()=>reject(new Error('No pude leer la fotografía.'));img.src=dataUrl;});}
+function canvasPixels(max=512){ensurePhoto();const c=api().getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('No pude leer la fotografía original.');const ctx=c.getContext('2d',{willReadFrequently:true});return Promise.resolve({data:ctx.getImageData(0,0,c.width,c.height).data,width:c.width,height:c.height});}
 function capabilities(){return {webgpu:!!navigator.gpu,wasm:typeof WebAssembly==='object',cores:navigator.hardwareConcurrency||2,online:navigator.onLine};}
 async function analyze(){
  setStatus('Analizando…','working');
  const {data,width,height}=await canvasPixels();
  const cvReport=window.PhotoOpenCV?.ready?await window.PhotoOpenCV.analyzeCurrent().catch(()=>null):null;
- const n=width*height,gray=new Float32Array(n),samples=[],chroma=[];let lum=0,lum2=0,sat=0,r=0,g=0,b=0,edges=0,noise=0,skin=0,sky=0,green=0,clippedBlack=0,clippedWhite=0;
+ const n=width*height,gray=new Float32Array(n),samples=[],chroma=[];let lum=0,lum2=0,sat=0,r=0,g=0,b=0,edges=0,noise=0,skin=0,sky=0,green=0,brightNeutral=0,clippedBlack=0,clippedWhite=0;
  for(let i=0,p=0;i<data.length;i+=4,p++){
   const R=data[i],G=data[i+1],B=data[i+2],L=.2126*R+.7152*G+.0722*B;gray[p]=L;lum+=L;lum2+=L*L;r+=R;g+=G;b+=B;
   const mx=Math.max(R,G,B),mn=Math.min(R,G,B),s=mx?((mx-mn)/mx):0;sat+=s;if((p&7)===0){samples.push(L);chroma.push(s)}
   if(L<8)clippedBlack++;if(L>247)clippedWhite++;
   if(R>G&&G>B&&R>70&&G>35&&(R-B)>15)skin++;
   if(B>R*1.08&&B>G*1.03&&B>85)sky++;
-  if(G>R*1.08&&G>B*1.06&&G>65)green++;
+  if(G>R*1.08&&G>B*1.06&&G>65)green++;if(L>178&&Math.max(R,G,B)-Math.min(R,G,B)<20)brightNeutral++;
  }
  for(let y=1;y<height-1;y+=2)for(let x=1;x<width-1;x+=2){const p=y*width+x;const gx=Math.abs(gray[p+1]-gray[p-1]),gy=Math.abs(gray[p+width]-gray[p-width]);edges+=gx+gy;noise+=Math.abs(gray[p]-((gray[p-1]+gray[p+1]+gray[p-width]+gray[p+width])/4));}
  const mean=lum/n,contrast=Math.sqrt(Math.max(0,lum2/n-mean*mean)),saturation=sat/n,warmth=(r-b)/n,sharpness=edges/Math.max(1,((width-2)*(height-2)/4)),noiseLevel=noise/Math.max(1,((width-2)*(height-2)/4));
  const p05=percentile(samples,.05),p50=percentile(samples,.5),p95=percentile(samples,.95),dynamicRange=p95-p05,blackClip=clippedBlack/n,whiteClip=clippedWhite/n;
  const detections=Number(document.querySelector('#vision-count')?.textContent?.match(/\d+/)?.[0]||0);
- const ratios={skin:skin/n,sky:sky/n,green:green/n};
- const scene=ratios.skin>.13?'Retrato':ratios.sky>.25?'Exterior / cielo':ratios.green>.22?'Naturaleza':dynamicRange<55&&mean<105?'Noche / poca luz':edges>80&&saturation<.12?'Documento / texto':'General';
+ const ratios={skin:skin/n,sky:sky/n,green:green/n,brightNeutral:brightNeutral/n};
+ const looksLikeDocument=ratios.brightNeutral>.52&&saturation<.18&&mean>145&&dynamicRange>45;
+ const scene=ratios.skin>.13?'Retrato':ratios.sky>.25?'Exterior / cielo':ratios.green>.22?'Naturaleza':dynamicRange<55&&mean<105?'Noche / poca luz':looksLikeDocument?'Documento / texto':'General';
  const rec={brightness:0,contrast:0,saturation:0,temperature:0,sharpness:0,blur:0};
  if(p50<92)rec.brightness=clamp(Math.round((108-p50)*.28),6,18);else if(p50>176)rec.brightness=-clamp(Math.round((p50-168)*.25),5,16);
  if(dynamicRange<78)rec.contrast=clamp(Math.round((88-dynamicRange)*.35),8,24);else if(blackClip>.035||whiteClip>.035)rec.contrast=-clamp(Math.round((blackClip+whiteClip)*180),5,18);
@@ -43,7 +44,8 @@ async function analyze(){
  if(sharpness<42)rec.sharpness=noiseLevel>13?8:18;else if(sharpness<72)rec.sharpness=8;
  if(noiseLevel>20&&scene==='Noche / poca luz')rec.blur=1;
  if(scene==='Retrato'){rec.contrast=clamp(rec.contrast,-8,10);rec.saturation=clamp(rec.saturation,-6,10);rec.sharpness=clamp(rec.sharpness,0,12)}
- if(scene==='Documento / texto'){rec.saturation=-100;rec.contrast=Math.max(rec.contrast,24);rec.sharpness=Math.max(rec.sharpness,20)}
+ if(scene==='Documento / texto'){rec.brightness=clamp(rec.brightness,-8,8);rec.saturation=Math.max(rec.saturation,-18);rec.contrast=clamp(Math.max(rec.contrast,12),10,18);rec.sharpness=clamp(Math.max(rec.sharpness,12),10,18)}
+ rec.brightness=clamp(rec.brightness,-10,10);rec.contrast=clamp(rec.contrast,-10,14);rec.saturation=clamp(rec.saturation,-14,16);rec.temperature=clamp(rec.temperature,-10,10);rec.sharpness=clamp(rec.sharpness,0,14);rec.blur=clamp(rec.blur,0,2);
  const confidence=clamp(Math.round(55+Math.min(25,dynamicRange/5)+Math.min(15,n/8000)),55,95);
  if(cvReport){
    sharpness=cvReport.laplacianVariance||sharpness;
@@ -104,7 +106,7 @@ async function applyMode(mode,button){
     sharpness:highNoise?4:7,
     blur:highNoise?3:1
    },
-   document:{brightness:12,contrast:48,saturation:-100,temperature:0,sharpness:38,blur:0},
+   document:{brightness:6,contrast:18,saturation:-18,temperature:0,sharpness:16,blur:0},
    vivid:{
     brightness:clamp(base.brightness,-8,16),
     contrast:clamp(Math.max(18,base.contrast),15,28),

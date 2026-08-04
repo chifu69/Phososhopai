@@ -25,3 +25,9 @@ Consulta `windows-server/README-SERVER.txt` para la instalación.
 - Nueva foto elimina el proyecto visual actual.
 - Alienware usa automáticamente el lienzo, sin duplicar la foto.
 - Corrección de opacidad después de recomendaciones.
+
+
+## PHOTO IA 10.2.1
+- Corrige el análisis para usar únicamente los píxeles de la fotografía, sin incluir el fondo negro o transparente del lienzo.
+- Evita clasificar fotografías normales como documentos y aplicar blanco y negro por error.
+- Limita las recomendaciones automáticas a ajustes conservadores y reversibles.

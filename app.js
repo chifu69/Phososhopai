@@ -62,6 +62,23 @@ async function setMainImage(dataUrl,name='image.jpg'){
  $('empty-state').hidden=true;$('project-title').textContent=name;$('image-info').textContent=`${img.width} × ${img.height}px`;setEnabled(true);resetSliderUI();state.history=[];state.future=[];snapshot();normalizePhotoVisualState();document.dispatchEvent(new CustomEvent('photoia:image-loaded',{detail:{name,width:img.width,height:img.height}}));
 }
 
+
+function getPhotoAnalysisCanvas(max=900){
+ if(!state.photo)throw new Error('Abre una foto primero.');
+ const source=state.photo._originalElement||state.photo.getElement?.()||state.photo._element;
+ if(!source)throw new Error('No pude leer la fotografía original.');
+ const sw=source.naturalWidth||source.videoWidth||source.width||state.photo.width;
+ const sh=source.naturalHeight||source.videoHeight||source.height||state.photo.height;
+ const ratio=Math.min(1,max/Math.max(sw,sh));
+ const canvas=document.createElement('canvas');
+ canvas.width=Math.max(1,Math.round(sw*ratio));canvas.height=Math.max(1,Math.round(sh*ratio));
+ const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true});
+ ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
+ ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
+ ctx.drawImage(source,0,0,sw,sh,0,0,canvas.width,canvas.height);
+ return canvas;
+}
+
 function normalizePhotoVisualState(){
  if(!state.photo)return;
  state.photo.set({opacity:1,visible:true});
@@ -259,7 +276,7 @@ window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv
 window.PhotoIA={
   get state(){return state},
   snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,
-  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,setMainImage,loadFile,executeLegacyCommand:executeCommand
+  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
 };
 document.addEventListener('DOMContentLoaded',()=>{init();window.dispatchEvent(new CustomEvent('photoia-ready'))});
 })();
