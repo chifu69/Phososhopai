@@ -17,7 +17,7 @@
     const modeToolbar = document.getElementById('mode-toolbar');
     if (!main || !workspace || !oldTabs || !modeToolbar) return;
 
-    document.body.classList.add('photoia-pro-ui');
+    document.body.classList.add('photoia-pro-ui', 'photoia-modern-ui');
     main.classList.add('pro-stage');
 
     const allPanels = [...main.querySelectorAll(':scope > section.panel')];
@@ -34,12 +34,17 @@
     sheet.hidden = true;
     sheet.innerHTML = `
       <div class="pro-sheet-head">
-        <div><small>PHOTO IA</small><strong id="pro-sheet-title">Herramientas</strong></div>
+        <div><small>PHOTO IA 12.3</small><strong id="pro-sheet-title">Herramientas</strong></div>
         <button id="pro-sheet-close" type="button" aria-label="Cerrar panel">×</button>
+      </div>
+      <div id="pro-create-tools" class="pro-create-tools" hidden>
+        <span>Herramientas</span>
       </div>
       <div id="pro-sheet-content" class="pro-sheet-content"></div>`;
     document.body.appendChild(sheet);
+
     const sheetContent = sheet.querySelector('#pro-sheet-content');
+    const createTools = sheet.querySelector('#pro-create-tools');
     toolPanels.forEach(panel => {
       panel.classList.add('pro-tool-panel');
       sheetContent.appendChild(panel);
@@ -47,13 +52,8 @@
 
     const leftDock = document.createElement('nav');
     leftDock.className = 'pro-dock pro-dock-left';
-    leftDock.setAttribute('aria-label', 'Secciones de PHOTO IA');
+    leftDock.setAttribute('aria-label', 'Herramientas principales de PHOTO IA');
     document.body.appendChild(leftDock);
-
-    const rightDock = document.createElement('nav');
-    rightDock.className = 'pro-dock pro-dock-right';
-    rightDock.setAttribute('aria-label', 'Herramientas del lienzo');
-    document.body.appendChild(rightDock);
 
     const navButtons = [...oldTabs.querySelectorAll('[data-studio-tab]')];
     const navTitle = {
@@ -61,40 +61,52 @@
     };
     navButtons.forEach(button => {
       button.classList.remove('studio-tab');
-      button.classList.add('pro-dock-item');
-      button.querySelector('small')?.classList.add('pro-dock-label');
+      button.classList.add('pro-dock-item', 'pro-nav-item');
+      const label = button.querySelector('small');
+      label?.classList.add('pro-dock-label');
+      button.setAttribute('aria-label', label?.textContent?.trim() || 'Herramienta');
       leftDock.appendChild(button);
     });
     oldTabs.remove();
 
     const modeButtons = [...modeToolbar.querySelectorAll('[data-canvas-mode]')];
-    modeButtons.forEach(button => {
-      button.classList.remove('mode-tool');
-      button.classList.add('pro-dock-item', 'pro-mode-item');
-      button.querySelector('small')?.classList.add('pro-dock-label');
-      rightDock.appendChild(button);
+    const eraseButton = modeButtons.find(button => button.dataset.canvasMode === 'erase');
+    const createModeButtons = modeButtons.filter(button => button !== eraseButton);
+
+    // Las herramientas manuales aparecen dentro de Crear, debajo de la foto.
+    createModeButtons.forEach(button => {
+      button.classList.remove('mode-tool', 'active');
+      button.classList.add('pro-create-tool');
+      const label = button.querySelector('small');
+      button.setAttribute('aria-label', label?.textContent?.trim() || 'Herramienta de Crear');
+      createTools.appendChild(button);
     });
     modeToolbar.remove();
 
-    const utility = document.createElement('div');
-    utility.className = 'pro-dock-utility';
-    utility.innerHTML = `
-      <button class="pro-dock-item" id="pro-compare" type="button" disabled><span>◐</span><small class="pro-dock-label">Antes/Después</small></button>
-      <button class="pro-dock-item" id="pro-new-photo" type="button" disabled><span>📷</span><small class="pro-dock-label">Nueva foto</small></button>`;
-    rightDock.appendChild(utility);
+    // Borrar y Antes/Después viven en el dock izquierdo.
+    if (eraseButton) {
+      eraseButton.classList.remove('mode-tool');
+      eraseButton.classList.add('pro-dock-item', 'pro-erase-item');
+      eraseButton.querySelector('small')?.classList.add('pro-dock-label');
+      eraseButton.setAttribute('aria-label', 'Borrar');
+      leftDock.appendChild(eraseButton);
+    }
 
-    const compareProxy = utility.querySelector('#pro-compare');
-    const newPhotoProxy = utility.querySelector('#pro-new-photo');
+    const utilities = document.createElement('div');
+    utilities.className = 'pro-dock-utility';
+    utilities.innerHTML = `
+      <button class="pro-dock-item" id="pro-compare" type="button" disabled aria-label="Antes y después">
+        <span>◐</span><small class="pro-dock-label">Antes/Después</small>
+      </button>`;
+    leftDock.appendChild(utilities);
+
+    const compareProxy = utilities.querySelector('#pro-compare');
     const originalCompare = document.getElementById('compare-btn');
-    const originalNew = document.getElementById('new-photo-btn');
     compareProxy.addEventListener('click', () => originalCompare?.click());
-    newPhotoProxy.addEventListener('click', () => originalNew?.click());
-    const syncProxyState = () => {
-      compareProxy.disabled = originalCompare?.disabled ?? true;
-      newPhotoProxy.disabled = originalNew?.disabled ?? true;
-    };
-    new MutationObserver(syncProxyState).observe(originalCompare, { attributes: true, attributeFilter: ['disabled'] });
-    new MutationObserver(syncProxyState).observe(originalNew, { attributes: true, attributeFilter: ['disabled'] });
+    const syncProxyState = () => { compareProxy.disabled = originalCompare?.disabled ?? true; };
+    if (originalCompare) {
+      new MutationObserver(syncProxyState).observe(originalCompare, { attributes: true, attributeFilter: ['disabled'] });
+    }
     syncProxyState();
 
     const categoryByPanel = new Map();
@@ -111,12 +123,19 @@
     });
 
     let activeCategory = null;
-    let collapseTimer = null;
-    const expandTemporarily = button => {
-      document.querySelectorAll('.pro-dock-item.expanded').forEach(item => item.classList.remove('expanded'));
-      button.classList.add('expanded');
-      clearTimeout(collapseTimer);
-      collapseTimer = setTimeout(() => button.classList.remove('expanded'), 2600);
+    let tooltipTimer = null;
+
+    const pulseItem = button => {
+      document.querySelectorAll('.pro-dock-item.peek').forEach(item => item.classList.remove('peek'));
+      button.classList.add('peek');
+      clearTimeout(tooltipTimer);
+      tooltipTimer = setTimeout(() => button.classList.remove('peek'), 1800);
+    };
+
+    const setActiveMode = selected => {
+      [...createModeButtons, eraseButton].filter(Boolean).forEach(item => {
+        item.classList.toggle('active', item === selected);
+      });
     };
 
     function openCategory(category, trigger) {
@@ -124,11 +143,12 @@
       const hasVisible = toolPanels.some(panel => panel.dataset.studioCategory === category);
       toolPanels.forEach(panel => { panel.hidden = panel.dataset.studioCategory !== category; });
       navButtons.forEach(button => button.classList.toggle('active', button.dataset.studioTab === category));
+      createTools.hidden = category !== 'create';
       const title = sheet.querySelector('#pro-sheet-title');
       if (title) title.textContent = navTitle[category] || 'Herramientas';
       sheet.hidden = !hasVisible;
       document.body.classList.toggle('pro-sheet-open', hasVisible);
-      if (trigger) expandTemporarily(trigger);
+      if (trigger) pulseItem(trigger);
       localStorage.setItem('photoia-active-studio-tab', category);
     }
 
@@ -140,21 +160,21 @@
           sheet.hidden = true;
           document.body.classList.remove('pro-sheet-open');
           button.classList.remove('active');
-          expandTemporarily(button);
+          pulseItem(button);
           return;
         }
         openCategory(category, button);
       });
     });
 
-    modeButtons.forEach(button => {
-      button.addEventListener('click', () => {
-        modeButtons.forEach(item => item.classList.toggle('active', item === button));
-        expandTemporarily(button);
-      });
+    createModeButtons.forEach(button => {
+      button.addEventListener('click', () => setActiveMode(button));
     });
-
-    utility.querySelectorAll('.pro-dock-item').forEach(button => button.addEventListener('click', () => expandTemporarily(button)));
+    eraseButton?.addEventListener('click', () => {
+      setActiveMode(eraseButton);
+      pulseItem(eraseButton);
+    });
+    compareProxy.addEventListener('click', () => pulseItem(compareProxy));
 
     sheet.querySelector('#pro-sheet-close')?.addEventListener('click', () => {
       sheet.hidden = true;
@@ -164,7 +184,7 @@
 
     document.addEventListener('pointerdown', event => {
       if (sheet.hidden || window.innerWidth > 900) return;
-      if (sheet.contains(event.target) || leftDock.contains(event.target) || rightDock.contains(event.target)) return;
+      if (sheet.contains(event.target) || leftDock.contains(event.target)) return;
       sheet.hidden = true;
       document.body.classList.remove('pro-sheet-open');
       navButtons.forEach(button => button.classList.remove('active'));

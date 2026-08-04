@@ -573,3 +573,146 @@ body.photoia-pro-ui{overflow-x:hidden}
     max-height:54dvh!important;
   }
 }
+
+/* PHOTO IA 12.3 — Modern Compact Left Dock
+   One compact navigation dock. Manual tools live inside Crear. */
+.photoia-modern-ui .pro-dock-right{display:none!important}
+.photoia-modern-ui .pro-dock-left{
+  left:max(0px,env(safe-area-inset-left))!important;
+  gap:3px!important;
+  padding:5px 2px!important;
+  border-radius:0 16px 16px 0!important;
+  border-left:0!important;
+  background:color-mix(in srgb,var(--surface) 76%,transparent)!important;
+  box-shadow:8px 16px 34px rgba(15,23,42,.16)!important;
+  backdrop-filter:blur(24px) saturate(1.35)!important;
+  -webkit-backdrop-filter:blur(24px) saturate(1.35)!important;
+}
+.photoia-modern-ui .pro-dock-item{
+  width:27px!important;
+  min-width:27px!important;
+  height:27px!important;
+  min-height:27px!important;
+  padding:0!important;
+  border-radius:9px!important;
+  overflow:visible!important;
+  border-color:transparent!important;
+  background:transparent!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.photoia-modern-ui .pro-dock-item>span{
+  flex:0 0 27px!important;
+  font-size:.84rem!important;
+  line-height:1!important;
+}
+.photoia-modern-ui .pro-dock-item.active,
+.photoia-modern-ui .pro-dock-item.peek{
+  width:29px!important;
+  min-width:29px!important;
+  height:29px!important;
+  min-height:29px!important;
+  background:linear-gradient(145deg,color-mix(in srgb,var(--surface) 96%,#fff 4%),color-mix(in srgb,var(--surface2) 92%,transparent))!important;
+  border-color:color-mix(in srgb,var(--accent) 30%,var(--line))!important;
+  box-shadow:0 5px 14px rgba(15,23,42,.16),0 0 0 2px color-mix(in srgb,var(--accent) 11%,transparent)!important;
+  transform:scale(1.07)!important;
+}
+.photoia-modern-ui .pro-dock-item.active>span,
+.photoia-modern-ui .pro-dock-item.peek>span{font-size:.9rem!important}
+.photoia-modern-ui .pro-dock-label{
+  position:absolute!important;
+  left:35px!important;
+  top:50%!important;
+  transform:translateY(-50%) translateX(-4px)!important;
+  width:max-content!important;
+  max-width:none!important;
+  padding:5px 8px!important;
+  border:1px solid color-mix(in srgb,var(--line) 82%,transparent)!important;
+  border-radius:9px!important;
+  background:color-mix(in srgb,var(--surface) 92%,transparent)!important;
+  box-shadow:0 7px 20px rgba(15,23,42,.14)!important;
+  color:var(--text)!important;
+  font-size:.58rem!important;
+  font-weight:850!important;
+  opacity:0!important;
+  pointer-events:none!important;
+  white-space:nowrap!important;
+  backdrop-filter:blur(16px)!important;
+  -webkit-backdrop-filter:blur(16px)!important;
+  transition:opacity .15s ease,transform .15s ease!important;
+}
+.photoia-modern-ui .pro-dock-item.active .pro-dock-label,
+.photoia-modern-ui .pro-dock-item.peek .pro-dock-label{
+  opacity:1!important;
+  transform:translateY(-50%) translateX(0)!important;
+}
+.photoia-modern-ui .pro-dock-utility{
+  gap:3px!important;
+  padding-top:4px!important;
+  margin-top:2px!important;
+}
+.photoia-modern-ui .pro-create-tools{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  overflow-x:auto;
+  padding:7px 8px 9px;
+  border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);
+  scrollbar-width:none;
+}
+.photoia-modern-ui .pro-create-tools[hidden]{display:none!important}
+.photoia-modern-ui .pro-create-tools::-webkit-scrollbar{display:none}
+.photoia-modern-ui .pro-create-tools>span{
+  flex:0 0 auto;
+  color:var(--muted);
+  font-size:.62rem;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+}
+.photoia-modern-ui .pro-create-tool{
+  flex:0 0 auto;
+  min-width:44px;
+  min-height:42px;
+  padding:6px 9px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:5px;
+  border:1px solid color-mix(in srgb,var(--line) 82%,transparent);
+  border-radius:13px;
+  background:color-mix(in srgb,var(--surface2) 84%,transparent);
+  color:var(--text);
+  font-weight:850;
+  box-shadow:0 4px 13px rgba(15,23,42,.06);
+}
+.photoia-modern-ui .pro-create-tool span{font-size:1.03rem}
+.photoia-modern-ui .pro-create-tool small{font-size:.68rem}
+.photoia-modern-ui .pro-create-tool.active{
+  background:linear-gradient(135deg,var(--accent),color-mix(in srgb,var(--accent) 76%,#fff));
+  border-color:var(--accent);
+  color:#211604;
+  box-shadow:0 7px 18px color-mix(in srgb,var(--accent) 28%,transparent);
+}
+.photoia-modern-ui .pro-tool-sheet{
+  left:30px!important;
+  right:6px!important;
+  border:1px solid color-mix(in srgb,var(--line) 72%,transparent)!important;
+  box-shadow:0 20px 54px rgba(15,23,42,.22)!important;
+  backdrop-filter:blur(28px) saturate(1.25)!important;
+  -webkit-backdrop-filter:blur(28px) saturate(1.25)!important;
+}
+.photoia-modern-ui .pro-sheet-head{
+  background:linear-gradient(180deg,color-mix(in srgb,var(--surface) 95%,transparent),color-mix(in srgb,var(--surface2) 80%,transparent));
+}
+.photoia-modern-ui .pro-sheet-head button{
+  border-radius:12px!important;
+  background:color-mix(in srgb,var(--surface2) 82%,transparent)!important;
+}
+@media(max-width:430px){
+  .photoia-modern-ui .pro-dock-item{width:25px!important;min-width:25px!important;height:25px!important;min-height:25px!important}
+  .photoia-modern-ui .pro-dock-item>span{flex-basis:25px!important;font-size:.78rem!important}
+  .photoia-modern-ui .pro-dock-item.active,.photoia-modern-ui .pro-dock-item.peek{width:27px!important;min-width:27px!important;height:27px!important;min-height:27px!important}
+  .photoia-modern-ui .pro-dock-label{left:32px!important}
+  .photoia-modern-ui .pro-tool-sheet{left:28px!important;right:4px!important}
+}
