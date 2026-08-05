@@ -794,3 +794,8 @@ body.photoia-pro-ui{overflow-x:hidden}
 @media(max-width:380px){.module-grid{grid-template-columns:1fr}.photoia-adaptive-ui .pro-sheet-head small{display:none}.photoia-adaptive-ui .pro-sheet-head strong{font-size:.9rem}}
 @media(orientation:landscape) and (max-height:600px){.photoia-adaptive-ui .pro-dock-left{top:50%;max-height:86dvh!important}.photoia-adaptive-ui .pro-tool-sheet{left:auto!important;right:4px!important;top:54px!important;bottom:4px!important;width:min(42vw,390px)!important;height:auto!important}.photoia-adaptive-ui.pro-sheet-open .workspace .canvas-wrap{height:var(--aw-canvas-h)!important}.photoia-adaptive-ui.pro-sheet-open .app-shell{padding-right:min(43vw,400px)!important}}
 @media(prefers-reduced-motion:reduce){.photoia-adaptive-ui *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
+
+/* PHOTO IA 13.1 — Photo Critic + regional intelligence. Existing layout preserved. */
+.photo-critic-list{display:grid;gap:8px;margin:10px 0 0;padding:0;list-style:none}
+.photo-critic-list li{display:grid;gap:2px;padding:9px 10px;border:1px solid color-mix(in srgb,var(--line) 78%,transparent);border-radius:12px;background:color-mix(in srgb,var(--surface) 90%,transparent)}
+.photo-critic-list strong{font-size:12px}.photo-critic-list span{font-size:11px;color:var(--muted);line-height:1.35}

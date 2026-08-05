@@ -1,10 +1,10 @@
 (() => {
 'use strict';
-const VERSION='4.1-portrait-retouch-engine';
+const VERSION='5.0-photo-critic-regional-engine';
 let ready=false;
 const api=()=>window.PhotoIA;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-function getSourceCanvas(max=1600){const c=api()?.getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('Abre una foto primero.');return c;}
+async function getSourceCanvas(max=1600,source='current'){const c=source==='original'?await api()?.getOriginalAnalysisCanvas?.(max):api()?.getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('Abre una foto primero.');return c;}
 function safeDelete(...items){items.flat().forEach(m=>{try{m?.delete?.()}catch{}})}
 function matMeanStd(mat){const mean=new cv.Mat(),std=new cv.Mat();cv.meanStdDev(mat,mean,std);const out={mean:mean.doubleAt(0,0),std:std.doubleAt(0,0)};safeDelete(mean,std);return out;}
 function percentileFromHist(hist,p,total){let acc=0;for(let i=0;i<256;i++){acc+=hist.data32F[i];if(acc>=total*p)return i;}return 0;}
@@ -29,7 +29,7 @@ function buildRegionMasks(src){const rgb=new cv.Mat(),hsv=new cv.Mat();cv.cvtCol
 function maskRatio(mask){return cv.mean(mask)[0]/255;}
 function deleteMasks(m){Object.values(m||{}).forEach(x=>safeDelete(x));}
 function horizon(gray,edges){const lines=new cv.Mat();cv.HoughLinesP(edges,lines,1,Math.PI/180,Math.max(35,gray.cols*.08),Math.max(40,gray.cols*.18),18);let sum=0,w=0,count=0;for(let i=0;i<lines.rows;i++){const x1=lines.data32S[i*4],y1=lines.data32S[i*4+1],x2=lines.data32S[i*4+2],y2=lines.data32S[i*4+3],dx=x2-x1,dy=y2-y1,len=Math.hypot(dx,dy);if(len<30)continue;let a=Math.atan2(dy,dx)*180/Math.PI;while(a>90)a-=180;while(a<-90)a+=180;if(Math.abs(a)<18){sum+=a*len;w+=len;count++;}}lines.delete();return{angle:w?sum/w:0,confidence:clamp(count/12,0,1)};}
-async function analyzeCurrent(){if(!ready||!window.cv?.Mat)throw new Error('OpenCV todavía no está listo.');const canvas=getSourceCanvas();let src,gray,lap,edges,blurred,diff,masks;try{src=cv.imread(canvas);gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);lap=new cv.Mat();cv.Laplacian(gray,lap,cv.CV_64F);const ls=matMeanStd(lap),lapVar=ls.std*ls.std;edges=new cv.Mat();cv.Canny(gray,edges,52,142);const edgeDensity=cv.countNonZero(edges)/(edges.rows*edges.cols);blurred=new cv.Mat();cv.GaussianBlur(gray,blurred,new cv.Size(5,5),0);diff=new cv.Mat();cv.absdiff(gray,blurred,diff);const noise=cv.mean(diff)[0];const stats=matMeanStd(gray),hist=histogram(gray);masks=buildRegionMasks(src);const regions={sky:+maskRatio(masks.sky).toFixed(3),green:+maskRatio(masks.green).toFixed(3),skin:+maskRatio(masks.skin).toFixed(3),face:+maskRatio(masks.face).toFixed(3),dark:+maskRatio(masks.dark).toFixed(3)};const hz=horizon(gray,edges),blurRisk=lapVar<45?'high':lapVar<120?'medium':'low';const detectedRegions=[regions.face>.025?'Rostro':null,regions.skin>.035?'Piel':null,regions.sky>.07?'Cielo':null,regions.green>.08?'Vegetación':null].filter(Boolean);const report={version:VERSION,width:src.cols,height:src.rows,brightness:Math.round(stats.mean),contrast:Math.round(stats.std),histogram:hist,dynamicRange:hist.p95-hist.p05,laplacianVariance:Math.round(lapVar),edgeDensity:+edgeDensity.toFixed(4),noiseEstimate:+noise.toFixed(2),blurRisk,regions,detectedRegions,horizon:hz,clipping:{black:hist.p01<3,white:hist.p99>252}};render(report);return report;}finally{deleteMasks(masks);safeDelete(src,gray,lap,edges,blurred,diff)}}
+async function analyzeCurrent(source='current'){if(!ready||!window.cv?.Mat)throw new Error('OpenCV todavía no está listo.');const canvas=await getSourceCanvas(1200,source);let src,gray,lap,edges,blurred,diff,masks;try{src=cv.imread(canvas);gray=new cv.Mat();cv.cvtColor(src,gray,cv.COLOR_RGBA2GRAY);lap=new cv.Mat();cv.Laplacian(gray,lap,cv.CV_64F);const ls=matMeanStd(lap),lapVar=ls.std*ls.std;edges=new cv.Mat();cv.Canny(gray,edges,52,142);const edgeDensity=cv.countNonZero(edges)/(edges.rows*edges.cols);blurred=new cv.Mat();cv.GaussianBlur(gray,blurred,new cv.Size(5,5),0);diff=new cv.Mat();cv.absdiff(gray,blurred,diff);const noise=cv.mean(diff)[0];const stats=matMeanStd(gray),hist=histogram(gray);masks=buildRegionMasks(src);const regions={sky:+maskRatio(masks.sky).toFixed(3),green:+maskRatio(masks.green).toFixed(3),skin:+maskRatio(masks.skin).toFixed(3),face:+maskRatio(masks.face).toFixed(3),dark:+maskRatio(masks.dark).toFixed(3)};const hz=horizon(gray,edges),blurRisk=lapVar<45?'high':lapVar<120?'medium':'low';const detectedRegions=[regions.face>.025?'Rostro':null,regions.skin>.035?'Piel':null,regions.sky>.07?'Cielo':null,regions.green>.08?'Vegetación':null].filter(Boolean);const report={version:VERSION,width:src.cols,height:src.rows,brightness:Math.round(stats.mean),contrast:Math.round(stats.std),histogram:hist,dynamicRange:hist.p95-hist.p05,laplacianVariance:Math.round(lapVar),edgeDensity:+edgeDensity.toFixed(4),noiseEstimate:+noise.toFixed(2),blurRisk,regions,detectedRegions,horizon:hz,clipping:{black:hist.p01<3,white:hist.p99>252}};render(report);return report;}finally{deleteMasks(masks);safeDelete(src,gray,lap,edges,blurred,diff)}}
 function grayWorld(src,strength=.72){const rgb=new cv.Mat();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);const ch=new cv.MatVector();cv.split(rgb,ch);const means=[0,1,2].map(i=>cv.mean(ch.get(i))[0]),target=(means[0]+means[1]+means[2])/3;for(let i=0;i<3;i++){const m=ch.get(i),raw=target/Math.max(1,means[i]),factor=1+(clamp(raw,.86,1.14)-1)*strength;m.convertTo(m,-1,factor,0);}cv.merge(ch,rgb);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)safeDelete(ch.get(i));safeDelete(ch,rgb);}
 function toneCurve(src,recipe,analysis){const rgb=new cv.Mat(),lab=new cv.Mat(),ch=new cv.MatVector();cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);cv.split(lab,ch);const l=ch.get(0),lut=new cv.Mat(1,256,cv.CV_8U);const exp=Number(recipe.exposure||0),sh=Number(recipe.shadows||0)/100,hi=Number(recipe.highlights||0)/100,ct=Number(recipe.contrast||0)/100,black=Number(recipe.blackPoint||0);for(let x=0;x<256;x++){let y=x*Math.pow(2,exp);const n=clamp(y/255,0,1);y+=sh*38*Math.pow(1-n,2.15);y-=hi*34*Math.pow(n,2.35);y=128+(y-128)*(1+ct*.62);y-=black*Math.pow(1-n,2.5)*.7;lut.data[x]=Math.round(clamp(y,0,255));}cv.LUT(l,lut,l);cv.merge(ch,lab);cv.cvtColor(lab,rgb,cv.COLOR_Lab2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);for(let i=0;i<3;i++)safeDelete(ch.get(i));safeDelete(lut,ch,lab,rgb);}
 function claheLuminance(src,clip=1.35){const rgb=new cv.Mat(),lab=new cv.Mat(),channels=new cv.MatVector();let l,a,b,out,clahe,merged;try{cv.cvtColor(src,rgb,cv.COLOR_RGBA2RGB);cv.cvtColor(rgb,lab,cv.COLOR_RGB2Lab);cv.split(lab,channels);l=channels.get(0);a=channels.get(1);b=channels.get(2);out=new cv.Mat();clahe=new cv.CLAHE(clip,new cv.Size(8,8));clahe.apply(l,out);const rebuilt=new cv.MatVector();rebuilt.push_back(out);rebuilt.push_back(a);rebuilt.push_back(b);merged=new cv.Mat();cv.merge(rebuilt,merged);rebuilt.delete();cv.cvtColor(merged,rgb,cv.COLOR_Lab2RGB);cv.cvtColor(rgb,src,cv.COLOR_RGB2RGBA);}finally{safeDelete(clahe,l,a,b,out,merged,channels,lab,rgb)}}
@@ -91,7 +91,7 @@ function preserveTexture(original,repaired,mask){
  }finally{safeDelete(origBlur,repBlur,origF,origBlurF,repF,detail,restored)}
 }
 async function removeSkinSpots(mode='blemish'){
- if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks,spotMask,rgb,result;
+ if(!ready)throw new Error('OpenCV no está listo.');const canvas=await getSourceCanvas(1800,'current');let src,masks,spotMask,rgb,result;
  try{
   src=cv.imread(canvas);masks=buildRegionMasks(src);if(maskRatio(masks.skin)<.012)throw new Error('No detecté suficiente piel para hacer el retoque.');
   spotMask=buildSpotMask(src,masks.skin,mode);const pixels=cv.countNonZero(spotMask);if(pixels<2)throw new Error(mode==='mole'?'No detecté lunares pequeños seguros para retirar.':'No detecté granitos o manchas pequeñas seguras para retirar.');
@@ -107,7 +107,7 @@ async function removeSkinSpots(mode='blemish'){
  }finally{deleteMasks(masks);safeDelete(src,spotMask,rgb,result)}
 }
 async function smoothPortraitSkin(strength=.35){
- if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks,smooth,mask;
+ if(!ready)throw new Error('OpenCV no está listo.');const canvas=await getSourceCanvas(1800,'current');let src,masks,smooth,mask;
  try{
   src=cv.imread(canvas);masks=buildRegionMasks(src);if(maskRatio(masks.skin)<.012)throw new Error('No detecté suficiente piel para suavizar.');
   smooth=src.clone();bilateralRGBA(smooth,7,19+strength*15,19+strength*15);mask=skinTextureMask(src,masks.skin);
@@ -125,9 +125,46 @@ function regionalEnhance(src,recipe,analysis,masks){const r=analysis?.regions||{
  // Reduce noise mainly in dark areas. Keep the blend conservative to preserve texture.
  if(r.dark>.08&&Number(recipe.denoise||0)>0){const smooth=denoiseCopy(src,clamp(Number(recipe.denoise),2,8));blendMasked(src,smooth,masks.dark,clamp(.20+strength*.10,0,.36));smooth.delete();}
 }
-async function enhanceCurrent(recipe={},analysis=null){if(!ready)throw new Error('OpenCV no está listo.');const canvas=getSourceCanvas(1800);let src,masks;const stage=(name,fn)=>{try{fn()}catch(err){console.warn('[OpenCV Portrait Natural]',name,err)}};try{src=cv.imread(canvas);masks=buildRegionMasks(src);const strength=clamp(Number(recipe.adaptiveStrength||.65),.25,1);stage('balance de blancos',()=>grayWorld(src,.48+strength*.30));stage('curva tonal',()=>toneCurve(src,recipe,analysis));stage('contraste local',()=>claheLuminance(src,(analysis?.regions?.face||0)>.02?1.03+strength*.10:1.10+strength*.34));stage('color global',()=>globalColor(src,recipe));stage('ajustes regionales',()=>regionalEnhance(src,recipe,analysis,masks));if(analysis?.blurRisk==='high'){const globalDetail=sharpenCopy(src,.075,1.2);blendMasked(src,globalDetail,masks.dark,.06);globalDetail.delete();}const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.96);}catch(err){console.error('[OpenCV Portrait Natural] apply failed',err);throw new Error('No se pudo procesar la foto: '+(err?.message||String(err)))}finally{deleteMasks(masks);safeDelete(src)}}
+async function enhanceCurrent(recipe={},analysis=null,source='original'){if(!ready)throw new Error('OpenCV no está listo.');const canvas=await getSourceCanvas(1800,source);let src,masks;const stage=(name,fn)=>{try{fn()}catch(err){console.warn('[OpenCV Portrait Natural]',name,err)}};try{src=cv.imread(canvas);masks=buildRegionMasks(src);const strength=clamp(Number(recipe.adaptiveStrength||.65),.25,1);stage('balance de blancos',()=>grayWorld(src,.48+strength*.30));stage('curva tonal',()=>toneCurve(src,recipe,analysis));stage('contraste local',()=>claheLuminance(src,(analysis?.regions?.face||0)>.02?1.03+strength*.10:1.10+strength*.34));stage('color global',()=>globalColor(src,recipe));stage('ajustes regionales',()=>regionalEnhance(src,recipe,analysis,masks));if(analysis?.blurRisk==='high'){const globalDetail=sharpenCopy(src,.075,1.2);blendMasked(src,globalDetail,masks.dark,.06);globalDetail.delete();}const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.96);}catch(err){console.error('[OpenCV Portrait Natural] apply failed',err);throw new Error('No se pudo procesar la foto: '+(err?.message||String(err)))}finally{deleteMasks(masks);safeDelete(src)}}
+
+function critiquePhoto(report){
+ const h=report.histogram||{},r=report.regions||{},issues=[],strengths=[];
+ if(r.face>.02){
+  if((h.p50||report.brightness)<105)issues.push({code:'face-dark',label:'Rostro oscuro',advice:'Iluminar rostro y piel sin aumentar la exposición del fondo.'});
+  if(report.contrast>72)issues.push({code:'skin-harsh',label:'Textura facial agresiva',advice:'Proteger piel y reducir claridad local en el rostro.'});
+  if(report.noiseEstimate>14)issues.push({code:'face-noise',label:'Ruido en piel y sombras',advice:'Reducir ruido solo en sombras y conservar ojos, cabello y barba.'});
+  strengths.push('Rostro detectado');
+ }
+ if(report.clipping?.white)issues.push({code:'highlights',label:'Altas luces al límite',advice:'Recuperar luces sin oscurecer al sujeto.'});
+ if(report.clipping?.black)issues.push({code:'shadows',label:'Sombras cerradas',advice:'Abrir sombras de forma selectiva.'});
+ if(report.blurRisk==='high')issues.push({code:'soft-focus',label:'Enfoque bajo',advice:'Añadir detalle solo a bordes importantes, no a la piel.'});
+ else strengths.push('Enfoque utilizable');
+ if(!issues.length)strengths.push('Exposición equilibrada');
+ return{issues,strengths,summary:issues.length?`Encontré ${issues.length} oportunidad${issues.length===1?'':'es'} de mejora sin perjudicar la foto.`:'La foto ya está equilibrada; aplicaré una mejora ligera y natural.'};
+}
+function regionMaskFor(masks,region){
+ if(region==='face')return masks.face;
+ if(region==='skin')return masks.skin;
+ if(region==='background'){
+  const fg=new cv.Mat(),bg=new cv.Mat();cv.max(masks.face,masks.skin,fg);cv.bitwise_not(fg,bg);fg.delete();return bg;
+ }
+ return null;
+}
+async function adjustRegion(region='face',options={}){
+ if(!ready)throw new Error('OpenCV no está listo.');const canvas=await getSourceCanvas(1800,'current');let src,masks,target,mask;
+ try{
+  src=cv.imread(canvas);masks=buildRegionMasks(src);mask=regionMaskFor(masks,region);if(!mask||maskRatio(mask)<.005)throw new Error(`No detecté suficiente ${region==='background'?'fondo':region==='skin'?'piel':'rostro'} para editar.`);
+  target=src.clone();const exposure=clamp(Number(options.exposure||0),-.4,.7),shadows=clamp(Number(options.shadows||0),-25,45),warmth=clamp(Number(options.warmth||0),-12,12),detail=clamp(Number(options.detail||0),-20,18);
+  const recipe={exposure,shadows,highlights:0,contrast:0,vibrance:0,warmth,clarity:0,blackPoint:0,whitePoint:255,gamma:1,denoise:options.denoise?6:0,adaptiveStrength:.55};
+  toneCurve(target,recipe,{regions:{face:(region==='face'||region==='skin')?0.08:0}});if(warmth)globalColor(target,recipe);
+  if(options.smooth&&region!=='background'){const softened=target.clone();bilateralRGBA(softened,7,22,22);const safe=skinTextureMask(src,mask);blendMasked(target,softened,safe,.20);safeDelete(softened,safe);}
+  if(detail>0){const edge=region==='face'?faceEdgeMask(src,mask):mask;const sharp=sharpenCopy(target,Math.min(.07,detail/260),.95);blendMasked(target,sharp,edge,.18);safeDelete(sharp);if(edge!==mask)safeDelete(edge);}
+  blendMasked(src,target,mask,clamp(Number(options.strength||.72),.2,1));
+  const out=document.createElement('canvas');out.width=src.cols;out.height=src.rows;cv.imshow(out,src);return out.toDataURL('image/jpeg',.98);
+ }finally{if(mask&&![masks?.face,masks?.skin,masks?.sky,masks?.green,masks?.dark].includes(mask))safeDelete(mask);deleteMasks(masks);safeDelete(src,target)}
+}
 function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;const regs=r.detectedRegions?.length?r.detectedRegions.join(' · '):'General';el.innerHTML=`<strong>OpenCV Portrait Beauty activo</strong><span>Regiones: ${regs}</span><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Ruido: ${r.noiseEstimate}</span><span>Horizonte: ${Math.abs(r.horizon.angle).toFixed(1)}°</span>`;}
 function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Portrait Beauty activo';badge.classList.add('ready')}}
 window.addEventListener('opencv-script-loaded',()=>{const wait=()=>window.cv?.Mat?markReady():setTimeout(wait,200);wait()});
-window.PhotoOpenCV={version:VERSION,get ready(){return ready},analyzeCurrent,enhanceCurrent,removeSkinSpots,smoothPortraitSkin};
+window.PhotoOpenCV={version:VERSION,get ready(){return ready},analyzeCurrent,enhanceCurrent,removeSkinSpots,smoothPortraitSkin,critiquePhoto,adjustRegion};
 })();

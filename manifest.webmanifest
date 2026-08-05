@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 13.0 Professional",
+  "name": "PHOTO IA 13.1 Professional",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con Adaptive Workspace, Fabric, OpenCV y Alienware opcional.",
-  "start_url": "./?v=13.0-professional-adaptive",
+  "start_url": "./?v=13.1-professional-adaptive",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",

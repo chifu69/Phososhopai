@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='1.8.6-local-first-core';
+const VERSION='2.0-adaptive-segmentation';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -122,6 +122,30 @@ function featherMask(mask,width,height){
   }
   return out;
 }
+
+function maskBounds(mask,w,h,threshold=110){let minX=w,minY=h,maxX=-1,maxY=-1;for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(mask[y*w+x]>=threshold){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;}}return maxX<0?null:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1};}
+function profileMask(base,w,h,mode='person',canvas=null){
+ if(mode==='person')return base;
+ const box=maskBounds(base,w,h);if(!box)return base;const out=new Uint8Array(base.length);
+ if(mode==='bust'||mode==='face'){
+  const top=box.y,bottom=mode==='face'?box.y+box.h*.43:box.y+box.h*.70;
+  const centerX=box.x+box.w/2,half=mode==='face'?box.w*.34:box.w*.54;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(base[i]<80||y<top||y>bottom||Math.abs(x-centerX)>half)continue;out[i]=base[i];}
+  return blurMask(out,w,h,mode==='face'?2:1);
+ }
+ if(mode==='skin'&&canvas){
+  const rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+  const faceTop=box.y,faceBottom=box.y+box.h*.48,centerX=box.x+box.w/2,half=box.w*.38;
+  for(let y=Math.max(0,Math.floor(faceTop));y<Math.min(h,Math.ceil(faceBottom));y++)for(let x=Math.max(0,Math.floor(centerX-half));x<Math.min(w,Math.ceil(centerX+half));x++){
+   const i=y*w+x,j=i*4,r=rgba[j],g=rgba[j+1],b=rgba[j+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+   const isSkin=r>55&&g>32&&b>20&&(mx-mn)>10&&r>g*.92&&r>b*1.05;
+   if(isSkin&&base[i]>45)out[i]=255;
+  }
+  return blurMask(out,w,h,2);
+ }
+ return base;
+}
+function refineCurrentMask(){if(!state.mask)return api()?.toast('Primero crea una máscara.');const {data,width,height}=state.mask;let refined=blurMask(data,width,height,1);const binary=new Uint8Array(refined.length);for(let i=0;i<refined.length;i++)binary[i]=refined[i]>72?Math.max(80,refined[i]):0;refined=blurMask(binary,width,height,2);setMask(refined,width,height,state.maskKind||'Selección refinada');setStatus('Máscara refinada: bordes suavizados y pequeños huecos recuperados.','ready');api()?.toast('Máscara refinada');}
 function magicWandMask(canvas,nx,ny){
   const ctx=canvas.getContext('2d',{willReadFrequently:true});const {width:w,height:h}=canvas;
   const rgba=ctx.getImageData(0,0,w,h).data;const sx=Math.max(0,Math.min(w-1,Math.round(nx*(w-1)))),sy=Math.max(0,Math.min(h-1,Math.round(ny*(h-1))));
@@ -392,20 +416,24 @@ function closeResult(result){
   try{result?.categoryMask?.close?.();}catch(_){ }
   try{result?.confidenceMasks?.forEach(m=>m.close?.());}catch(_){ }
 }
-async function segmentPerson(){
+async function segmentProfile(mode='person'){
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
-  const operation=beginOperation('Separando a la persona…');setStatus('Preparando una copia optimizada de la foto…','loading');
+  const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro',skin:'Piel'};const label=labels[mode]||labels.person;
+  const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);setStatus('Preparando una copia optimizada de la foto…','loading');
   try{
-    const work=await getWorkCanvas(operation);
-    setStatus('Separando a la persona sin descargar modelos…','loading');logDebug('OFFLINE CORE: inferencia inicio',{width:work.width,height:work.height});
-    await letOverlayPaint();
-    const mask=offlinePortraitMask(work);
+    const work=await getWorkCanvas(operation);setStatus(`Detectando ${label.toLowerCase()}…`,'loading');await letOverlayPaint();
+    const person=offlinePortraitMask(work),mask=profileMask(person,work.width,work.height,mode,work);
     if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
-    await setMask(mask,work.width,work.height,'Persona');
-    setStatus('Persona segmentada. Ya puedes quitar el fondo.','ready');api().toast('Máscara de persona lista');
-  }catch(err){const msg=friendlyError(err);logDebug('SEGMENTAR PERSONA: ERROR',err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
-  finally{finishOperation(operation);}
+    const selected=mask.reduce((n,v)=>n+(v>80),0);if(selected<work.width*work.height*.006)throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
+    await setMask(mask,work.width,work.height,label);setStatus(`${label} seleccionado. Puedes editarlo, refinar la máscara o quitar el fondo.`,'ready');api().toast(`${label} listo`);
+  }catch(err){const msg=friendlyError(err);logDebug(`SEGMENTAR ${mode}: ERROR`,err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}finally{finishOperation(operation);}
 }
+const segmentPerson=()=>segmentProfile('person');
+const segmentBust=()=>segmentProfile('bust');
+const segmentFace=()=>segmentProfile('face');
+const segmentSkin=()=>segmentProfile('skin');
+function restoreBackground(){const photo=api()?.state?.photo;if(!photo)return;photo.visible=true;api().state.canvas.requestRenderAll();api().snapshot?.();setStatus('Imagen completa visible. Los cambios de las capas permanecen.','ready');api().toast('Fondo restaurado');}
+function isolateSelection(){const photo=api()?.state?.photo;if(!photo||!state.mask)return api()?.toast('Primero crea una selección.');createCutout();}
 function canvasPointToNormalized(pointer){
   const photo=api().state.photo;const bounds=photo.getBoundingRect(true,true);
   const x=(pointer.x-bounds.left)/bounds.width,y=(pointer.y-bounds.top)/bounds.height;
@@ -456,7 +484,7 @@ async function createCutout(){
   }catch(err){const msg=friendlyError(err);console.error(err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
   finally{finishOperation(operation);}
 }
-function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
+function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/identificacion|credencial|selecciona.*busto/.test(t)){segmentBust();return true;}if(/selecciona.*rostro|solo.*cara|solo.*rostro/.test(t)){segmentFace();return true;}if(/selecciona.*piel|solo.*piel/.test(t)){segmentSkin();return true;}if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/regresa.*fondo|restaura.*fondo|muestra.*imagen completa/.test(t)){restoreBackground();return true;}if(/refina.*mascara|mejora.*mascara/.test(t)){refineCurrentMask();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
 function boot(){
   if(!$('segment-person'))return;
   $('segment-person').onclick=segmentPerson;$('segment-tap').onclick=beginTapMode;$('segment-show').onclick=()=>showMask(true);$('segment-hide').onclick=()=>showMask(false);$('segment-clear').onclick=clearMask;$('segment-cutout').onclick=createCutout;
@@ -469,7 +497,7 @@ function boot(){
   logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor 8.3 local listo. No descarga BodyPix ni modelos externos.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
-window.PhotoSegmentation={version:VERSION,segmentPerson,beginTapMode,createCutout,clearMask,showMask,cancel:()=>cancelCurrent(true),command,get mask(){return state.mask}};
+window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,cancel:()=>cancelCurrent(true),command,get mask(){return state.mask}};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();
 })();

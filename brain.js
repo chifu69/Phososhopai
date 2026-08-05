@@ -213,6 +213,7 @@ register({name:'context',score:t=>/^(?:ahora\s+)?(?:hazlo|ponlo|cambialo|muevelo
   if(/desbloquea/.test(t)){o.userLocked=false;o.set({selectable:true,evented:true});changed=true;}else if(/bloquea/.test(t)){o.userLocked=true;o.set({selectable:false,evented:false});c.discardActiveObject();changed=true;}
   if(changed){o.setCoords();c.requestRenderAll();snapshot();remember(o,'context');say('Objeto actualizado.');}else say('No identifiqué qué cambio hacerle al objeto.','warn');
 }});
+register({name:'photo-critic',score:t=>/(cara|rostro).*(oscura|sombra|clara|quemada|brillante)|menos cansad|ojeras|solo.*fondo|mejora.*fondo|solo.*piel|identificacion|credencial|pasaporte|regresa.*fondo|restaura.*fondo/.test(t)?180:0,run(t,raw){Promise.resolve(api().executeLegacyCommand(raw)).catch(err=>say(err?.message||'No pude completar la edición regional.','error'));}});
 register({name:'filters',score:t=>/blanco y negro|escala de grises|profesional|retrato|vibrante|mas color|brillo|contraste|nitidez|desenfoc/.test(t)?100:0,run(t){
   if(/blanco y negro|escala de grises/.test(t))api().applyPreset('bw');else if(/profesional|mejora/.test(t))api().applyPreset('professional');else if(/retrato/.test(t))api().applyPreset('portrait');else if(/vibrante|mas color/.test(t))api().applyPreset('vivid');
   else if(/brillo/.test(t)){const el=$('brightness'),delta=/menos|baja|reduce|oscure/.test(t)?-20:20;el.value=Math.max(-100,Math.min(100,Number(el.value)+delta));api().applySlider('brightness',el.value,true);}

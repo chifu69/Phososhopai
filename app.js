@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='12.2-edge-docks-expanded-workspace';
+const VERSION='13.1-photo-critic-regional-intelligence';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -114,6 +114,14 @@ function getPhotoAnalysisCanvas(max=900){
  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
  ctx.drawImage(source,0,0,sw,sh,0,0,canvas.width,canvas.height);
  return canvas;
+}
+
+async function getOriginalAnalysisCanvas(max=1800){
+ if(!state.originalDataUrl)throw new Error('Abre una foto primero.');
+ const img=await new Promise((resolve,reject)=>{const im=new Image();im.decoding='async';im.onload=()=>resolve(im);im.onerror=()=>reject(new Error('No pude leer la fotografía original.'));im.src=state.originalDataUrl});
+ const sw=img.naturalWidth||img.width,sh=img.naturalHeight||img.height,ratio=Math.min(1,max/Math.max(sw,sh));
+ const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(sw*ratio));canvas.height=Math.max(1,Math.round(sh*ratio));
+ const ctx=canvas.getContext('2d',{alpha:false,willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,sw,sh,0,0,canvas.width,canvas.height);return canvas;
 }
 
 function normalizePhotoVisualState(){
@@ -291,9 +299,12 @@ async function applyPreset(name){
   toast(name==='bw'?'Blanco y negro aplicado':'Mejora aplicada desde la foto original');
  }finally{processing(false)}
 }
-function executeCommand(raw){
+async function executeCommand(raw){
  const t=normalize(raw);
  if(!t)return toast('Escribe una instrucción.');
+ const handledBySmart=await window.PhotoSmartCore?.understand?.(raw);
+ if(handledBySmart)return true;
+ if(window.PhotoSegmentation?.command?.(raw))return true;
 
  // Nombres internos usados por los botones. Se ejecutan directamente y nunca
  // dependen del intérprete de lenguaje natural.
@@ -427,7 +438,7 @@ window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv
 window.PhotoIA={
   get state(){return state},
   snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,restoreJSON,undo,redo,reset,download,
-  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
+  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,getOriginalAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
 };
 document.addEventListener('DOMContentLoaded',()=>{init();window.dispatchEvent(new CustomEvent('photoia-ready'))});
 })();

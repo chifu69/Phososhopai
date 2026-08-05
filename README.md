@@ -1,4 +1,4 @@
-# PHOTO IA 13.0 —  Mobile Pro UI
+# PHOTO IA 13.1 —  Mobile Pro UI
 
 - La foto adapta automáticamente el alto del lienzo a su proporción.
 - Ocupa prácticamente todo el cuadro sin deformarse ni recortarse.
