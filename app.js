@@ -262,13 +262,34 @@ async function applyProcessedImageDataUrl(dataUrl,commit=true){
  state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();resetSliderUI();normalizePhotoVisualState();state.canvas.requestRenderAll();if(commit)snapshot();return true;
 }
 
-function applyPreset(name){if(!state.photo)return;resetSliderUI();state.photo.filters=[];const F=fabric.Image.filters;
- const add=(key,f)=>{f.__key=key;state.photo.filters.push(f)};
- if(name==='bw')add('preset',new F.Grayscale());
- if(name==='vivid'){add('brightness',new F.Brightness({brightness:.05}));add('contrast',new F.Contrast({contrast:.15}));add('saturation',new F.Saturation({saturation:.35}))}
- if(name==='portrait'){add('brightness',new F.Brightness({brightness:.06}));add('contrast',new F.Contrast({contrast:.05}));add('saturation',new F.Saturation({saturation:.06}));add('blur',new F.Blur({blur:.025}))}
- if(name==='auto'||name==='professional'){add('brightness',new F.Brightness({brightness:.04}));add('contrast',new F.Contrast({contrast:.12}));add('saturation',new F.Saturation({saturation:.16}));add('sharpness',new F.Convolute({matrix:[0,-.15,0,-.15,1.6,-.15,0,-.15,0]}))}
- state.photo.applyFilters();state.canvas.requestRenderAll();snapshot();toast(name==='bw'?'Blanco y negro aplicado':'Ajuste aplicado')
+async function applyPreset(name){
+ if(!state.photo||!state.originalDataUrl)return;
+ processing(true,'Aplicando mejora…');
+ try{
+  // Siempre parte de la fotografía base. Pulsar el mismo botón varias veces
+  // produce exactamente el mismo resultado y nunca acumula filtros.
+  const previous=state.photo;
+  const props={left:previous.left,top:previous.top,scaleX:previous.scaleX,scaleY:previous.scaleY,angle:previous.angle,flipX:previous.flipX,flipY:previous.flipY,originX:previous.originX,originY:previous.originY};
+  const fresh=await fabricImageFromURL(state.originalDataUrl);
+  fresh.photoRole='main';fresh.layerId='layer-photo';fresh.layerName='Fotografía';fresh.layerType='photo';
+  fresh.set({...props,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
+  fresh.filters=[];const F=fabric.Image.filters;
+  const add=(key,f)=>{f.__key=key;fresh.filters.push(f)};
+  if(name==='bw')add('preset',new F.Grayscale());
+  if(name==='vivid'){add('brightness',new F.Brightness({brightness:.035}));add('contrast',new F.Contrast({contrast:.10}));add('saturation',new F.Saturation({saturation:.24}))}
+  if(name==='portrait'){add('brightness',new F.Brightness({brightness:.035}));add('contrast',new F.Contrast({contrast:.025}));add('saturation',new F.Saturation({saturation:.035}));add('blur',new F.Blur({blur:.012}))}
+  if(name==='auto'||name==='professional'){
+    add('brightness',new F.Brightness({brightness:.028}));
+    add('contrast',new F.Contrast({contrast:.075}));
+    add('saturation',new F.Saturation({saturation:.09}));
+    add('sharpness',new F.Convolute({matrix:[0,-.07,0,-.07,1.28,-.07,0,-.07,0]}));
+  }
+  fresh.applyFilters();
+  state.canvas.remove(previous);state.photo=fresh;state.canvas.add(fresh);state.canvas.sendToBack(fresh);fresh.setCoords();
+  resetSliderUI();normalizePhotoVisualState();state.canvas.requestRenderAll();snapshot();
+  document.dispatchEvent(new CustomEvent('photoia:preset-applied',{detail:{name}}));
+  toast(name==='bw'?'Blanco y negro aplicado':'Mejora aplicada desde la foto original');
+ }finally{processing(false)}
 }
 function executeCommand(raw){
  const t=normalize(raw);
@@ -405,7 +426,7 @@ window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv
 
 window.PhotoIA={
   get state(){return state},
-  snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,
+  snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,restoreJSON,undo,redo,reset,download,
   setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
 };
 document.addEventListener('DOMContentLoaded',()=>{init();window.dispatchEvent(new CustomEvent('photoia-ready'))});

@@ -1,13 +1,13 @@
 {
-  "name": "PHOTO IA 12.4",
+  "name": "PHOTO IA 13.0 Professional",
   "short_name": "PHOTO IA",
-  "description": "Editor fotográfico privado con interfaz Mobile Pro, Fabric, OpenCV y conexión opcional al Alienware.",
-  "start_url": "./?v=12.4-full-canvas-layout",
+  "description": "Editor fotográfico privado con Adaptive Workspace, Fabric, OpenCV y Alienware opcional.",
+  "start_url": "./?v=13.0-professional-adaptive",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
-  "orientation": "portrait-primary",
+  "orientation": "any",
   "icons": [],
   "scope": "./",
-  "id": "photo-ia-12-mobile-pro-ui"
+  "id": "photo-ia-13-professional-adaptive"
 }
