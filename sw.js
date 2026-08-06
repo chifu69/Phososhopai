@@ -1,18 +1,18 @@
-const CACHE='photo-ia-13-2-background-preserve';
-const VERSION='13.2';
+const CACHE='photo-ia-13-3-identity-lock';
+const VERSION='13.3';
 const CORE=[
- './','./index.html','./styles.css?v=13.2-background-preserve','./ui-layout.js?v=13.2-background-preserve','./app.js?v=13.2-background-preserve',
- './creative-tools.js?v=13.2-background-preserve','./brain.js?v=13.2-background-preserve',
- './opencv-engine.js?v=13.2-background-preserve','./smart-core.js?v=13.2-background-preserve','./ai-studio.js?v=13.2-background-preserve',
- './vision.js?v=13.2-background-preserve','./segmentation.js?v=13.2-background-preserve','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=13.3-identity-lock','./ui-layout.js?v=13.3-identity-lock','./app.js?v=13.3-identity-lock',
+ './creative-tools.js?v=13.3-identity-lock','./brain.js?v=13.3-identity-lock',
+ './opencv-engine.js?v=13.3-identity-lock','./smart-core.js?v=13.3-identity-lock','./ai-studio.js?v=13.3-identity-lock',
+ './vision.js?v=13.3-identity-lock','./segmentation.js?v=13.3-identity-lock','./manifest.webmanifest'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=13.2-background-preserve',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=13.2-background-preserve',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=13.2-background-preserve',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=13.2-background-preserve',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=13.2-background-preserve',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=13.2-background-preserve',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/vendor/fabric.min.js?v=13.3-identity-lock',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=13.3-identity-lock',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=13.3-identity-lock',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=13.3-identity-lock',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=13.3-identity-lock',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=13.3-identity-lock',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
  {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe opcional',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},

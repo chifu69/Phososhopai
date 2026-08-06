@@ -6,8 +6,33 @@ const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(loca
 const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},online:false,mode:'image_edit'};
 function app(){return window.PhotoIA}
 function toast(m){app()?.toast?.(m)}
-function read(){try{const x=JSON.parse(localStorage.getItem(STORE)||'{}');state.settings={...state.settings,...(x.settings||{})};state.history=Array.isArray(x.history)?x.history.slice(0,8):[]}catch{}}
-function save(){localStorage.setItem(STORE,JSON.stringify({settings:state.settings,history:state.history.slice(0,8)}))}
+function read(){
+ try{
+  const x=JSON.parse(localStorage.getItem(STORE)||'{}');
+  state.settings={...state.settings,...(x.settings||{})};
+  // Los resultados contienen imágenes grandes. Se mantienen solo en memoria
+  // para no llenar el almacenamiento limitado de Safari/iPhone.
+  state.history=[];
+  if(Array.isArray(x.history)&&x.history.length){
+   try{localStorage.removeItem(STORE)}catch(_){}
+   safeSaveSettings();
+  }
+ }catch(_){
+  state.history=[];
+ }
+}
+function safeSaveSettings(){
+ try{
+  // Elimina primero versiones antiguas que podían guardar imágenes Base64.
+  localStorage.removeItem(STORE);
+  localStorage.setItem(STORE,JSON.stringify({settings:state.settings}));
+  return true;
+ }catch(err){
+  console.warn('[PHOTO IA] No se pudo guardar la configuración local:',err);
+  return false;
+ }
+}
+function save(){return safeSaveSettings()}
 function setBadge(mode,text){const el=$('ai-server-badge');el.className=`ai-server-badge ${mode}`;el.innerHTML=`<i></i>${text}`;state.online=mode==='online'}
 function setStatus(mode,title,detail,pct=0){const box=$('ai-job-status');box.className=`ai-job-status ${mode}`;box.querySelector('strong').textContent=title;box.querySelector('small').textContent=detail;$('ai-progress-text').textContent=`${Math.round(pct)}%`;$('ai-progress-bar').style.width=`${Math.max(0,Math.min(100,pct))}%`}
 function dataUrlToBlob(data){const [head,b64]=data.split(',');const mime=(head.match(/:(.*?);/)||[])[1]||'image/jpeg';const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime})}
@@ -17,36 +42,135 @@ function useCanvas(silent=false){const d=canvasImage();if(!d){if(!silent)toast('
 function chooseFile(input,key,previewId){const f=input.files?.[0];if(!f)return;state[key]=f;preview(previewId,f,key==='main'?'📷':'＋',key==='main'?'Foto principal':'Referencia');if(key==='reference')$('ai-clear-reference').disabled=false}
 function renderHistory(){const wrap=$('ai-history');wrap.innerHTML='';if(!state.history.length){wrap.innerHTML='<p class="layers-empty">Todavía no hay resultados del Estudio IA.</p>';return}state.history.forEach((item,i)=>{const d=document.createElement('div');d.className='ai-history-item';d.innerHTML=`<img alt="Resultado IA ${i+1}" src="${item.image}"><button type="button">Usar resultado</button>`;d.querySelector('button').onclick=async()=>{await app()?.setMainImage?.(item.image,'Resultado Estudio IA');toast('Resultado colocado en el lienzo')};wrap.appendChild(d)})}
 async function testConnection(){const raw=$('ai-server-url').value.trim().replace(/\/$/,'');if(!raw){setBadge('offline','Falta dirección');return toast('Escribe la dirección del servidor.')}setBadge('testing','Probando…');$('ai-connection-note').textContent='Buscando Photoshop AI Server…';const c=new AbortController();const timer=setTimeout(()=>c.abort(),5000);try{const r=await fetch(`${raw}/health`,{headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},signal:c.signal,cache:'no-store'});if(!r.ok){let detail='';try{const j=await r.json();detail=j.detail||j.error||''}catch{};if(r.status===401)throw new Error(detail||'Token incorrecto');throw new Error(detail||`HTTP ${r.status}`)};const info=await r.json().catch(()=>({}));const ready=info.ready!==false;setBadge(ready?'online':'testing',ready?'PC lista':'Falta configurar');$('ai-connection-note').textContent=`Conectada${info.gpu?` • ${info.gpu}`:''}${info.model?` • ${info.model}`:''}${info.workflowReady===false?' • Falta workflow API':''}`;state.online=ready;toast(ready?'Alienware conectado':'Servidor conectado; falta terminar el workflow')}catch(e){setBadge('offline','PC desconectada');const msg=e?.name==='AbortError'?'Tiempo de espera agotado':(e?.message||'Servidor no disponible');$('ai-connection-note').textContent=msg;toast(msg)}finally{clearTimeout(timer)}}
-function saveSettings(){state.settings.url=$('ai-server-url').value.trim().replace(/\/$/,'');state.settings.token=$('ai-server-token').value.trim();save();toast('Conexión guardada')}
+function saveSettings(){
+ state.settings.url=$('ai-server-url').value.trim().replace(/\/$/,'');
+ state.settings.token=$('ai-server-token').value.trim();
+ const stored=save();
+ toast(stored?'Conexión guardada':'Conexión lista; Safari no permitió guardarla permanentemente');
+}
 async function sourceBlob(source){if(source instanceof File)return source;if(typeof source==='string'&&source.startsWith('data:'))return dataUrlToBlob(source);throw new Error('No hay fotografía principal.')}
 function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('No pude abrir una de las imágenes.'));img.src=src;});}
-async function preserveOriginalSubject(generated,original,maskDataUrl){
+function normalizedText(value){
+ return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+}
+function classifyEdit(prompt){
+ const t=normalizedText(prompt);
+ const clothing=/\b(ropa|camisa|playera|pantalon|vestido|traje|chaqueta|chamarra|abrigo|sueter|sudadera|uniforme|zapatos|botas|gorra|sombrero|ponme|visteme|cambia.*ropa|wear|shirt|pants|dress|jacket|coat|sweater|outfit|uniform|shoes|boots|hat)\b/.test(t);
+ const scene=/\b(fondo|paisaje|playa|alaska|nieve|montana|bosque|ciudad|calle|atardecer|amanecer|desierto|campo|oficina|estudio|background|beach|snow|mountain|forest|city|sunset|desert|landscape)\b/.test(t)||state.mode==='replace_background';
+ if(scene&&clothing)return 'scene_and_wardrobe';
+ if(scene)return 'background_only';
+ if(clothing)return 'wardrobe_only';
+ return 'general_edit';
+}
+function maskStats(maskPixels,sourcePixels,generatedPixels){
+ let sr=0,sg=0,sb=0,gr=0,gg=0,gb=0,n=0;
+ for(let i=0;i<maskPixels.length;i+=4){
+  const a=maskPixels[i+3]/255;
+  if(a<.12)continue;
+  sr+=sourcePixels[i]*a;sg+=sourcePixels[i+1]*a;sb+=sourcePixels[i+2]*a;
+  gr+=generatedPixels[i]*a;gg+=generatedPixels[i+1]*a;gb+=generatedPixels[i+2]*a;
+  n+=a;
+ }
+ if(!n)return null;
+ return {source:[sr/n,sg/n,sb/n],generated:[gr/n,gg/n,gb/n]};
+}
+async function compositeLockedRegion(generated,original,maskDataUrl,{lightingStrength=.30}={}){
  const [bg,src,mask]=await Promise.all([loadImage(generated),loadImage(original),loadImage(maskDataUrl)]);
- const out=document.createElement('canvas');out.width=bg.naturalWidth||bg.width;out.height=bg.naturalHeight||bg.height;
- const ctx=out.getContext('2d');ctx.drawImage(bg,0,0,out.width,out.height);
- const subject=document.createElement('canvas');subject.width=out.width;subject.height=out.height;
- const sctx=subject.getContext('2d');sctx.drawImage(src,0,0,out.width,out.height);sctx.globalCompositeOperation='destination-in';sctx.drawImage(mask,0,0,out.width,out.height);sctx.globalCompositeOperation='source-over';
- ctx.drawImage(subject,0,0);return out.toDataURL('image/png');
+ const w=bg.naturalWidth||bg.width,h=bg.naturalHeight||bg.height;
+ const out=document.createElement('canvas');out.width=w;out.height=h;
+ const ctx=out.getContext('2d',{willReadFrequently:true});ctx.drawImage(bg,0,0,w,h);
+ const srcCanvas=document.createElement('canvas');srcCanvas.width=w;srcCanvas.height=h;
+ const sctx=srcCanvas.getContext('2d',{willReadFrequently:true});sctx.drawImage(src,0,0,w,h);
+ const maskCanvas=document.createElement('canvas');maskCanvas.width=w;maskCanvas.height=h;
+ const mctx=maskCanvas.getContext('2d',{willReadFrequently:true});mctx.drawImage(mask,0,0,w,h);
+
+ const generatedPixels=ctx.getImageData(0,0,w,h);
+ const sourcePixels=sctx.getImageData(0,0,w,h);
+ const maskPixels=mctx.getImageData(0,0,w,h);
+ const stats=maskStats(maskPixels.data,sourcePixels.data,generatedPixels.data);
+
+ let gain=[1,1,1],offset=[0,0,0];
+ if(stats){
+  for(let c=0;c<3;c++){
+   const s=Math.max(18,stats.source[c]),g=stats.generated[c];
+   const rawGain=Math.max(.72,Math.min(1.28,g/s));
+   gain[c]=1+(rawGain-1)*lightingStrength;
+   offset[c]=Math.max(-18,Math.min(18,(g-s)*lightingStrength*.45));
+  }
+ }
+ const outData=generatedPixels.data,srcData=sourcePixels.data,maskData=maskPixels.data;
+ for(let i=0;i<outData.length;i+=4){
+  const a=maskData[i+3]/255;
+  if(a<=0)continue;
+  for(let c=0;c<3;c++){
+   const adjusted=Math.max(0,Math.min(255,srcData[i+c]*gain[c]+offset[c]));
+   outData[i+c]=Math.round(outData[i+c]*(1-a)+adjusted*a);
+  }
+  outData[i+3]=255;
+ }
+ ctx.putImageData(generatedPixels,0,0);
+ return out.toDataURL('image/png');
 }
 async function prepareTask(prompt){
- const background=state.mode==='replace_background';
- if(!background)return {prompt,task:'general_edit',source:state.main,mask:''};
- setStatus('processing','Protegiendo a la persona','Creando una máscara para conservar rostro, cabello, ropa y cuerpo…',6);
- await window.PhotoSegmentation?.segmentPerson?.();
- const mask=window.PhotoSegmentation?.exportMaskDataUrl?.()||'';
- const source=window.PhotoSegmentation?.exportSourceDataUrl?.()||state.main;
- if(!mask)throw new Error('No pude separar a la persona. Usa Selección IA y vuelve a intentarlo.');
- const directed=`${prompt}\n\nINSTRUCCIONES DE EDICIÓN: modifica solamente el fondo. No cambies la persona, rostro, ojos, nariz, boca, piel, cabello, ropa, manos, pose ni proporciones. Mantén exactamente la identidad y la expresión. Crea un fondo fotográfico realista que coincida con la perspectiva, profundidad de campo e iluminación.`;
- return {prompt:directed,task:'replace_background',source,mask};
+ const task=classifyEdit(prompt);
+ const segmentation=window.PhotoSegmentation;
+ let source=state.main,personMask='',identityMask='';
+
+ if(task==='background_only'||task==='scene_and_wardrobe'||task==='wardrobe_only'){
+  setStatus('processing','Identity Lock','Detectando a la persona y bloqueando el rostro original…',6);
+  await segmentation?.segmentPerson?.();
+  personMask=segmentation?.exportMaskDataUrl?.()||'';
+  source=segmentation?.exportSourceDataUrl?.()||state.main;
+  if(!personMask)throw new Error('No pude separar a la persona. Usa Selección IA y vuelve a intentarlo.');
+
+  if(task!=='background_only'){
+   await segmentation?.segmentFace?.();
+   identityMask=segmentation?.exportMaskDataUrl?.()||'';
+   if(!identityMask)throw new Error('No pude crear el bloqueo facial. Intenta con una foto donde el rostro sea visible.');
+  }
+ }
+
+ let directed=prompt;
+ if(task==='background_only'){
+  directed=`${prompt}
+
+IDENTITY LOCK — CAMBIO DE FONDO:
+Cambia únicamente el ambiente y el fondo. Conserva exactamente la misma persona, rostro, cabello, expresión, cuerpo, pose, manos y ropa. No reconstruyas ni embellezcas la cara. Ajusta de forma realista la dirección de la luz, temperatura de color, sombras y reflejos para integrar a la persona con el nuevo paisaje.`;
+ }else if(task==='wardrobe_only'){
+  directed=`${prompt}
+
+IDENTITY LOCK — CAMBIO DE ROPA:
+Modifica exclusivamente la ropa solicitada y ajústala al cuerpo, pose, perspectiva y pliegues naturales. Conserva exactamente el rostro, ojos, nariz, boca, piel, cabello, edad, expresión, manos y proporciones. No redibujes la cara. Mantén el fondo original salvo que la instrucción diga lo contrario.`;
+ }else if(task==='scene_and_wardrobe'){
+  directed=`${prompt}
+
+IDENTITY LOCK — ESCENARIO Y VESTUARIO:
+Conserva exactamente el rostro, cabello, identidad, edad, expresión, pose, manos y proporciones de la persona original. Puedes cambiar el paisaje y adaptar la ropa de manera lógica al ambiente solicitado (por ejemplo, ropa de invierno para Alaska). Ajusta iluminación, temperatura de color, sombras y reflejos del rostro para que coincidan con el nuevo entorno, sin alterar ningún rasgo facial.`;
+ }else{
+  directed=`${prompt}
+
+IDENTITY LOCK:
+Preserva exactamente el rostro, identidad, cabello, edad y expresión salvo que el usuario pida explícitamente editar el rostro. Realiza únicamente el cambio solicitado.`;
+ }
+ return {prompt:directed,task,source,personMask,identityMask};
 }
 
 async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
  state.controller=new AbortController();$('ai-generate').disabled=true;$('ai-cancel-job').hidden=false;setStatus('processing','Enviando fotografías','Preparando la tarea para FLUX.2 Klein…',12);
- try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile',task.task==='replace_background'?'background_preserve':'smart_edit');form.append('task',task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.mask)form.append('mask',await sourceBlob(task.mask),'mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
+ try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile',task.task);form.append('task',task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('allow_wardrobe_change',String(task.task==='wardrobe_only'||task.task==='scene_and_wardrobe'));form.append('adapt_face_lighting','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.personMask)form.append('mask',await sourceBlob(task.personMask),'person-mask.png');if(task.identityMask)form.append('identity_mask',await sourceBlob(task.identityMask),'identity-mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
  const progress=setInterval(()=>{const current=parseInt($('ai-progress-text').textContent)||12;if(current<88)setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando la edición…',current+Math.random()*5)},1200);
  const r=await fetch(`${state.settings.url}/api/v1/edit`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},body:form,signal:state.controller.signal});clearInterval(progress);if(!r.ok){let msg='';try{msg=(await r.json()).error||''}catch{}throw new Error(msg||`Error ${r.status}`)}
  const type=r.headers.get('content-type')||'';let result;if(type.includes('application/json')){const j=await r.json();result=j.image||j.dataUrl||j.result;if(result&&!result.startsWith('data:')&&!result.startsWith('http'))result=`data:image/png;base64,${result}`}else{const blob=await r.blob();result=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob)})}
- if(!result)throw new Error('El servidor no devolvió una imagen.');if(task.task==='replace_background'&&task.mask){setStatus('processing','Protegiendo identidad','Recolocando la persona original sin reconstruir su rostro…',94);result=await preserveOriginalSubject(result,task.source,task.mask);}setStatus('done','Edición terminada',task.task==='replace_background'?'Fondo cambiado; la persona original fue preservada.':'El resultado se colocó en el lienzo.',100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
+ if(!result)throw new Error('El servidor no devolvió una imagen.');
+ if(task.task==='background_only'&&task.personMask){
+  setStatus('processing','Identity Lock','Restaurando la persona original y adaptando su iluminación…',94);
+  result=await compositeLockedRegion(result,task.source,task.personMask,{lightingStrength:.24});
+ }else if((task.task==='wardrobe_only'||task.task==='scene_and_wardrobe')&&task.identityMask){
+  setStatus('processing','Identity Lock','Restaurando el rostro original y adaptando la luz al ambiente…',94);
+  result=await compositeLockedRegion(result,task.source,task.identityMask,{lightingStrength:.38});
+ }
+ const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Ropa cambiada; el rostro original quedó bloqueado.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; el rostro original quedó bloqueado.':'El resultado se colocó en el lienzo.';
+ setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
  }catch(e){if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
 function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();
  $('ai-choose-reference').onclick=()=>$('ai-reference-file').click();$('ai-reference-file').onchange=e=>chooseFile(e.target,'reference','ai-reference-preview');$('ai-clear-reference').onclick=()=>{state.reference=null;$('ai-reference-file').value='';preview('ai-reference-preview',null,'＋','Persona, ropa o estilo');$('ai-clear-reference').disabled=true};
