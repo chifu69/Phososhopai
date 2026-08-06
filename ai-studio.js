@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id);
-const STORE='photoia-ai-studio-v3';
+const STORE='photoia-ai-studio-v4';
 const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(location.protocol==='http:'&&location.port==='8189'))?location.origin:'';
 const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},online:false,mode:'image_edit'};
 function app(){return window.PhotoIA}
@@ -19,13 +19,34 @@ function renderHistory(){const wrap=$('ai-history');wrap.innerHTML='';if(!state.
 async function testConnection(){const raw=$('ai-server-url').value.trim().replace(/\/$/,'');if(!raw){setBadge('offline','Falta dirección');return toast('Escribe la dirección del servidor.')}setBadge('testing','Probando…');$('ai-connection-note').textContent='Buscando Photoshop AI Server…';const c=new AbortController();const timer=setTimeout(()=>c.abort(),5000);try{const r=await fetch(`${raw}/health`,{headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},signal:c.signal,cache:'no-store'});if(!r.ok){let detail='';try{const j=await r.json();detail=j.detail||j.error||''}catch{};if(r.status===401)throw new Error(detail||'Token incorrecto');throw new Error(detail||`HTTP ${r.status}`)};const info=await r.json().catch(()=>({}));const ready=info.ready!==false;setBadge(ready?'online':'testing',ready?'PC lista':'Falta configurar');$('ai-connection-note').textContent=`Conectada${info.gpu?` • ${info.gpu}`:''}${info.model?` • ${info.model}`:''}${info.workflowReady===false?' • Falta workflow API':''}`;state.online=ready;toast(ready?'Alienware conectado':'Servidor conectado; falta terminar el workflow')}catch(e){setBadge('offline','PC desconectada');const msg=e?.name==='AbortError'?'Tiempo de espera agotado':(e?.message||'Servidor no disponible');$('ai-connection-note').textContent=msg;toast(msg)}finally{clearTimeout(timer)}}
 function saveSettings(){state.settings.url=$('ai-server-url').value.trim().replace(/\/$/,'');state.settings.token=$('ai-server-token').value.trim();save();toast('Conexión guardada')}
 async function sourceBlob(source){if(source instanceof File)return source;if(typeof source==='string'&&source.startsWith('data:'))return dataUrlToBlob(source);throw new Error('No hay fotografía principal.')}
+function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('No pude abrir una de las imágenes.'));img.src=src;});}
+async function preserveOriginalSubject(generated,original,maskDataUrl){
+ const [bg,src,mask]=await Promise.all([loadImage(generated),loadImage(original),loadImage(maskDataUrl)]);
+ const out=document.createElement('canvas');out.width=bg.naturalWidth||bg.width;out.height=bg.naturalHeight||bg.height;
+ const ctx=out.getContext('2d');ctx.drawImage(bg,0,0,out.width,out.height);
+ const subject=document.createElement('canvas');subject.width=out.width;subject.height=out.height;
+ const sctx=subject.getContext('2d');sctx.drawImage(src,0,0,out.width,out.height);sctx.globalCompositeOperation='destination-in';sctx.drawImage(mask,0,0,out.width,out.height);sctx.globalCompositeOperation='source-over';
+ ctx.drawImage(subject,0,0);return out.toDataURL('image/png');
+}
+async function prepareTask(prompt){
+ const background=state.mode==='replace_background';
+ if(!background)return {prompt,task:'general_edit',source:state.main,mask:''};
+ setStatus('processing','Protegiendo a la persona','Creando una máscara para conservar rostro, cabello, ropa y cuerpo…',6);
+ await window.PhotoSegmentation?.segmentPerson?.();
+ const mask=window.PhotoSegmentation?.exportMaskDataUrl?.()||'';
+ const source=window.PhotoSegmentation?.exportSourceDataUrl?.()||state.main;
+ if(!mask)throw new Error('No pude separar a la persona. Usa Selección IA y vuelve a intentarlo.');
+ const directed=`${prompt}\n\nINSTRUCCIONES DE EDICIÓN: modifica solamente el fondo. No cambies la persona, rostro, ojos, nariz, boca, piel, cabello, ropa, manos, pose ni proporciones. Mantén exactamente la identidad y la expresión. Crea un fondo fotográfico realista que coincida con la perspectiva, profundidad de campo e iluminación.`;
+ return {prompt:directed,task:'replace_background',source,mask};
+}
+
 async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
  state.controller=new AbortController();$('ai-generate').disabled=true;$('ai-cancel-job').hidden=false;setStatus('processing','Enviando fotografías','Preparando la tarea para FLUX.2 Klein…',12);
- try{const form=new FormData();form.append('prompt',prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile','smart_edit');form.append('image',await sourceBlob(state.main),'main.jpg');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
+ try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile',task.task==='replace_background'?'background_preserve':'smart_edit');form.append('task',task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.mask)form.append('mask',await sourceBlob(task.mask),'mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
  const progress=setInterval(()=>{const current=parseInt($('ai-progress-text').textContent)||12;if(current<88)setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando la edición…',current+Math.random()*5)},1200);
  const r=await fetch(`${state.settings.url}/api/v1/edit`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},body:form,signal:state.controller.signal});clearInterval(progress);if(!r.ok){let msg='';try{msg=(await r.json()).error||''}catch{}throw new Error(msg||`Error ${r.status}`)}
  const type=r.headers.get('content-type')||'';let result;if(type.includes('application/json')){const j=await r.json();result=j.image||j.dataUrl||j.result;if(result&&!result.startsWith('data:')&&!result.startsWith('http'))result=`data:image/png;base64,${result}`}else{const blob=await r.blob();result=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob)})}
- if(!result)throw new Error('El servidor no devolvió una imagen.');setStatus('done','Edición terminada','El resultado se colocó en el lienzo.',100);state.history.unshift({image:result,prompt,date:Date.now()});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
+ if(!result)throw new Error('El servidor no devolvió una imagen.');if(task.task==='replace_background'&&task.mask){setStatus('processing','Protegiendo identidad','Recolocando la persona original sin reconstruir su rostro…',94);result=await preserveOriginalSubject(result,task.source,task.mask);}setStatus('done','Edición terminada',task.task==='replace_background'?'Fondo cambiado; la persona original fue preservada.':'El resultado se colocó en el lienzo.',100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
  }catch(e){if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
 function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();
  $('ai-choose-reference').onclick=()=>$('ai-reference-file').click();$('ai-reference-file').onchange=e=>chooseFile(e.target,'reference','ai-reference-preview');$('ai-clear-reference').onclick=()=>{state.reference=null;$('ai-reference-file').value='';preview('ai-reference-preview',null,'＋','Persona, ropa o estilo');$('ai-clear-reference').disabled=true};

@@ -497,7 +497,15 @@ function boot(){
   logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor 8.3 local listo. No descarga BodyPix ni modelos externos.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
-window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,cancel:()=>cancelCurrent(true),command,get mask(){return state.mask}};
+function exportMaskDataUrl(){
+  if(!state.mask)return '';
+  const {data,width,height}=state.mask,canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+  const ctx=canvas.getContext('2d',{willReadFrequently:true}),img=ctx.createImageData(width,height);
+  for(let i=0;i<data.length;i++){const v=data[i];img.data[i*4]=255;img.data[i*4+1]=255;img.data[i*4+2]=255;img.data[i*4+3]=v;}
+  ctx.putImageData(img,0,0);return canvas.toDataURL('image/png');
+}
+function exportSourceDataUrl(){return state.workCanvas?.toDataURL?.('image/png')||'';}
+window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get mask(){return state.mask}};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();
 })();
