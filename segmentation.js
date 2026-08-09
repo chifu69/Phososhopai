@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='2.1-selection-ia-fix';
+const VERSION='2.1.1-selection-ia-ios-hotfix';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -489,20 +489,16 @@ function confidenceResultMask(result,w,h){
  return blurMask(resizeMaskNearest(bin,mw,mh,w,h),w,h,1);
 }
 async function intelligentPersonMask(work,operation){
- // Prefer the real semantic model when its optional local core is installed.
- try{
-  setStatus('Usando motor IA para separar la persona…','loading');
-  const segmenter=await ensurePersonSegmenter(operation);
-  const result=await runTask(()=>segmenter.segment(work),operation);
-  const mask=categoryResultMask(result,work.width,work.height);closeResult(result);
-  if(mask){const n=mask.reduce((a,v)=>a+(v>100),0);if(n>work.width*work.height*.025&&n<work.width*work.height*.95){logDebug('PERSONA: MediaPipe correcto',{selected:n});return mask;}}
-  throw makeError('La máscara semántica no fue válida.','MODEL_MASK_INVALID');
- }catch(err){
-  if(operation?.cancelled)throw err;
-  logDebug('PERSONA: usando respaldo local',err);
-  setStatus('Usando selección local compatible…','loading');
-  return offlinePortraitMask(work);
- }
+ // iPhone/GitHub Pages safe path: do NOT wait for optional MediaPipe files.
+ // Those assets may not be uploaded and Safari can remain on the loading spinner
+ // while import/WASM/model initialization times out. The local engine is the
+ // reliable baseline for Selection IA and does not need network/model downloads.
+ if(operation?.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
+ setStatus('Analizando la persona localmente…','loading');
+ await letOverlayPaint();
+ const mask=offlinePortraitMask(work);
+ if(operation?.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
+ return mask;
 }
 async function segmentProfile(mode='person'){
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
@@ -531,18 +527,9 @@ function canvasPointToNormalized(pointer){
 async function segmentAtPoint(x,y){
   const operation=beginOperation('Creando selección inteligente…');setStatus('Analizando el objeto que tocaste…','loading');
   try{
-    const work=await getWorkCanvas(operation);await letOverlayPaint();let mask=null;
-    try{
-      const segmenter=await ensureInteractiveSegmenter(operation);
-      const result=await runTask(()=>segmenter.segment(work,{keypoint:{x,y}}),operation);
-      mask=confidenceResultMask(result,work.width,work.height);closeResult(result);
-      if(!mask||mask.reduce((n,v)=>n+(v>100),0)<120)throw makeError('Selección semántica insuficiente.','INTERACTIVE_MASK_SMALL');
-      logDebug('OBJETO: segmentador interactivo correcto');
-    }catch(modelErr){
-      if(operation.cancelled)throw modelErr;
-      logDebug('OBJETO: respaldo por color/bordes',modelErr);
-      setStatus('Usando selección local por bordes…','loading');mask=magicWandMask(work,x,y);
-    }
+    const work=await getWorkCanvas(operation);await letOverlayPaint();
+    setStatus('Seleccionando el objeto por color y bordes…','loading');
+    const mask=magicWandMask(work,x,y);
     await setMask(mask,work.width,work.height,'Objeto por toque');
     setStatus('Objeto seleccionado. La máscara azul muestra exactamente lo que editarás.','ready');api().toast('Objeto seleccionado');
   }catch(err){const msg=friendlyError(err);logDebug('SELECCIÓN INTELIGENTE: ERROR',err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
