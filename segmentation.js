@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='2.0-adaptive-segmentation';
+const VERSION='2.1-selection-ia-fix';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -124,28 +124,79 @@ function featherMask(mask,width,height){
 }
 
 function maskBounds(mask,w,h,threshold=110){let minX=w,minY=h,maxX=-1,maxY=-1;for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(mask[y*w+x]>=threshold){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y;}}return maxX<0?null:{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1};}
+function morphology(mask,w,h,kind='dilate',radius=1){
+ const out=new Uint8Array(mask.length);
+ for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+  let v=kind==='erode'?255:0;
+  for(let dy=-radius;dy<=radius;dy++)for(let dx=-radius;dx<=radius;dx++){
+   const xx=x+dx,yy=y+dy;if(xx<0||yy<0||xx>=w||yy>=h){if(kind==='erode')v=0;continue;}
+   const p=mask[yy*w+xx];v=kind==='erode'?Math.min(v,p):Math.max(v,p);
+  }
+  out[y*w+x]=v;
+ }
+ return out;
+}
+function closeMask(mask,w,h,radius=1){return morphology(morphology(mask,w,h,'dilate',radius),w,h,'erode',radius);}
+function skinPixel(r,g,b){
+ const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+ const cb=128-.168736*r-.331264*g+.5*b;
+ const cr=128+.5*r-.418688*g-.081312*b;
+ const rgbRule=r>45&&g>28&&b>18&&(mx-mn)>12&&r>g*.92&&r>b*1.04;
+ const ycbcrRule=cr>132&&cr<180&&cb>74&&cb<138;
+ return rgbRule&&ycbcrRule;
+}
+function upperSkinComponent(base,w,h,canvas){
+ const box=maskBounds(base,w,h,75);if(!box||!canvas)return null;
+ const rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+ const candidate=new Uint8Array(base.length);
+ const maxY=Math.min(h-1,Math.round(box.y+box.h*.58));
+ for(let y=Math.max(0,box.y);y<=maxY;y++)for(let x=Math.max(0,box.x);x<Math.min(w,box.x+box.w);x++){
+  const i=y*w+x,j=i*4;if(base[i]>45&&skinPixel(rgba[j],rgba[j+1],rgba[j+2]))candidate[i]=255;
+ }
+ const comp=largestCenterComponent(candidate,w,h),cb=maskBounds(comp,w,h,110);
+ return cb&&cb.w>box.w*.10&&cb.h>box.h*.08?{mask:comp,box:cb}:null;
+}
 function profileMask(base,w,h,mode='person',canvas=null){
  if(mode==='person')return base;
- const box=maskBounds(base,w,h);if(!box)return base;const out=new Uint8Array(base.length);
- if(mode==='bust'||mode==='face'){
-  const top=box.y,bottom=mode==='face'?box.y+box.h*.43:box.y+box.h*.70;
-  const centerX=box.x+box.w/2,half=mode==='face'?box.w*.34:box.w*.54;
-  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(base[i]<80||y<top||y>bottom||Math.abs(x-centerX)>half)continue;out[i]=base[i];}
-  return blurMask(out,w,h,mode==='face'?2:1);
+ const box=maskBounds(base,w,h,75);if(!box)return base;const out=new Uint8Array(base.length);
+ if(mode==='bust'){
+  // A bust is the REAL person silhouette, cropped below the shoulders/upper torso.
+  // Do not replace it with a face/skin rectangle.
+  const bottom=Math.min(h-1,Math.round(box.y+box.h*.66));
+  for(let y=box.y;y<=bottom;y++)for(let x=box.x;x<Math.min(w,box.x+box.w);x++){const i=y*w+x;if(base[i]>45)out[i]=base[i];}
+  return blurMask(closeMask(out,w,h,1),w,h,1);
  }
- if(mode==='skin'&&canvas){
-  const rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
-  const faceTop=box.y,faceBottom=box.y+box.h*.48,centerX=box.x+box.w/2,half=box.w*.38;
-  for(let y=Math.max(0,Math.floor(faceTop));y<Math.min(h,Math.ceil(faceBottom));y++)for(let x=Math.max(0,Math.floor(centerX-half));x<Math.min(w,Math.ceil(centerX+half));x++){
-   const i=y*w+x,j=i*4,r=rgba[j],g=rgba[j+1],b=rgba[j+2],mx=Math.max(r,g,b),mn=Math.min(r,g,b);
-   const isSkin=r>55&&g>32&&b>20&&(mx-mn)>10&&r>g*.92&&r>b*1.05;
-   if(isSkin&&base[i]>45)out[i]=255;
+ if(mode==='face'){
+  const detected=upperSkinComponent(base,w,h,canvas);
+  let fb=detected?.box;
+  if(!fb){fb={x:Math.round(box.x+box.w*.24),y:box.y,w:Math.round(box.w*.52),h:Math.round(box.h*.42)};}
+  // Expand detected facial skin just enough to include eyes, lips and ears, but not hair/neck.
+  const cx=fb.x+fb.w/2,cy=fb.y+fb.h/2;
+  const rx=Math.max(8,fb.w*.64),ry=Math.max(8,fb.h*.62);
+  for(let y=Math.max(0,Math.floor(cy-ry));y<Math.min(h,Math.ceil(cy+ry));y++)for(let x=Math.max(0,Math.floor(cx-rx));x<Math.min(w,Math.ceil(cx+rx));x++){
+   const i=y*w+x,nx=(x-cx)/rx,ny=(y-cy)/ry;if(nx*nx+ny*ny<=1&&base[i]>20)out[i]=255;
   }
   return blurMask(out,w,h,2);
  }
+ if(mode==='skin'&&canvas){
+  const rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+  for(let y=box.y;y<Math.min(h,box.y+box.h);y++)for(let x=box.x;x<Math.min(w,box.x+box.w);x++){
+   const i=y*w+x,j=i*4;if(base[i]>35&&skinPixel(rgba[j],rgba[j+1],rgba[j+2]))out[i]=255;
+  }
+  return blurMask(closeMask(out,w,h,1),w,h,1);
+ }
  return base;
 }
-function refineCurrentMask(){if(!state.mask)return api()?.toast('Primero crea una máscara.');const {data,width,height}=state.mask;let refined=blurMask(data,width,height,1);const binary=new Uint8Array(refined.length);for(let i=0;i<refined.length;i++)binary[i]=refined[i]>72?Math.max(80,refined[i]):0;refined=blurMask(binary,width,height,2);setMask(refined,width,height,state.maskKind||'Selección refinada');setStatus('Máscara refinada: bordes suavizados y pequeños huecos recuperados.','ready');api()?.toast('Máscara refinada');}
+async function refineCurrentMask(){
+ if(!state.mask)return api()?.toast('Primero crea una máscara.');
+ const {data,width,height}=state.mask;
+ // Close pinholes, recover one-pixel gaps, then feather only the edge.
+ let binary=new Uint8Array(data.length);for(let i=0;i<data.length;i++)binary[i]=data[i]>70?255:0;
+ binary=closeMask(binary,width,height,1);
+ let refined=blurMask(binary,width,height,2);
+ await setMask(refined,width,height,state.maskKind||'Selección refinada');
+ setStatus('Máscara refinada: huecos pequeños recuperados y borde suavizado sin cambiar el objeto.','ready');api()?.toast('Máscara refinada');
+}
 function magicWandMask(canvas,nx,ny){
   const ctx=canvas.getContext('2d',{willReadFrequently:true});const {width:w,height:h}=canvas;
   const rgba=ctx.getImageData(0,0,w,h).data;const sx=Math.max(0,Math.min(w-1,Math.round(nx*(w-1)))),sy=Math.max(0,Math.min(h-1,Math.round(ny*(h-1))));
@@ -416,16 +467,54 @@ function closeResult(result){
   try{result?.categoryMask?.close?.();}catch(_){ }
   try{result?.confidenceMasks?.forEach(m=>m.close?.());}catch(_){ }
 }
+function resizeMaskNearest(src,sw,sh,dw,dh){
+ if(sw===dw&&sh===dh)return src;const out=new Uint8Array(dw*dh);
+ for(let y=0;y<dh;y++){const sy=Math.min(sh-1,Math.floor(y*sh/dh));for(let x=0;x<dw;x++){const sx=Math.min(sw-1,Math.floor(x*sw/dw));out[y*dw+x]=src[sy*sw+sx];}}
+ return out;
+}
+function categoryResultMask(result,w,h){
+ const m=result?.categoryMask;if(!m)return null;
+ let raw=null;try{raw=m.getAsUint8Array?.();}catch(_){ }
+ if(!raw?.length)return null;
+ const mw=m.width||w,mh=m.height||h;const bin=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)bin[i]=raw[i]===PERSON_CLASS_ID||raw[i]>0?255:0;
+ return blurMask(resizeMaskNearest(bin,mw,mh,w,h),w,h,1);
+}
+function confidenceResultMask(result,w,h){
+ const masks=result?.confidenceMasks;if(!masks?.length)return null;const m=masks[0];let raw=null;
+ try{raw=m.getAsFloat32Array?.();}catch(_){ }
+ if(!raw?.length){try{const u=m.getAsUint8Array?.();if(u?.length)raw=Float32Array.from(u,v=>v/255);}catch(_){ }}
+ if(!raw?.length)return null;const mw=m.width||w,mh=m.height||h;const bin=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++){const v=raw[i];bin[i]=v>.62?255:v>.38?Math.round((v-.38)/.24*255):0;}
+ return blurMask(resizeMaskNearest(bin,mw,mh,w,h),w,h,1);
+}
+async function intelligentPersonMask(work,operation){
+ // Prefer the real semantic model when its optional local core is installed.
+ try{
+  setStatus('Usando motor IA para separar la persona…','loading');
+  const segmenter=await ensurePersonSegmenter(operation);
+  const result=await runTask(()=>segmenter.segment(work),operation);
+  const mask=categoryResultMask(result,work.width,work.height);closeResult(result);
+  if(mask){const n=mask.reduce((a,v)=>a+(v>100),0);if(n>work.width*work.height*.025&&n<work.width*work.height*.95){logDebug('PERSONA: MediaPipe correcto',{selected:n});return mask;}}
+  throw makeError('La máscara semántica no fue válida.','MODEL_MASK_INVALID');
+ }catch(err){
+  if(operation?.cancelled)throw err;
+  logDebug('PERSONA: usando respaldo local',err);
+  setStatus('Usando selección local compatible…','loading');
+  return offlinePortraitMask(work);
+ }
+}
 async function segmentProfile(mode='person'){
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
   const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro',skin:'Piel'};const label=labels[mode]||labels.person;
   const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);setStatus('Preparando una copia optimizada de la foto…','loading');
   try{
     const work=await getWorkCanvas(operation);setStatus(`Detectando ${label.toLowerCase()}…`,'loading');await letOverlayPaint();
-    const person=offlinePortraitMask(work),mask=profileMask(person,work.width,work.height,mode,work);
+    const person=await intelligentPersonMask(work,operation);
+    const mask=profileMask(person,work.width,work.height,mode,work);
     if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
     const selected=mask.reduce((n,v)=>n+(v>80),0);if(selected<work.width*work.height*.006)throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
-    await setMask(mask,work.width,work.height,label);setStatus(`${label} seleccionado. Puedes editarlo, refinar la máscara o quitar el fondo.`,'ready');api().toast(`${label} listo`);
+    await setMask(mask,work.width,work.height,label);setStatus(`${label} seleccionado. La máscara azul coincide con el área que recibirá la edición.`,'ready');api().toast(`${label} listo`);
   }catch(err){const msg=friendlyError(err);logDebug(`SEGMENTAR ${mode}: ERROR`,err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}finally{finishOperation(operation);}
 }
 const segmentPerson=()=>segmentProfile('person');
@@ -440,11 +529,22 @@ function canvasPointToNormalized(pointer){
   return {x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y)),inside:x>=0&&x<=1&&y>=0&&y<=1};
 }
 async function segmentAtPoint(x,y){
-  const operation=beginOperation('Creando selección inteligente…');setStatus('Analizando colores y bordes cercanos…','loading');
+  const operation=beginOperation('Creando selección inteligente…');setStatus('Analizando el objeto que tocaste…','loading');
   try{
-    const work=await getWorkCanvas(operation);await letOverlayPaint();
-    const mask=magicWandMask(work,x,y);await setMask(mask,work.width,work.height,'Objeto');
-    setStatus('Objeto seleccionado. Si tomó demasiado o muy poco, toca otra zona.','ready');api().toast('Selección inteligente lista');
+    const work=await getWorkCanvas(operation);await letOverlayPaint();let mask=null;
+    try{
+      const segmenter=await ensureInteractiveSegmenter(operation);
+      const result=await runTask(()=>segmenter.segment(work,{keypoint:{x,y}}),operation);
+      mask=confidenceResultMask(result,work.width,work.height);closeResult(result);
+      if(!mask||mask.reduce((n,v)=>n+(v>100),0)<120)throw makeError('Selección semántica insuficiente.','INTERACTIVE_MASK_SMALL');
+      logDebug('OBJETO: segmentador interactivo correcto');
+    }catch(modelErr){
+      if(operation.cancelled)throw modelErr;
+      logDebug('OBJETO: respaldo por color/bordes',modelErr);
+      setStatus('Usando selección local por bordes…','loading');mask=magicWandMask(work,x,y);
+    }
+    await setMask(mask,work.width,work.height,'Objeto por toque');
+    setStatus('Objeto seleccionado. La máscara azul muestra exactamente lo que editarás.','ready');api().toast('Objeto seleccionado');
   }catch(err){const msg=friendlyError(err);logDebug('SELECCIÓN INTELIGENTE: ERROR',err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
   finally{finishOperation(operation);}
 }
