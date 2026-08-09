@@ -1,18 +1,18 @@
-const CACHE='photo-ia-13-4-selection-fix';
-const VERSION='13.4.1';
+const CACHE='photo-ia-13-5-selection-stable';
+const VERSION='13.5';
 const CORE=[
- './','./index.html','./styles.css?v=13.4.1-ios-hotfix','./ui-layout.js?v=13.4.1-ios-hotfix','./app.js?v=13.4.1-ios-hotfix',
- './creative-tools.js?v=13.4.1-ios-hotfix','./brain.js?v=13.4.1-ios-hotfix',
- './opencv-engine.js?v=13.4.1-ios-hotfix','./smart-core.js?v=13.4.1-ios-hotfix','./ai-studio.js?v=13.4.1-ios-hotfix',
- './vision.js?v=13.4.1-ios-hotfix','./segmentation.js?v=13.4.1-ios-hotfix','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=13.5-selection-stable','./ui-layout.js?v=13.5-selection-stable','./app.js?v=13.5-selection-stable',
+ './creative-tools.js?v=13.5-selection-stable','./brain.js?v=13.5-selection-stable',
+ './opencv-engine.js?v=13.5-selection-stable','./smart-core.js?v=13.5-selection-stable','./ai-studio.js?v=13.5-selection-stable',
+ './vision.js?v=13.5-selection-stable','./segmentation.js?v=13.5-selection-stable','./manifest.webmanifest'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=13.4.1-ios-hotfix',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=13.4.1-ios-hotfix',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=13.4.1-ios-hotfix',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=13.4.1-ios-hotfix',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=13.4.1-ios-hotfix',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=13.4.1-ios-hotfix',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/vendor/fabric.min.js?v=13.5-selection-stable',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=13.5-selection-stable',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=13.5-selection-stable',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=13.5-selection-stable',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=13.5-selection-stable',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=13.5-selection-stable',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
  {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe opcional',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
@@ -68,6 +68,10 @@ self.addEventListener('fetch',e=>{
  if(url.origin!==location.origin) return;
  e.respondWith((async()=>{
   const cache=await caches.open(CACHE);
+  if(e.request.mode==='navigate'){
+   try{const fresh=await fetch(e.request,{cache:'no-store'});if(fresh.ok){cache.put('./index.html',fresh.clone());return fresh;}}catch(_){ }
+   return (await cache.match('./index.html'))||new Response('Offline',{status:503});
+  }
   const cached=await cache.match(e.request,{ignoreSearch:false}) || await cache.match(url.href);
   if(cached) return cached;
   const scopePath=new URL(self.registration.scope).pathname;
