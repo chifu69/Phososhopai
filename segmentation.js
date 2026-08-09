@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='2.1-hybrid-smart-selection';
+const VERSION='2.2-bust-anchor-selection';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -17,7 +17,7 @@ const state={
   tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null
 };
 
-const DEBUG_KEY='photoia-segmentation-debug-v1360';
+const DEBUG_KEY='photoia-segmentation-debug-v1370';
 
 // PHOTO IA 8.3 uses a dependency-free local portrait cutout engine.
 // It avoids CDN failures and never downloads BodyPix or a model at runtime.
@@ -55,8 +55,91 @@ function offlinePortraitMask(canvas){const ctx=canvas.getContext('2d',{willReadF
   let clean=closeMask(raw,w,h,1);clean=largestCenterComponent(clean,w,h);clean=closeMask(clean,w,h,1);clean=openMask(clean,w,h,1);clean=blurMask(clean,w,h,1);let selected=0;for(const v of clean)if(v>110)selected++;if(selected<w*h*.025)throw makeError('No pude separar claramente a la persona. Prueba Objeto por toque o una foto con más contraste.','OFFLINE_MASK_SMALL');if(selected>w*h*.86)throw makeError('La selección tomó demasiado fondo. Prueba Objeto por toque para indicar el sujeto.','OFFLINE_MASK_LARGE');logDebug('SMART PORTRAIT: máscara lista',{width:w,height:h,selected,total:w*h,palette:palette.length});return clean;}
 function featherMask(mask,width,height){return blurMask(mask,width,height,1)}
 function faceBoxFromPerson(base,w,h){const b=maskBounds(base,w,h);if(!b)return null;return {x:b.x+b.w*.22,y:b.y+b.h*.03,w:b.w*.56,h:b.h*.46};}
+function largestSkinFaceBox(canvas){
+  const w=canvas.width,h=canvas.height,rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+  const raw=new Uint8Array(w*h);
+  for(let y=Math.floor(h*.08);y<Math.floor(h*.70);y++)for(let x=Math.floor(w*.12);x<Math.ceil(w*.88);x++){
+    const i=y*w+x,j=i*4;if(skinConfidence(rgba[j],rgba[j+1],rgba[j+2]))raw[i]=255;
+  }
+  let m=closeMask(raw,w,h,2);m=openMask(m,w,h,1);
+  const seen=new Uint8Array(m.length),q=new Int32Array(m.length);let best=null,bestScore=-1e9;
+  for(let i=0;i<m.length;i++){if(seen[i]||m[i]<100)continue;let head=0,tail=0,minX=w,minY=h,maxX=-1,maxY=-1,area=0;seen[i]=1;q[tail++]=i;
+    while(head<tail){const idx=q[head++],x=idx%w,y=(idx/w)|0;area++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);for(const ni of [idx-1,idx+1,idx-w,idx+w]){if(ni<0||ni>=m.length||seen[ni]||m[ni]<100)continue;const nx=ni%w,ny=(ni/w)|0;if(Math.abs(nx-x)+Math.abs(ny-y)!==1)continue;seen[ni]=1;q[tail++]=ni;}}
+    const bw=maxX-minX+1,bh=maxY-minY+1,cx=minX+bw/2,cy=minY+bh/2,centerPenalty=Math.abs(cx-w*.5)/(w*.5),verticalPenalty=Math.abs(cy-h*.34)/(h*.5);const score=area*(1-centerPenalty*.75-verticalPenalty*.5);
+    if(area>w*h*.006&&bw>w*.10&&bh>h*.08&&score>bestScore){bestScore=score;best={x:minX,y:minY,w:bw,h:bh};}
+  }
+  if(!best)return null;
+  const padX=best.w*.16,padTop=best.h*.28,padBottom=best.h*.18;
+  return {x:Math.max(0,best.x-padX),y:Math.max(0,best.y-padTop),w:Math.min(w,best.w+padX*2),h:Math.min(h,best.h+padTop+padBottom)};
+}
+async function detectFaceAnchor(canvas,base){
+  const w=canvas.width,h=canvas.height;
+  if('FaceDetector' in window){
+    try{
+      const detector=new FaceDetector({fastMode:true,maxDetectedFaces:3});
+      const faces=await Promise.race([detector.detect(canvas),new Promise((_,rej)=>setTimeout(()=>rej(new Error('FACE_TIMEOUT')),2200))]);
+      if(faces?.length){
+        const ranked=faces.map(f=>f.boundingBox).filter(Boolean).sort((a,b)=>{const ac=Math.abs((a.x+a.width/2)-w*.5),bc=Math.abs((b.x+b.width/2)-w*.5);return (b.width*b.height-bc*120)-(a.width*a.height-ac*120)});
+        const b=ranked[0];if(b&&b.width>w*.10&&b.height>h*.08)return {x:b.x,y:b.y,w:b.width,h:b.height,source:'FaceDetector'};
+      }
+    }catch(err){logDebug('BUST FACE DETECTOR fallback',err?.message||err);}
+  }
+  const skin=largestSkinFaceBox(canvas);if(skin)return {...skin,source:'skin-anchor'};
+  const fb=faceBoxFromPerson(base,w,h);return fb?{...fb,source:'person-bounds'}:null;
+}
+function bustEnvelope(anchor,w,h){
+  const faceCx=anchor.x+anchor.w/2,faceTop=anchor.y,faceBottom=anchor.y+anchor.h;
+  const top=Math.max(0,faceTop-anchor.h*.72);
+  const bottom=Math.min(h-1,faceBottom+anchor.h*1.95);
+  return {faceCx,faceTop,faceBottom,top,bottom};
+}
+function buildBustMask(canvas,base,anchor){
+  const w=canvas.width,h=canvas.height,rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,palette=sampleBorderPalette(rgba,w,h),env=bustEnvelope(anchor,w,h),out=new Uint8Array(w*h);
+  const faceW=anchor.w,faceH=anchor.h;
+  for(let y=Math.floor(env.top);y<=Math.floor(env.bottom);y++){
+    let half;
+    if(y<env.faceTop)half=faceW*(.58+.18*(env.faceTop-y)/Math.max(1,env.faceTop-env.top));
+    else if(y<=env.faceBottom)half=faceW*.62;
+    else{const t=(y-env.faceBottom)/Math.max(1,env.bottom-env.faceBottom);half=faceW*(.72+1.12*Math.pow(t,.72));}
+    const left=Math.max(0,Math.floor(env.faceCx-half)),right=Math.min(w-1,Math.ceil(env.faceCx+half));
+    for(let x=left;x<=right;x++){
+      const i=y*w+x,j=i*4,pd=nearestPaletteDistance(rgba[j],rgba[j+1],rgba[j+2],palette);
+      const dx=Math.abs(x-env.faceCx)/Math.max(1,half);
+      const core=dx<.60;
+      const inFace=y>=env.faceTop-anchor.h*.12&&y<=env.faceBottom+anchor.h*.15&&dx<.82;
+      const baseHit=base[i]>48;
+      const likelySubject=pd>42;
+      if(inFace||baseHit||(core&&pd>27)||(likelySubject&&dx<.90))out[i]=255;
+    }
+  }
+  // Force a continuous central neck/torso bridge so a valid bust can never collapse into facial patches.
+  const bridgeTop=Math.floor(env.faceTop+faceH*.62),bridgeBottom=Math.floor(env.bottom);
+  for(let y=bridgeTop;y<=bridgeBottom;y++){const t=(y-bridgeTop)/Math.max(1,bridgeBottom-bridgeTop),half=faceW*(.34+.72*t);for(let x=Math.max(0,Math.floor(env.faceCx-half));x<=Math.min(w-1,Math.ceil(env.faceCx+half));x++)out[y*w+x]=Math.max(out[y*w+x],210);}
+  let clean=closeMask(out,w,h,2);clean=largestCenterComponent(clean,w,h);clean=closeMask(clean,w,h,2);clean=blurMask(clean,w,h,1);
+  return clean;
+}
+function validateBustMask(mask,w,h,anchor){
+  let count=0,faceHits=0,torsoHits=0;const env=bustEnvelope(anchor,w,h);
+  const faceArea=Math.max(1,anchor.w*anchor.h),torsoTop=Math.min(h-1,Math.floor(anchor.y+anchor.h*1.05));
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const v=mask[y*w+x];if(v<80)continue;count++;if(x>=anchor.x&&x<=anchor.x+anchor.w&&y>=anchor.y&&y<=anchor.y+anchor.h)faceHits++;if(y>=torsoTop&&y<=env.bottom&&Math.abs(x-env.faceCx)<anchor.w*1.2)torsoHits++;}
+  const ratio=count/(w*h),faceCoverage=faceHits/faceArea;
+  if(ratio<.07||ratio>.72||faceCoverage<.50||torsoHits<anchor.w*anchor.h*.22)return false;
+  return true;
+}
+async function smartBustMask(canvas,base){
+  const anchor=await detectFaceAnchor(canvas,base);if(!anchor)throw makeError('No pude localizar el rostro para construir el busto.','BUST_NO_FACE');
+  logDebug('BUST anchor',anchor);let mask=buildBustMask(canvas,base,anchor);
+  if(!validateBustMask(mask,canvas.width,canvas.height,anchor)){
+    logDebug('BUST validation retry',{anchor});
+    // Conservative fallback: use a solid anatomical envelope clipped only by obvious border-like background.
+    const w=canvas.width,h=canvas.height,rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,palette=sampleBorderPalette(rgba,w,h),env=bustEnvelope(anchor,w,h),fallback=new Uint8Array(w*h);
+    for(let y=Math.floor(env.top);y<=Math.floor(env.bottom);y++){const t=Math.max(0,(y-anchor.y)/Math.max(1,env.bottom-anchor.y));const half=anchor.w*(y<anchor.y?.74:(.68+1.12*Math.pow(t,.75)));for(let x=Math.max(0,Math.floor(env.faceCx-half));x<=Math.min(w-1,Math.ceil(env.faceCx+half));x++){const i=y*w+x,j=i*4,pd=nearestPaletteDistance(rgba[j],rgba[j+1],rgba[j+2],palette),dx=Math.abs(x-env.faceCx)/Math.max(1,half);if(dx<.72||pd>34||base[i]>45)fallback[i]=255;}}
+    mask=blurMask(closeMask(fallback,w,h,2),w,h,1);
+  }
+  if(!validateBustMask(mask,canvas.width,canvas.height,anchor))throw makeError('La máscara de busto no pasó la validación inteligente. Intenta con Refina máscara o una foto con más separación del fondo.','BUST_INVALID');
+  return mask;
+}
 function profileMask(base,w,h,mode='person',canvas=null){if(mode==='person')return base;const box=maskBounds(base,w,h);if(!box)return base;const out=new Uint8Array(base.length),cx=box.x+box.w/2;
-  if(mode==='bust'){const top=box.y,bottom=Math.min(h-1,box.y+box.h*.74);for(let y=Math.floor(top);y<=bottom;y++){const t=(y-top)/Math.max(1,bottom-top),half=box.w*(.34+.25*t);for(let x=Math.max(0,Math.floor(cx-half));x<Math.min(w,Math.ceil(cx+half));x++){const i=y*w+x;if(base[i]>72)out[i]=base[i];}}return blurMask(closeMask(out,w,h,1),w,h,1);}
   if(mode==='face'){const fb=faceBoxFromPerson(base,w,h);if(!fb)return out;const ecx=fb.x+fb.w/2,ecy=fb.y+fb.h*.52,rx=fb.w*.48,ry=fb.h*.48;for(let y=Math.max(0,Math.floor(fb.y));y<Math.min(h,Math.ceil(fb.y+fb.h));y++)for(let x=Math.max(0,Math.floor(fb.x));x<Math.min(w,Math.ceil(fb.x+fb.w));x++){const i=y*w+x,ellipse=((x-ecx)/rx)**2+((y-ecy)/ry)**2;if(ellipse<=1&&base[i]>55)out[i]=255;}return blurMask(closeMask(out,w,h,1),w,h,2);}
   if(mode==='skin'&&canvas){const rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;for(let y=box.y;y<box.y+box.h;y++)for(let x=box.x;x<box.x+box.w;x++){const i=y*w+x;if(base[i]<45)continue;const j=i*4;if(skinConfidence(rgba[j],rgba[j+1],rgba[j+2]))out[i]=255;}let skin=closeMask(out,w,h,1);skin=openMask(skin,w,h,1);return blurMask(skin,w,h,1);}
   return base;}
@@ -325,7 +408,7 @@ async function segmentProfile(mode='person'){
   const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);setStatus('Preparando una copia optimizada de la foto…','loading');
   try{
     const work=await getWorkCanvas(operation);setStatus(`Detectando ${label.toLowerCase()}…`,'loading');await letOverlayPaint();
-    await letOverlayPaint();const person=offlinePortraitMask(work);await letOverlayPaint();const mask=profileMask(person,work.width,work.height,mode,work);
+    await letOverlayPaint();const person=offlinePortraitMask(work);await letOverlayPaint();const mask=mode==='bust'?await smartBustMask(work,person):profileMask(person,work.width,work.height,mode,work);
     if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
     const selected=mask.reduce((n,v)=>n+(v>80),0);if(selected<work.width*work.height*.006)throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
     await setMask(mask,work.width,work.height,label);setStatus(`${label} seleccionado. Puedes editarlo, refinar la máscara o quitar el fondo.`,'ready');api().toast(`${label} listo`);
