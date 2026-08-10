@@ -158,10 +158,10 @@ async function prepareTask(prompt){
  const task=classifyEdit(prompt);
  const segmentation=window.PhotoSegmentation;
  const originalSource=state.main;
- let source=state.main,personMask='',identityMask='',faceMask='',skinMask='';
+ let source=state.main,personMask='',identityMask='',faceMask='',skinMask='',clothingMask='';
 
  if(task==='background_only'||task==='scene_and_wardrobe'||task==='wardrobe_only'){
-  setStatus('processing','Layered Identity Guard','Separando persona, límites y regiones protegidas…',6);
+  setStatus('processing','Semantic Face & Skin Engine','Separando persona y construyendo mapa semántico…',6);
   await segmentation?.segmentPerson?.();
   personMask=segmentation?.exportMaskDataUrl?.()||'';
   // The segmentation work image may be lower resolution for speed. Use it only
@@ -174,8 +174,11 @@ async function prepareTask(prompt){
    await segmentation?.segmentFace?.();
    faceMask=segmentation?.exportMaskDataUrl?.()||'';
    if(!faceMask)throw new Error('No pude crear el bloqueo facial. Intenta con una foto donde el rostro sea visible.');
-   setStatus('processing','Layered Identity Guard','Protegiendo rostro, cabello, piel y manos…',9);
+   setStatus('processing','Semantic Face & Skin Engine','Detectando rostro, piel, cabello y ropa por capas…',9);
    try{await segmentation?.segmentSkin?.();skinMask=segmentation?.exportMaskDataUrl?.()||'';}catch(_){skinMask=''}
+   if(task==='wardrobe_only'){
+    try{await segmentation?.segmentClothing?.();clothingMask=segmentation?.exportMaskDataUrl?.()||'';}catch(_){clothingMask=''}
+   }
    identityMask=await buildIdentityProtection(faceMask,skinMask);
    if(!identityMask)identityMask=faceMask;
   }
@@ -190,12 +193,12 @@ Cambia únicamente el ambiente y el fondo. Conserva exactamente la misma persona
  }else if(task==='wardrobe_only'){
   directed=`${prompt}
 
-LAYERED IDENTITY GUARD — CAMBIO DE ROPA:
+SEMANTIC IDENTITY GUARD — CAMBIO DE ROPA:
 Trabaja como una edición por capas: la fotografía original es la capa base y solo el vestuario es editable. Modifica exclusivamente la ropa solicitada y ajústala al cuerpo, pose, perspectiva y pliegues naturales. Conserva exactamente el rostro, ojos, nariz, boca, piel, cabello, edad, expresión, manos y proporciones. No redibujes la cara. Mantén el fondo original salvo que la instrucción diga lo contrario.`;
  }else if(task==='scene_and_wardrobe'){
   directed=`${prompt}
 
-LAYERED IDENTITY GUARD — ESCENARIO Y VESTUARIO:
+SEMANTIC IDENTITY GUARD — ESCENARIO Y VESTUARIO:
 Trata rostro, cabello, piel y manos como regiones bloqueadas independientes. Conserva exactamente el rostro, cabello, identidad, edad, expresión, pose, manos y proporciones de la persona original. Puedes cambiar el paisaje y adaptar la ropa de manera lógica al ambiente solicitado (por ejemplo, ropa de invierno para Alaska). Ajusta iluminación, temperatura de color, sombras y reflejos del rostro para que coincidan con el nuevo entorno, sin alterar ningún rasgo facial.`;
  }else{
   directed=`${prompt}
@@ -203,7 +206,7 @@ Trata rostro, cabello, piel y manos como regiones bloqueadas independientes. Con
 IDENTITY LOCK:
 Preserva exactamente el rostro, identidad, cabello, edad y expresión salvo que el usuario pida explícitamente editar el rostro. Realiza únicamente el cambio solicitado.`;
  }
- return {prompt:directed,task,source,originalSource,personMask,identityMask,faceMask,skinMask};
+ return {prompt:directed,task,source,originalSource,personMask,identityMask,faceMask,skinMask,clothingMask};
 }
 
 async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
@@ -214,16 +217,16 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
  const type=r.headers.get('content-type')||'';let result;if(type.includes('application/json')){const j=await r.json();result=j.image||j.dataUrl||j.result;if(result&&!result.startsWith('data:')&&!result.startsWith('http'))result=`data:image/png;base64,${result}`}else{const blob=await r.blob();result=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob)})}
  if(!result)throw new Error('El servidor no devolvió una imagen.');
  if(task.task==='background_only'&&task.personMask){
-  setStatus('processing','Layered Identity Guard','Recomponiendo la persona desde los píxeles originales…',94);
+  setStatus('processing','Semantic Face & Skin Engine','Recomponiendo la persona desde los píxeles originales…',94);
   result=await compositeLockedRegion(result,task.originalSource,task.personMask,{lightingStrength:.24});
- }else if(task.task==='wardrobe_only'&&task.personMask){
-  // Photoshop-style layer logic: generated pixels are accepted only inside
-  // the detected person bounds; the original background is never regenerated.
-  setStatus('processing','Layered Identity Guard','Recortando la generación a la persona y restaurando identidad…',93);
-  result=await compositeGeneratedInsideMask(result,task.originalSource,task.personMask);
-  if(task.identityMask)result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.18});
+ }else if(task.task==='wardrobe_only'&&(task.clothingMask||task.personMask)){
+  // Semantic wardrobe logic: accept generated pixels only inside the clothing
+  // region when available. Face/skin/hair never need to be regenerated.
+  setStatus('processing','Semantic Face & Skin Engine','Aplicando únicamente la ropa y restaurando identidad…',93);
+  result=await compositeGeneratedInsideMask(result,task.originalSource,task.clothingMask||task.personMask);
+  if(task.identityMask)result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.08});
  }else if(task.task==='scene_and_wardrobe'&&task.identityMask){
-  setStatus('processing','Layered Identity Guard','Restaurando rostro, cabello y piel desde el original…',94);
+  setStatus('processing','Semantic Face & Skin Engine','Restaurando rostro, cabello y piel desde el original…',94);
   result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.28});
  }
  const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Ropa cambiada por capas; rostro, cabello, piel y fondo original quedaron protegidos.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';

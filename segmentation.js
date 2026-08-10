@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='2.3-adobe-style-multipass-selection';
+const VERSION='3.0-semantic-face-skin-engine';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -14,7 +14,7 @@ const RUN_TIMEOUT=45000;
 const state={
   module:null,fileset:null,imageSegmenter:null,interactiveSegmenter:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
-  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null
+  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null,semantic:{faceAnchor:null,faceMask:null,skinMask:null,hairMask:null,clothingMask:null,confidence:{}}
 };
 
 const DEBUG_KEY='photoia-segmentation-debug-v1380';
@@ -222,6 +222,102 @@ async function smartBustMask(canvas,base){
   // Never stop at validation. Return the best recoverable mask and tell the UI confidence separately.
   result._photoIAQuality=finalQ;return result;
 }
+
+function ycbcr(r,g,b){
+  return {y:.299*r+.587*g+.114*b,cb:128-.168736*r-.331264*g+.5*b,cr:128+.5*r-.418688*g-.081312*b};
+}
+function robustStats(values){
+  if(!values.length)return null;
+  const sorted=[...values].sort((a,b)=>a-b),trim=Math.floor(sorted.length*.12),core=sorted.slice(trim,Math.max(trim+1,sorted.length-trim));
+  const mean=core.reduce((a,b)=>a+b,0)/core.length;
+  const variance=core.reduce((s,v)=>s+(v-mean)*(v-mean),0)/core.length;
+  return {mean,std:Math.sqrt(Math.max(1,variance))};
+}
+function buildFaceMaskFromAnchor(canvas,base,anchor){
+  if(!anchor)return null;
+  const w=canvas.width,h=canvas.height,rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,out=new Uint8Array(w*h);
+  const cx=anchor.x+anchor.w*.5,cy=anchor.y+anchor.h*.54,rx=Math.max(3,anchor.w*.46),ry=Math.max(3,anchor.h*.50);
+  for(let y=Math.max(0,Math.floor(anchor.y-anchor.h*.04));y<Math.min(h,Math.ceil(anchor.y+anchor.h*1.04));y++){
+    for(let x=Math.max(0,Math.floor(anchor.x));x<Math.min(w,Math.ceil(anchor.x+anchor.w));x++){
+      const i=y*w+x;if(base[i]<35)continue;
+      const dx=(x-cx)/rx,dy=(y-cy)/ry,d2=dx*dx+dy*dy;if(d2>1)continue;
+      const j=i*4,skin=skinConfidence(rgba[j],rgba[j+1],rgba[j+2]);
+      const central=d2<.58;
+      if(skin||central)out[i]=255;
+    }
+  }
+  let m=closeMask(out,w,h,1);m=largestCenterComponent(m,w,h);m=blurMask(m,w,h,1);
+  return m;
+}
+function learnSkinModel(canvas,faceMask){
+  if(!faceMask)return null;
+  const w=canvas.width,h=canvas.height,rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,cbs=[],crs=[],ys=[];
+  for(let i=0;i<faceMask.length;i++){
+    if(faceMask[i]<150)continue;const j=i*4,r=rgba[j],g=rgba[j+1],b=rgba[j+2];
+    const c=ycbcr(r,g,b);
+    if(c.y<42||c.y>242)continue;
+    if(skinConfidence(r,g,b)||faceMask[i]>235){cbs.push(c.cb);crs.push(c.cr);ys.push(c.y);}
+  }
+  const cb=robustStats(cbs),cr=robustStats(crs),y=robustStats(ys);
+  if(!cb||!cr||cbs.length<24)return null;
+  return {cb,cr,y,n:cbs.length};
+}
+function adaptiveSkinScore(r,g,b,model){
+  const c=ycbcr(r,g,b);let generic=skinConfidence(r,g,b)?1:0;
+  if(!model)return generic;
+  const zcb=Math.abs(c.cb-model.cb.mean)/Math.max(6,model.cb.std*2.2),zcr=Math.abs(c.cr-model.cr.mean)/Math.max(7,model.cr.std*2.2);
+  const chroma=Math.sqrt(zcb*zcb+zcr*zcr),lumOk=c.y>Math.max(28,model.y.mean-100)&&c.y<Math.min(252,model.y.mean+115);
+  if(chroma<1.0&&lumOk)return 1;
+  if(chroma<1.45&&lumOk&&generic)return .82;
+  return generic?.45:0;
+}
+function anatomicalSkinPrior(anchor,w,h,x,y){
+  if(!anchor)return .45;
+  const cx=anchor.x+anchor.w*.5,faceBottom=anchor.y+anchor.h;
+  if(y<=faceBottom*1.04)return 1;
+  const relY=(y-faceBottom)/Math.max(1,h-faceBottom),dx=Math.abs(x-cx);
+  if(y<faceBottom+anchor.h*.72&&dx<anchor.w*.52)return .95;
+  if(y<faceBottom+anchor.h*2.9&&dx>anchor.w*.45&&dx<anchor.w*1.65)return .82;
+  if(relY>.52&&dx>anchor.w*.22&&dx<anchor.w*1.5)return .74;
+  return .34;
+}
+function buildSemanticSkinMask(canvas,base,faceMask,anchor){
+  const w=canvas.width,h=canvas.height,rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,out=new Uint8Array(w*h),model=learnSkinModel(canvas,faceMask);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const i=y*w+x;if(base[i]<55)continue;
+    if(faceMask&&faceMask[i]>70){out[i]=255;continue;}
+    const j=i*4,score=adaptiveSkinScore(rgba[j],rgba[j+1],rgba[j+2],model),prior=anatomicalSkinPrior(anchor,w,h,x,y);
+    if(score*prior>.54)out[i]=255;
+  }
+  let skin=closeMask(out,w,h,1);skin=openMask(skin,w,h,1);skin=blurMask(skin,w,h,1);return skin;
+}
+function buildHairMask(canvas,base,faceMask,anchor){
+  if(!anchor)return new Uint8Array(base.length);
+  const w=canvas.width,h=canvas.height,rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data,out=new Uint8Array(w*h);
+  const cx=anchor.x+anchor.w*.5,top=Math.max(0,Math.floor(anchor.y-anchor.h*.34)),bottom=Math.min(h,Math.ceil(anchor.y+anchor.h*.96)),rx=anchor.w*.78;
+  for(let y=top;y<bottom;y++)for(let x=Math.max(0,Math.floor(cx-rx));x<Math.min(w,Math.ceil(cx+rx));x++){
+    const i=y*w+x;if(base[i]<45||(faceMask&&faceMask[i]>120))continue;
+    const j=i*4,c=ycbcr(rgba[j],rgba[j+1],rgba[j+2]),dx=Math.abs(x-cx)/rx,spatial=(1-dx)*.65+(y<anchor.y+anchor.h*.35?.35:0),darkness=Math.max(0,(150-c.y)/115);
+    if(spatial+darkness>.72)out[i]=255;
+  }
+  return blurMask(closeMask(out,w,h,1),w,h,1);
+}
+function subtractMasks(base,...cuts){
+  const out=new Uint8Array(base.length);for(let i=0;i<base.length;i++){if(base[i]<55)continue;let cut=0;for(const m of cuts)if(m)cut=Math.max(cut,m[i]||0);out[i]=Math.max(0,base[i]-Math.min(255,cut));}return out;
+}
+async function semanticMasks(canvas,person){
+  const w=canvas.width,h=canvas.height,anchor=await detectFaceAnchor(canvas,person);
+  if(!anchor)throw makeError('No pude localizar el rostro con suficiente precisión.','SEMANTIC_NO_FACE');
+  const face=buildFaceMaskFromAnchor(canvas,person,anchor);
+  if(!face||!maskBounds(face,w,h))throw makeError('No pude construir una máscara facial confiable.','SEMANTIC_FACE_EMPTY');
+  const skin=buildSemanticSkinMask(canvas,person,face,anchor),hair=buildHairMask(canvas,person,face,anchor);
+  let clothing=subtractMasks(person,skin,hair,face);clothing=closeMask(clothing,w,h,1);clothing=openMask(clothing,w,h,1);clothing=blurMask(clothing,w,h,1);
+  const faceArea=face.reduce((n,v)=>n+(v>100),0),personArea=person.reduce((n,v)=>n+(v>100),0),skinArea=skin.reduce((n,v)=>n+(v>100),0);
+  const confidence=Math.max(1,Math.min(99,Math.round(62+(anchor.source==='FaceDetector'?24:anchor.source==='skin-anchor'?11:2)-Math.abs((faceArea/Math.max(1,personArea))-.08)*80)));
+  state.semantic={faceAnchor:anchor,faceMask:face,skinMask:skin,hairMask:hair,clothingMask:clothing,confidence:{face:confidence,skin:Math.max(1,Math.min(99,Math.round(54+Math.min(.25,skinArea/Math.max(1,personArea))*120)))}};
+  logDebug('SEMANTIC FACE/SKIN',{anchor,confidence:state.semantic.confidence,personArea,faceArea,skinArea});return state.semantic;
+}
+
 function profileMask(base,w,h,mode='person',canvas=null){if(mode==='person')return base;const box=maskBounds(base,w,h);if(!box)return base;const out=new Uint8Array(base.length),cx=box.x+box.w/2;
   if(mode==='face'){const fb=faceBoxFromPerson(base,w,h);if(!fb)return out;const ecx=fb.x+fb.w/2,ecy=fb.y+fb.h*.52,rx=fb.w*.48,ry=fb.h*.48;for(let y=Math.max(0,Math.floor(fb.y));y<Math.min(h,Math.ceil(fb.y+fb.h));y++)for(let x=Math.max(0,Math.floor(fb.x));x<Math.min(w,Math.ceil(fb.x+fb.w));x++){const i=y*w+x,ellipse=((x-ecx)/rx)**2+((y-ecy)/ry)**2;if(ellipse<=1&&base[i]>55)out[i]=255;}return blurMask(closeMask(out,w,h,1),w,h,2);}
   if(mode==='skin'&&canvas){const rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;for(let y=box.y;y<box.y+box.h;y++)for(let x=box.x;x<box.x+box.w;x++){const i=y*w+x;if(base[i]<45)continue;const j=i*4;if(skinConfidence(rgba[j],rgba[j+1],rgba[j+2]))out[i]=255;}let skin=closeMask(out,w,h,1);skin=openMask(skin,w,h,1);return blurMask(skin,w,h,1);}
@@ -487,11 +583,18 @@ function closeResult(result){
 }
 async function segmentProfile(mode='person'){
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
-  const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro',skin:'Piel'};const label=labels[mode]||labels.person;
+  const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro preciso',skin:'Piel anatómica',hair:'Cabello',clothing:'Ropa'};const label=labels[mode]||labels.person;
   const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);setStatus('Preparando una copia optimizada de la foto…','loading');
   try{
     const work=await getWorkCanvas(operation);setStatus(`Detectando ${label.toLowerCase()}…`,'loading');await letOverlayPaint();
-    await letOverlayPaint();const person=offlinePortraitMask(work);await letOverlayPaint();const mask=mode==='bust'?await smartBustMask(work,person):profileMask(person,work.width,work.height,mode,work);
+    await letOverlayPaint();const person=offlinePortraitMask(work);await letOverlayPaint();
+    let mask;
+    if(mode==='bust')mask=await smartBustMask(work,person);
+    else if(mode==='face'||mode==='skin'||mode==='hair'||mode==='clothing'){
+      setStatus('Analizando rostro, piel, cabello y ropa por capas…','loading');
+      const semantic=await semanticMasks(work,person);
+      mask=mode==='face'?semantic.faceMask:mode==='skin'?semantic.skinMask:mode==='hair'?semantic.hairMask:semantic.clothingMask;
+    }else mask=person;
     if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
     const selected=mask.reduce((n,v)=>n+(v>80),0);if(selected<work.width*work.height*.006)throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
     await setMask(mask,work.width,work.height,label);const q=mask?._photoIAQuality;const confidence=q?Math.max(1,Math.min(99,Math.round(q.score))):null;setStatus(mode==='bust'&&confidence?`${label} seleccionado con análisis multipaso (${confidence}% de confianza). Puedes refinar bordes si lo deseas.`:`${label} seleccionado. Puedes editarlo, refinar la máscara o quitar el fondo.`,'ready');api().toast(mode==='bust'?'Busto analizado y seleccionado':`${label} listo`);
@@ -501,6 +604,8 @@ const segmentPerson=()=>segmentProfile('person');
 const segmentBust=()=>segmentProfile('bust');
 const segmentFace=()=>segmentProfile('face');
 const segmentSkin=()=>segmentProfile('skin');
+const segmentHair=()=>segmentProfile('hair');
+const segmentClothing=()=>segmentProfile('clothing');
 function restoreBackground(){const photo=api()?.state?.photo;if(!photo)return;photo.visible=true;api().state.canvas.requestRenderAll();api().snapshot?.();setStatus('Imagen completa visible. Los cambios de las capas permanecen.','ready');api().toast('Fondo restaurado');}
 function isolateSelection(){const photo=api()?.state?.photo;if(!photo||!state.mask)return api()?.toast('Primero crea una selección.');createCutout();}
 function canvasPointToNormalized(pointer){
@@ -556,7 +661,7 @@ async function createCutout(){
   }catch(err){const msg=friendlyError(err);console.error(err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
   finally{finishOperation(operation);}
 }
-function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/identificacion|credencial|selecciona.*busto/.test(t)){segmentBust();return true;}if(/selecciona.*rostro|solo.*cara|solo.*rostro/.test(t)){segmentFace();return true;}if(/selecciona.*piel|solo.*piel/.test(t)){segmentSkin();return true;}if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/regresa.*fondo|restaura.*fondo|muestra.*imagen completa/.test(t)){restoreBackground();return true;}if(/refina.*mascara|mejora.*mascara/.test(t)){refineCurrentMask();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
+function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/identificacion|credencial|selecciona.*busto/.test(t)){segmentBust();return true;}if(/selecciona.*rostro|solo.*cara|solo.*rostro/.test(t)){segmentFace();return true;}if(/selecciona.*piel|solo.*piel/.test(t)){segmentSkin();return true;}if(/selecciona.*cabello|solo.*cabello|pelo/.test(t)){segmentHair();return true;}if(/selecciona.*ropa|solo.*ropa|vestuario|prenda/.test(t)){segmentClothing();return true;}if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/regresa.*fondo|restaura.*fondo|muestra.*imagen completa/.test(t)){restoreBackground();return true;}if(/refina.*mascara|mejora.*mascara/.test(t)){refineCurrentMask();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
 function boot(){
   if(!$('segment-person'))return;
   $('segment-person').onclick=segmentPerson;$('segment-tap').onclick=beginTapMode;$('segment-show').onclick=()=>showMask(true);$('segment-hide').onclick=()=>showMask(false);$('segment-clear').onclick=clearMask;$('segment-cutout').onclick=createCutout;
@@ -566,7 +671,7 @@ function boot(){
   if($('segment-debug-test'))$('segment-debug-test').onclick=runConnectionTests;
   if($('processing-cancel'))$('processing-cancel').onclick=()=>cancelCurrent(true);
   api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(e.target?.photoRole==='main')clearMask();});
-  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor 8.3 local listo. No descarga BodyPix ni modelos externos.');
+  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Semantic Face & Skin Engine listo: rostro, piel, cabello y ropa por capas.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
 function exportMaskDataUrl(){
@@ -577,7 +682,7 @@ function exportMaskDataUrl(){
   ctx.putImageData(img,0,0);return canvas.toDataURL('image/png');
 }
 function exportSourceDataUrl(){return state.workCanvas?.toDataURL?.('image/png')||'';}
-window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get mask(){return state.mask}};
+window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get mask(){return state.mask}};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();
 })();
