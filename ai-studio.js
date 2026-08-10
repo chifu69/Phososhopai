@@ -160,25 +160,23 @@ async function prepareTask(prompt){
  const originalSource=state.main;
  let source=state.main,personMask='',identityMask='',faceMask='',skinMask='',clothingMask='';
 
- if(task==='background_only'||task==='scene_and_wardrobe'||task==='wardrobe_only'){
+ // v14.1: wardrobe edits are server-owned. Do NOT pre-segment skin/person on
+ // the iPhone and do NOT send local masks. The Alienware semantic parser has
+ // the higher-quality human/face/skin/clothing masks and must define the ROI.
+ if(task==='wardrobe_only'){
+  setStatus('processing','Alienware Semantic Parser','Enviando fotografía original completa; Alienware decidirá rostro, piel y ropa…',8);
+ }else if(task==='background_only'||task==='scene_and_wardrobe'){
   setStatus('processing','Semantic Face & Skin Engine','Separando persona y construyendo mapa semántico…',6);
   await segmentation?.segmentPerson?.();
   personMask=segmentation?.exportMaskDataUrl?.()||'';
-  // The segmentation work image may be lower resolution for speed. Use it only
-  // as the generation input; protected pixels are always restored from the
-  // full-resolution canvas snapshot stored in originalSource.
   source=segmentation?.exportSourceDataUrl?.()||state.main;
   if(!personMask)throw new Error('No pude separar a la persona. Usa Selección IA y vuelve a intentarlo.');
 
-  if(task!=='background_only'){
+  if(task==='scene_and_wardrobe'){
    await segmentation?.segmentFace?.();
    faceMask=segmentation?.exportMaskDataUrl?.()||'';
-   if(!faceMask)throw new Error('No pude crear el bloqueo facial. Intenta con una foto donde el rostro sea visible.');
-   setStatus('processing','Semantic Face & Skin Engine','Detectando rostro, piel, cabello y ropa por capas…',9);
+   setStatus('processing','Semantic Face & Skin Engine','Detectando identidad para el cambio de escenario…',9);
    try{await segmentation?.segmentSkin?.();skinMask=segmentation?.exportMaskDataUrl?.()||'';}catch(_){skinMask=''}
-   if(task==='wardrobe_only'){
-    try{await segmentation?.segmentClothing?.();clothingMask=segmentation?.exportMaskDataUrl?.()||'';}catch(_){clothingMask=''}
-   }
    identityMask=await buildIdentityProtection(faceMask,skinMask);
    if(!identityMask)identityMask=faceMask;
   }
@@ -186,32 +184,19 @@ async function prepareTask(prompt){
 
  let directed=prompt;
  if(task==='background_only'){
-  directed=`${prompt}
-
-IDENTITY LOCK — CAMBIO DE FONDO:
-Cambia únicamente el ambiente y el fondo. Conserva exactamente la misma persona, rostro, cabello, expresión, cuerpo, pose, manos y ropa. No reconstruyas ni embellezcas la cara. Ajusta de forma realista la dirección de la luz, temperatura de color, sombras y reflejos para integrar a la persona con el nuevo paisaje.`;
+  directed=`${prompt}\n\nIDENTITY LOCK — CAMBIO DE FONDO:\nCambia únicamente el ambiente y el fondo. Conserva exactamente la misma persona, rostro, cabello, expresión, cuerpo, pose, manos y ropa. No reconstruyas ni embellezcas la cara. Ajusta de forma realista la dirección de la luz, temperatura de color, sombras y reflejos para integrar a la persona con el nuevo paisaje.`;
  }else if(task==='wardrobe_only'){
-  directed=`${prompt}
-
-SEMANTIC IDENTITY GUARD — CAMBIO DE ROPA:
-Trabaja como una edición por capas: la fotografía original es la capa base y solo el vestuario es editable. Modifica exclusivamente la ropa solicitada y ajústala al cuerpo, pose, perspectiva y pliegues naturales. Conserva exactamente el rostro, ojos, nariz, boca, piel, cabello, edad, expresión, manos y proporciones. No redibujes la cara. Mantén el fondo original salvo que la instrucción diga lo contrario.`;
+  directed=`${prompt}\n\nCAMBIO DE ROPA:\nUsa tu segmentación semántica del Alienware para localizar a la persona y el vestuario. Reemplaza la ropa solicitada de forma completa y realista, siguiendo el cuerpo, pose, perspectiva, oclusiones y pliegues naturales. Conserva la identidad y el rostro de la persona y conserva el fondo original. No uses una máscara de piel enviada por el teléfono: determina localmente en el Alienware qué píxeles son ropa y cuáles son anatomía.`;
  }else if(task==='scene_and_wardrobe'){
-  directed=`${prompt}
-
-SEMANTIC IDENTITY GUARD — ESCENARIO Y VESTUARIO:
-Trata rostro, cabello, piel y manos como regiones bloqueadas independientes. Conserva exactamente el rostro, cabello, identidad, edad, expresión, pose, manos y proporciones de la persona original. Puedes cambiar el paisaje y adaptar la ropa de manera lógica al ambiente solicitado (por ejemplo, ropa de invierno para Alaska). Ajusta iluminación, temperatura de color, sombras y reflejos del rostro para que coincidan con el nuevo entorno, sin alterar ningún rasgo facial.`;
+  directed=`${prompt}\n\nSEMANTIC IDENTITY GUARD — ESCENARIO Y VESTUARIO:\nConserva la identidad, edad y rasgos faciales de la persona. Puedes cambiar el paisaje y adaptar la ropa de manera lógica al ambiente solicitado. Ajusta iluminación, temperatura de color, sombras y reflejos de forma natural.`;
  }else{
-  directed=`${prompt}
-
-IDENTITY LOCK:
-Preserva exactamente el rostro, identidad, cabello, edad y expresión salvo que el usuario pida explícitamente editar el rostro. Realiza únicamente el cambio solicitado.`;
+  directed=`${prompt}\n\nIDENTITY LOCK:\nPreserva exactamente el rostro, identidad, cabello, edad y expresión salvo que el usuario pida explícitamente editar el rostro. Realiza únicamente el cambio solicitado.`;
  }
  return {prompt:directed,task,source,originalSource,personMask,identityMask,faceMask,skinMask,clothingMask};
 }
-
 async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
  state.controller=new AbortController();$('ai-generate').disabled=true;$('ai-cancel-job').hidden=false;setStatus('processing','Enviando fotografías','Preparando la tarea para FLUX.2 Klein…',12);
- try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile',task.task);form.append('task',task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('allow_wardrobe_change',String(task.task==='wardrobe_only'||task.task==='scene_and_wardrobe'));form.append('adapt_face_lighting','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.personMask)form.append('mask',await sourceBlob(task.personMask),'person-mask.png');if(task.identityMask)form.append('identity_mask',await sourceBlob(task.identityMask),'identity-mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
+ try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile',task.task);form.append('task',task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('server_semantic_parser',String(task.task==='wardrobe_only'));form.append('client_masks_authoritative',String(task.task!=='wardrobe_only'));form.append('allow_wardrobe_change',String(task.task==='wardrobe_only'||task.task==='scene_and_wardrobe'));form.append('adapt_face_lighting','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.personMask)form.append('mask',await sourceBlob(task.personMask),'person-mask.png');if(task.identityMask)form.append('identity_mask',await sourceBlob(task.identityMask),'identity-mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
  const progress=setInterval(()=>{const current=parseInt($('ai-progress-text').textContent)||12;if(current<88)setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando la edición…',current+Math.random()*5)},1200);
  const r=await fetch(`${state.settings.url}/api/v1/edit`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},body:form,signal:state.controller.signal});clearInterval(progress);if(!r.ok){let msg='';try{msg=(await r.json()).error||''}catch{}throw new Error(msg||`Error ${r.status}`)}
  const type=r.headers.get('content-type')||'';let result;if(type.includes('application/json')){const j=await r.json();result=j.image||j.dataUrl||j.result;if(result&&!result.startsWith('data:')&&!result.startsWith('http'))result=`data:image/png;base64,${result}`}else{const blob=await r.blob();result=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob)})}
@@ -219,17 +204,15 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
  if(task.task==='background_only'&&task.personMask){
   setStatus('processing','Semantic Face & Skin Engine','Recomponiendo la persona desde los píxeles originales…',94);
   result=await compositeLockedRegion(result,task.originalSource,task.personMask,{lightingStrength:.24});
- }else if(task.task==='wardrobe_only'&&(task.clothingMask||task.personMask)){
-  // Semantic wardrobe logic: accept generated pixels only inside the clothing
-  // region when available. Face/skin/hair never need to be regenerated.
-  setStatus('processing','Semantic Face & Skin Engine','Aplicando únicamente la ropa y restaurando identidad…',93);
-  result=await compositeGeneratedInsideMask(result,task.originalSource,task.clothingMask||task.personMask);
-  if(task.identityMask)result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.08});
+ }else if(task.task==='wardrobe_only'){
+  // v14.1: accept the Alienware result directly. The server parser owns the
+  // wardrobe ROI; recompositing with the iPhone mask would restore old clothes.
+  setStatus('processing','Alienware Semantic Parser','Recibiendo cambio de ropa generado con la región del servidor…',94);
  }else if(task.task==='scene_and_wardrobe'&&task.identityMask){
   setStatus('processing','Semantic Face & Skin Engine','Restaurando rostro, cabello y piel desde el original…',94);
   result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.28});
  }
- const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Ropa cambiada por capas; rostro, cabello, piel y fondo original quedaron protegidos.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
+ const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Ropa procesada por el parser semántico del Alienware; PHOTO IA no impuso máscaras locales.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
  setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
  }catch(e){if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
 function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();

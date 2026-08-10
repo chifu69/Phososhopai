@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 14.0 Professional",
+  "name": "PHOTO IA 14.1 Professional",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con edición por capas, Multi-Pass Selection, Identity Guard y Alienware opcional.",
-  "start_url": "./?v=14.0-semantic-face-skin",
+  "start_url": "./?v=14.1-semantic-face-skin",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
