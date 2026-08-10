@@ -583,7 +583,7 @@ function closeResult(result){
 }
 async function segmentProfile(mode='person'){
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
-  const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro preciso',skin:'Piel anatómica',hair:'Cabello',clothing:'Ropa'};const label=labels[mode]||labels.person;
+  const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro preciso',skin:'Piel',hair:'Cabello',clothing:'Ropa'};const label=labels[mode]||labels.person;
   const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);setStatus('Preparando una copia optimizada de la foto…','loading');
   try{
     const work=await getWorkCanvas(operation);setStatus(`Detectando ${label.toLowerCase()}…`,'loading');await letOverlayPaint();
@@ -671,7 +671,7 @@ function boot(){
   if($('segment-debug-test'))$('segment-debug-test').onclick=runConnectionTests;
   if($('processing-cancel'))$('processing-cancel').onclick=()=>cancelCurrent(true);
   api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(e.target?.photoRole==='main')clearMask();});
-  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Semantic Face & Skin Engine listo: rostro, piel, cabello y ropa por capas.');
+  logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor de selección listo.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
 function exportMaskDataUrl(){

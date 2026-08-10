@@ -164,7 +164,10 @@ async function prepareTask(prompt){
  // the iPhone and do NOT send local masks. The Alienware semantic parser has
  // the higher-quality human/face/skin/clothing masks and must define the ROI.
  if(task==='wardrobe_only'){
-  setStatus('processing','Alienware Semantic Parser','Enviando fotografía original completa; Alienware decidirá rostro, piel y ropa…',8);
+  // v14.2: wardrobe flow is fully server-owned.
+  // Remove any old local selection/mask overlay before sending the original photo.
+  try{segmentation?.clearMask?.();}catch(_){}
+  setStatus('processing','Alienware','Enviando la fotografía original completa para cambiar la ropa…',8);
  }else if(task==='background_only'||task==='scene_and_wardrobe'){
   setStatus('processing','Semantic Face & Skin Engine','Separando persona y construyendo mapa semántico…',6);
   await segmentation?.segmentPerson?.();
@@ -207,12 +210,12 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
  }else if(task.task==='wardrobe_only'){
   // v14.1: accept the Alienware result directly. The server parser owns the
   // wardrobe ROI; recompositing with the iPhone mask would restore old clothes.
-  setStatus('processing','Alienware Semantic Parser','Recibiendo cambio de ropa generado con la región del servidor…',94);
+  setStatus('processing','Alienware','Recibiendo la edición terminada…',94);
  }else if(task.task==='scene_and_wardrobe'&&task.identityMask){
   setStatus('processing','Semantic Face & Skin Engine','Restaurando rostro, cabello y piel desde el original…',94);
   result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.28});
  }
- const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Ropa procesada por el parser semántico del Alienware; PHOTO IA no impuso máscaras locales.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
+ const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Cambio de ropa procesado en el Alienware sobre la fotografía original.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
  setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
  }catch(e){if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
 function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();
