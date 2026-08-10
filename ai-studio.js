@@ -41,7 +41,7 @@ function canvasImage(){try{return app()?.exportDataUrl?.()||''}catch{return ''}}
 function useCanvas(silent=false){const d=canvasImage();if(!d){if(!silent)toast('Abre una foto primero.');return false;}state.main=d;if(!silent)toast('Foto del lienzo preparada');return true}
 function chooseFile(input,key,previewId){const f=input.files?.[0];if(!f)return;state[key]=f;preview(previewId,f,key==='main'?'📷':'＋',key==='main'?'Foto principal':'Referencia');if(key==='reference')$('ai-clear-reference').disabled=false}
 function renderHistory(){const wrap=$('ai-history');wrap.innerHTML='';if(!state.history.length){wrap.innerHTML='<p class="layers-empty">Todavía no hay resultados del Estudio IA.</p>';return}state.history.forEach((item,i)=>{const d=document.createElement('div');d.className='ai-history-item';d.innerHTML=`<img alt="Resultado IA ${i+1}" src="${item.image}"><button type="button">Usar resultado</button>`;d.querySelector('button').onclick=async()=>{await app()?.setMainImage?.(item.image,'Resultado Estudio IA');toast('Resultado colocado en el lienzo')};wrap.appendChild(d)})}
-async function testConnection(){const raw=$('ai-server-url').value.trim().replace(/\/$/,'');if(!raw){setBadge('offline','Falta dirección');return toast('Escribe la dirección del servidor.')}setBadge('testing','Probando…');$('ai-connection-note').textContent='Buscando Photoshop AI Server…';const c=new AbortController();const timer=setTimeout(()=>c.abort(),5000);try{const r=await fetch(`${raw}/health`,{headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},signal:c.signal,cache:'no-store'});if(!r.ok){let detail='';try{const j=await r.json();detail=j.detail||j.error||''}catch{};if(r.status===401)throw new Error(detail||'Token incorrecto');throw new Error(detail||`HTTP ${r.status}`)};const info=await r.json().catch(()=>({}));const ready=info.ready!==false;setBadge(ready?'online':'testing',ready?'PC lista':'Falta configurar');$('ai-connection-note').textContent=`Conectada${info.gpu?` • ${info.gpu}`:''}${info.model?` • ${info.model}`:''}${info.workflowReady===false?' • Falta workflow API':''}`;state.online=ready;toast(ready?'Alienware conectado':'Servidor conectado; falta terminar el workflow')}catch(e){setBadge('offline','PC desconectada');const msg=e?.name==='AbortError'?'Tiempo de espera agotado':(e?.message||'Servidor no disponible');$('ai-connection-note').textContent=msg;toast(msg)}finally{clearTimeout(timer)}}
+async function testConnection(){const raw=$('ai-server-url').value.trim().replace(/\/$/,'');if(!raw){setBadge('offline','Falta dirección');return toast('Escribe la dirección del servidor.')}setBadge('testing','Probando…');$('ai-connection-note').textContent='Buscando PHOTO IA Bridge…';const c=new AbortController();const timer=setTimeout(()=>c.abort(),5000);try{const r=await fetch(`${raw}/health`,{headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},signal:c.signal,cache:'no-store'});if(!r.ok){let detail='';try{const j=await r.json();detail=j.detail||j.error||''}catch{};if(r.status===401)throw new Error(detail||'Token incorrecto');throw new Error(detail||`HTTP ${r.status}`)};const info=await r.json().catch(()=>({}));const ready=info.ready!==false;setBadge(ready?'online':'testing',ready?'PC lista':'Falta configurar');$('ai-connection-note').textContent=`Conectada${info.gpu?` • ${info.gpu}`:''}${info.model?` • ${info.model}`:''}${info.workflowReady===false?' • Falta workflow API':''}`;state.online=ready;toast(ready?'Alienware conectado':'Servidor conectado; falta terminar el workflow')}catch(e){setBadge('offline','PC desconectada');const msg=e?.name==='AbortError'?'Tiempo de espera agotado':(e?.message||'Servidor no disponible');$('ai-connection-note').textContent=msg;toast(msg)}finally{clearTimeout(timer)}}
 function saveSettings(){
  state.settings.url=$('ai-server-url').value.trim().replace(/\/$/,'');
  state.settings.token=$('ai-server-token').value.trim();
@@ -50,6 +50,48 @@ function saveSettings(){
 }
 async function sourceBlob(source){if(source instanceof File)return source;if(typeof source==='string'&&source.startsWith('data:'))return dataUrlToBlob(source);throw new Error('No hay fotografía principal.')}
 function loadImage(src){return new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=()=>reject(new Error('No pude abrir una de las imágenes.'));img.src=src;});}
+function smoothstep01(x){x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)}
+async function buildIdentityProtection(faceMask,skinMask){
+ const items=[faceMask,skinMask].filter(Boolean);
+ if(!items.length)return '';
+ const imgs=await Promise.all(items.map(loadImage));
+ const w=imgs[0].naturalWidth||imgs[0].width,h=imgs[0].naturalHeight||imgs[0].height;
+ const out=document.createElement('canvas');out.width=w;out.height=h;
+ const ctx=out.getContext('2d',{willReadFrequently:true});
+ ctx.clearRect(0,0,w,h);
+ // Union of exact face + skin masks.
+ for(const img of imgs){ctx.globalCompositeOperation='source-over';ctx.drawImage(img,0,0,w,h)}
+ // Infer a protected head/hair region from the face mask bounds. This mirrors
+ // Photoshop-style object bounds: the generator may see the whole photo, but
+ // identity pixels are treated as a separate locked region.
+ if(faceMask){
+  const fc=document.createElement('canvas');fc.width=w;fc.height=h;const fctx=fc.getContext('2d',{willReadFrequently:true});
+  const fimg=imgs[0];fctx.drawImage(fimg,0,0,w,h);const d=fctx.getImageData(0,0,w,h).data;
+  let minX=w,minY=h,maxX=-1,maxY=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const a=d[(y*w+x)*4+3];if(a>55){if(x<minX)minX=x;if(x>maxX)maxX=x;if(y<minY)minY=y;if(y>maxY)maxY=y}}
+  if(maxX>=minX&&maxY>=minY){
+   const fw=Math.max(1,maxX-minX+1),fh=Math.max(1,maxY-minY+1);
+   const cx=(minX+maxX)/2,cy=(minY+maxY)/2-fh*.22;
+   ctx.save();ctx.globalCompositeOperation='source-over';
+   const grad=ctx.createRadialGradient(cx,cy,Math.min(fw,fh)*.42,cx,cy,Math.max(fw*1.08,fh*1.16));
+   grad.addColorStop(0,'rgba(255,255,255,1)');grad.addColorStop(.72,'rgba(255,255,255,.98)');grad.addColorStop(1,'rgba(255,255,255,0)');
+   ctx.fillStyle=grad;ctx.beginPath();ctx.ellipse(cx,cy,fw*1.05,fh*1.30,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  }
+ }
+ return out.toDataURL('image/png');
+}
+async function compositeGeneratedInsideMask(generated,original,maskDataUrl){
+ const [gen,src,mask]=await Promise.all([loadImage(generated),loadImage(original),loadImage(maskDataUrl)]);
+ const w=gen.naturalWidth||gen.width,h=gen.naturalHeight||gen.height;
+ const out=document.createElement('canvas');out.width=w;out.height=h;const ctx=out.getContext('2d',{willReadFrequently:true});
+ ctx.drawImage(src,0,0,w,h);
+ const mc=document.createElement('canvas');mc.width=w;mc.height=h;const mctx=mc.getContext('2d',{willReadFrequently:true});mctx.drawImage(mask,0,0,w,h);
+ const md=mctx.getImageData(0,0,w,h).data;
+ const gc=document.createElement('canvas');gc.width=w;gc.height=h;const gctx=gc.getContext('2d',{willReadFrequently:true});gctx.drawImage(gen,0,0,w,h);
+ const gd=gctx.getImageData(0,0,w,h),sd=ctx.getImageData(0,0,w,h);
+ for(let i=0;i<gd.data.length;i+=4){let a=smoothstep01(md[i+3]/255);if(a>.86)a=1;for(let c=0;c<3;c++)sd.data[i+c]=Math.round(sd.data[i+c]*(1-a)+gd.data[i+c]*a);sd.data[i+3]=255}
+ ctx.putImageData(sd,0,0);return out.toDataURL('image/png');
+}
 function normalizedText(value){
  return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 }
@@ -100,8 +142,9 @@ async function compositeLockedRegion(generated,original,maskDataUrl,{lightingStr
  }
  const outData=generatedPixels.data,srcData=sourcePixels.data,maskData=maskPixels.data;
  for(let i=0;i<outData.length;i+=4){
-  const a=maskData[i+3]/255;
+  let a=smoothstep01(maskData[i+3]/255);
   if(a<=0)continue;
+  if(a>.82)a=1;
   for(let c=0;c<3;c++){
    const adjusted=Math.max(0,Math.min(255,srcData[i+c]*gain[c]+offset[c]));
    outData[i+c]=Math.round(outData[i+c]*(1-a)+adjusted*a);
@@ -114,19 +157,27 @@ async function compositeLockedRegion(generated,original,maskDataUrl,{lightingStr
 async function prepareTask(prompt){
  const task=classifyEdit(prompt);
  const segmentation=window.PhotoSegmentation;
- let source=state.main,personMask='',identityMask='';
+ const originalSource=state.main;
+ let source=state.main,personMask='',identityMask='',faceMask='',skinMask='';
 
  if(task==='background_only'||task==='scene_and_wardrobe'||task==='wardrobe_only'){
-  setStatus('processing','Identity Lock','Detectando a la persona y bloqueando el rostro original…',6);
+  setStatus('processing','Layered Identity Guard','Separando persona, límites y regiones protegidas…',6);
   await segmentation?.segmentPerson?.();
   personMask=segmentation?.exportMaskDataUrl?.()||'';
+  // The segmentation work image may be lower resolution for speed. Use it only
+  // as the generation input; protected pixels are always restored from the
+  // full-resolution canvas snapshot stored in originalSource.
   source=segmentation?.exportSourceDataUrl?.()||state.main;
   if(!personMask)throw new Error('No pude separar a la persona. Usa Selección IA y vuelve a intentarlo.');
 
   if(task!=='background_only'){
    await segmentation?.segmentFace?.();
-   identityMask=segmentation?.exportMaskDataUrl?.()||'';
-   if(!identityMask)throw new Error('No pude crear el bloqueo facial. Intenta con una foto donde el rostro sea visible.');
+   faceMask=segmentation?.exportMaskDataUrl?.()||'';
+   if(!faceMask)throw new Error('No pude crear el bloqueo facial. Intenta con una foto donde el rostro sea visible.');
+   setStatus('processing','Layered Identity Guard','Protegiendo rostro, cabello, piel y manos…',9);
+   try{await segmentation?.segmentSkin?.();skinMask=segmentation?.exportMaskDataUrl?.()||'';}catch(_){skinMask=''}
+   identityMask=await buildIdentityProtection(faceMask,skinMask);
+   if(!identityMask)identityMask=faceMask;
   }
  }
 
@@ -139,20 +190,20 @@ Cambia únicamente el ambiente y el fondo. Conserva exactamente la misma persona
  }else if(task==='wardrobe_only'){
   directed=`${prompt}
 
-IDENTITY LOCK — CAMBIO DE ROPA:
-Modifica exclusivamente la ropa solicitada y ajústala al cuerpo, pose, perspectiva y pliegues naturales. Conserva exactamente el rostro, ojos, nariz, boca, piel, cabello, edad, expresión, manos y proporciones. No redibujes la cara. Mantén el fondo original salvo que la instrucción diga lo contrario.`;
+LAYERED IDENTITY GUARD — CAMBIO DE ROPA:
+Trabaja como una edición por capas: la fotografía original es la capa base y solo el vestuario es editable. Modifica exclusivamente la ropa solicitada y ajústala al cuerpo, pose, perspectiva y pliegues naturales. Conserva exactamente el rostro, ojos, nariz, boca, piel, cabello, edad, expresión, manos y proporciones. No redibujes la cara. Mantén el fondo original salvo que la instrucción diga lo contrario.`;
  }else if(task==='scene_and_wardrobe'){
   directed=`${prompt}
 
-IDENTITY LOCK — ESCENARIO Y VESTUARIO:
-Conserva exactamente el rostro, cabello, identidad, edad, expresión, pose, manos y proporciones de la persona original. Puedes cambiar el paisaje y adaptar la ropa de manera lógica al ambiente solicitado (por ejemplo, ropa de invierno para Alaska). Ajusta iluminación, temperatura de color, sombras y reflejos del rostro para que coincidan con el nuevo entorno, sin alterar ningún rasgo facial.`;
+LAYERED IDENTITY GUARD — ESCENARIO Y VESTUARIO:
+Trata rostro, cabello, piel y manos como regiones bloqueadas independientes. Conserva exactamente el rostro, cabello, identidad, edad, expresión, pose, manos y proporciones de la persona original. Puedes cambiar el paisaje y adaptar la ropa de manera lógica al ambiente solicitado (por ejemplo, ropa de invierno para Alaska). Ajusta iluminación, temperatura de color, sombras y reflejos del rostro para que coincidan con el nuevo entorno, sin alterar ningún rasgo facial.`;
  }else{
   directed=`${prompt}
 
 IDENTITY LOCK:
 Preserva exactamente el rostro, identidad, cabello, edad y expresión salvo que el usuario pida explícitamente editar el rostro. Realiza únicamente el cambio solicitado.`;
  }
- return {prompt:directed,task,source,personMask,identityMask};
+ return {prompt:directed,task,source,originalSource,personMask,identityMask,faceMask,skinMask};
 }
 
 async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
@@ -163,13 +214,19 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
  const type=r.headers.get('content-type')||'';let result;if(type.includes('application/json')){const j=await r.json();result=j.image||j.dataUrl||j.result;if(result&&!result.startsWith('data:')&&!result.startsWith('http'))result=`data:image/png;base64,${result}`}else{const blob=await r.blob();result=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob)})}
  if(!result)throw new Error('El servidor no devolvió una imagen.');
  if(task.task==='background_only'&&task.personMask){
-  setStatus('processing','Identity Lock','Restaurando la persona original y adaptando su iluminación…',94);
-  result=await compositeLockedRegion(result,task.source,task.personMask,{lightingStrength:.24});
- }else if((task.task==='wardrobe_only'||task.task==='scene_and_wardrobe')&&task.identityMask){
-  setStatus('processing','Identity Lock','Restaurando el rostro original y adaptando la luz al ambiente…',94);
-  result=await compositeLockedRegion(result,task.source,task.identityMask,{lightingStrength:.38});
+  setStatus('processing','Layered Identity Guard','Recomponiendo la persona desde los píxeles originales…',94);
+  result=await compositeLockedRegion(result,task.originalSource,task.personMask,{lightingStrength:.24});
+ }else if(task.task==='wardrobe_only'&&task.personMask){
+  // Photoshop-style layer logic: generated pixels are accepted only inside
+  // the detected person bounds; the original background is never regenerated.
+  setStatus('processing','Layered Identity Guard','Recortando la generación a la persona y restaurando identidad…',93);
+  result=await compositeGeneratedInsideMask(result,task.originalSource,task.personMask);
+  if(task.identityMask)result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.18});
+ }else if(task.task==='scene_and_wardrobe'&&task.identityMask){
+  setStatus('processing','Layered Identity Guard','Restaurando rostro, cabello y piel desde el original…',94);
+  result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.28});
  }
- const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Ropa cambiada; el rostro original quedó bloqueado.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; el rostro original quedó bloqueado.':'El resultado se colocó en el lienzo.';
+ const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Ropa cambiada por capas; rostro, cabello, piel y fondo original quedaron protegidos.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
  setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
  }catch(e){if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
 function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();
