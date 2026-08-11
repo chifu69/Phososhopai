@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const VERSION='15.0';
+const VERSION='15.1';
 
 function normalize(value){
   return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -79,7 +79,7 @@ async function run({url,token,source,prompt,reference,signal,onProgress}){
   const form=new FormData();
   form.append('prompt',buildPrompt(prompt));
   form.append('mode','change_clothes');
-  form.append('profile','wardrobe_only');
+  form.append('profile','smart_edit');
   form.append('task','wardrobe_only');
 
   // Server owns segmentation. No client masks are ever attached here.

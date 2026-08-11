@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 15.0 Professional",
+  "name": "PHOTO IA 15.1 Professional",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con edición por capas, Multi-Pass Selection, Identity Guard y Alienware opcional.",
-  "start_url": "./?v=15.0-wardrobe-engine",
+  "start_url": "./?v=15.1-wardrobe-profile-fix",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
