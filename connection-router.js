@@ -1,8 +1,8 @@
 (() => {
 'use strict';
 
-const VERSION='15.3';
-const TAILSCALE_URL='https://100.79.114.52:8443';
+const VERSION='15.4';
+const TAILSCALE_URL='https://desktop-i33j4gg.tail079508.ts.net';
 
 function normalizeUrl(value){
   return String(value||'').trim().replace(/\/+$/,'');

@@ -1,5 +1,5 @@
-const CACHE='photo-ia-15-3-connection-router';
-const VERSION='15.3';
+const CACHE='photo-ia-15-4-tailscale-serve';
+const VERSION='15.4';
 const CORE=[
  './','./index.html','./styles.css?v=15.1-wardrobe-profile-fix','./ui-layout.js?v=15.1-wardrobe-profile-fix','./app.js?v=15.1-wardrobe-profile-fix',
  './creative-tools.js?v=15.1-wardrobe-profile-fix','./brain.js?v=15.1-wardrobe-profile-fix',
