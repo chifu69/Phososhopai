@@ -11,7 +11,7 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css">
   <link rel="stylesheet" href="styles.css?v=15.1-wardrobe-profile-fix">
-  <title>PHOTO IA 15.1 — Wardrobe Profile Fix</title>
+  <title>PHOTO IA 15.2 — Wardrobe Profile Fix</title>
 </head>
 <body>
 <div class="app-shell">
@@ -289,14 +289,14 @@
       <details class="ai-settings">
         <summary>⚙️ Conexión privada con el Alienware</summary>
         <div class="ai-settings-grid">
-          <label>Dirección del servidor<input id="ai-server-url" type="url" inputmode="url" placeholder="http://192.168.1.50:8189"></label>
+          <label>Dirección del servidor<input id="ai-server-url" type="url" inputmode="url" placeholder="https://192.168.x.x:8443"></label>
           <label>Token privado<input id="ai-server-token" type="password" autocomplete="off" placeholder="Se guardará solo en este teléfono"></label>
         </div>
         <div class="button-row">
           <button id="ai-test-server" class="secondary" type="button">Probar conexión</button>
           <button id="ai-save-settings" class="secondary" type="button">Guardar</button>
         </div>
-        <p id="ai-connection-note" class="ai-connection-note">Cuando regresemos a casa configuraremos la dirección y el token del servidor.</p>
+        <p id="ai-connection-note" class="ai-connection-note">PHOTO IA probará primero tu dirección guardada y después Tailscale automáticamente.</p>
       </details>
 
       <div class="ai-results-head"><strong>Resultados recientes</strong><button id="ai-clear-history" class="text-btn" type="button">Limpiar</button></div>
@@ -387,7 +387,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 15.1 • Wardrobe Profile Fix + Multi-Pass + Photo Critic</footer>
+  <footer>PHOTO IA 15.2 • Wardrobe Profile Fix + Multi-Pass + Photo Critic</footer>
 </div>
 
 <div id="local-install" class="local-install" hidden>
@@ -405,7 +405,7 @@
 <div id="crop-modal" class="crop-modal" hidden>
   <div class="crop-card"><div class="modal-head"><h2>Recorte profesional</h2><button id="crop-close" class="icon-btn">×</button></div><div class="crop-stage"><img id="crop-image" alt="Imagen para recortar"></div><div class="crop-ratios"><button data-ratio="NaN">Libre</button><button data-ratio="1">1:1</button><button data-ratio="0.8">4:5</button><button data-ratio="1.7777778">16:9</button></div><button id="crop-apply" class="primary wide">Aplicar recorte</button></div>
 </div>
-<div id="pwa-version-badge" class="pwa-version-badge" aria-label="Versión de PHOTO IA">PHOTO IA v15.1 · Wardrobe Profile Fix</div>
+<div id="pwa-version-badge" class="pwa-version-badge" aria-label="Versión de PHOTO IA">PHOTO IA v15.2 · Wardrobe Profile Fix</div>
 <div id="processing" class="processing" hidden><span></span><b>Procesando…</b><button id="processing-cancel" class="processing-cancel" hidden>Cancelar</button></div>
 <div id="toast" class="toast" role="status"></div>
 

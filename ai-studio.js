@@ -2,9 +2,10 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const STORE='photoia-ai-studio-v4';
-const ENGINE_VERSION='15.0';
+const ENGINE_VERSION='15.2';
 const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(location.protocol==='http:'&&location.port==='8189'))?location.origin:'';
-const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},online:false,mode:'image_edit'};
+const TAILSCALE_URL='https://100.79.114.52:8443';
+const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},activeUrl:'',online:false,mode:'image_edit'};
 function app(){return window.PhotoIA}
 function toast(m){app()?.toast?.(m)}
 function read(){
@@ -42,7 +43,35 @@ function canvasImage(){try{return app()?.exportDataUrl?.()||''}catch{return ''}}
 function useCanvas(silent=false){const d=canvasImage();if(!d){if(!silent)toast('Abre una foto primero.');return false;}state.main=d;if(!silent)toast('Foto del lienzo preparada');return true}
 function chooseFile(input,key,previewId){const f=input.files?.[0];if(!f)return;state[key]=f;preview(previewId,f,key==='main'?'📷':'＋',key==='main'?'Foto principal':'Referencia');if(key==='reference')$('ai-clear-reference').disabled=false}
 function renderHistory(){const wrap=$('ai-history');wrap.innerHTML='';if(!state.history.length){wrap.innerHTML='<p class="layers-empty">Todavía no hay resultados del Estudio IA.</p>';return}state.history.forEach((item,i)=>{const d=document.createElement('div');d.className='ai-history-item';d.innerHTML=`<img alt="Resultado IA ${i+1}" src="${item.image}"><button type="button">Usar resultado</button>`;d.querySelector('button').onclick=async()=>{await app()?.setMainImage?.(item.image,'Resultado Estudio IA');toast('Resultado colocado en el lienzo')};wrap.appendChild(d)})}
-async function testConnection(){const raw=$('ai-server-url').value.trim().replace(/\/$/,'');if(!raw){setBadge('offline','Falta dirección');return toast('Escribe la dirección del servidor.')}setBadge('testing','Probando…');$('ai-connection-note').textContent='Buscando PHOTO IA Bridge…';const c=new AbortController();const timer=setTimeout(()=>c.abort(),5000);try{const r=await fetch(`${raw}/health`,{headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},signal:c.signal,cache:'no-store'});if(!r.ok){let detail='';try{const j=await r.json();detail=j.detail||j.error||''}catch{};if(r.status===401)throw new Error(detail||'Token incorrecto');throw new Error(detail||`HTTP ${r.status}`)};const info=await r.json().catch(()=>({}));const ready=info.ready!==false;setBadge(ready?'online':'testing',ready?'PC lista':'Falta configurar');$('ai-connection-note').textContent=`Conectada${info.gpu?` • ${info.gpu}`:''}${info.model?` • ${info.model}`:''}${info.workflowReady===false?' • Falta workflow API':''}`;state.online=ready;toast(ready?'Alienware conectado':'Servidor conectado; falta terminar el workflow')}catch(e){setBadge('offline','PC desconectada');const msg=e?.name==='AbortError'?'Tiempo de espera agotado':(e?.message||'Servidor no disponible');$('ai-connection-note').textContent=msg;toast(msg)}finally{clearTimeout(timer)}}
+function connectionCandidates(){
+ const primary=$('ai-server-url')?.value?.trim().replace(/\/$/,'')||state.settings.url||'';
+ const list=[primary,TAILSCALE_URL].filter(Boolean);
+ return [...new Set(list)];
+}
+async function probeServer(raw,timeoutMs=10000){
+ const c=new AbortController();const timer=setTimeout(()=>c.abort(),timeoutMs);
+ try{
+  const r=await fetch(`${raw}/health`,{headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},signal:c.signal,cache:'no-store'});
+  let info={};try{info=await r.json()}catch{}
+  if(!r.ok){const detail=info.detail||info.error||'';if(r.status===401)throw new Error(detail||'Token incorrecto');throw new Error(detail||`HTTP ${r.status}`)}
+  return info;
+ }finally{clearTimeout(timer)}
+}
+async function testConnection(){
+ const candidates=connectionCandidates();if(!candidates.length){setBadge('offline','Falta dirección');return toast('Escribe la dirección del servidor.')}
+ setBadge('testing','Probando…');$('ai-connection-note').textContent='Buscando PHOTO IA Bridge por red local o Tailscale…';state.online=false;state.activeUrl='';
+ let lastError=null;
+ for(const raw of candidates){
+  try{
+   const info=await probeServer(raw);const ready=info.ready!==false;state.activeUrl=raw;state.online=ready;
+   setBadge(ready?'online':'testing',ready?'PC lista':'Falta configurar');
+   const via=raw===TAILSCALE_URL?'Tailscale':'red local';
+   $('ai-connection-note').textContent=`Conectada por ${via}${info.gpu?` • ${info.gpu}`:''}${info.model?` • ${info.model}`:''}${info.workflowReady===false?' • Falta workflow API':''}`;
+   toast(ready?`Alienware conectado por ${via}`:'Servidor conectado; falta terminar el workflow');return true;
+  }catch(e){lastError=e;if((e?.message||'').toLowerCase().includes('token'))break}
+ }
+ setBadge('offline','PC desconectada');const msg=lastError?.name==='AbortError'?'Tiempo de espera agotado':(lastError?.message||'Servidor no disponible');$('ai-connection-note').textContent=`${msg}. Se probaron red local y Tailscale.`;toast(msg);return false;
+}
 function saveSettings(){
  state.settings.url=$('ai-server-url').value.trim().replace(/\/$/,'');
  state.settings.token=$('ai-server-token').value.trim();
@@ -254,7 +283,8 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
  state.controller=new AbortController();$('ai-generate').disabled=true;$('ai-cancel-job').hidden=false;setStatus('processing','Enviando fotografías','Preparando la tarea para FLUX.2 Klein…',12);
  try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile',task.task);form.append('task',task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('server_semantic_parser',String(task.task==='wardrobe_only'));form.append('client_masks_authoritative',String(task.task!=='wardrobe_only'));form.append('allow_wardrobe_change',String(task.task==='wardrobe_only'||task.task==='scene_and_wardrobe'));form.append('adapt_face_lighting','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.personMask)form.append('mask',await sourceBlob(task.personMask),'person-mask.png');if(task.identityMask)form.append('identity_mask',await sourceBlob(task.identityMask),'identity-mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
  const progress=setInterval(()=>{const current=parseInt($('ai-progress-text').textContent)||12;if(current<88)setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando la edición…',current+Math.random()*5)},1200);
- const r=await fetch(`${state.settings.url}/api/v1/edit`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},body:form,signal:state.controller.signal});clearInterval(progress);if(!r.ok){let msg='';try{msg=(await r.json()).error||''}catch{}throw new Error(msg||`Error ${r.status}`)}
+ const targetUrl=state.activeUrl||state.settings.url;
+ const r=await fetch(`${targetUrl}/api/v1/edit`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},body:form,signal:state.controller.signal});clearInterval(progress);if(!r.ok){let msg='';try{msg=(await r.json()).error||''}catch{}throw new Error(msg||`Error ${r.status}`)}
  const type=r.headers.get('content-type')||'';let result;if(type.includes('application/json')){const j=await r.json();result=j.image||j.dataUrl||j.result;if(result&&!result.startsWith('data:')&&!result.startsWith('http'))result=`data:image/png;base64,${result}`}else{const blob=await r.blob();result=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob)})}
  if(!result)throw new Error('El servidor no devolvió una imagen.');
  if(task.task==='background_only'&&task.personMask){
@@ -271,7 +301,7 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
 function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();
  $('ai-choose-reference').onclick=()=>$('ai-reference-file').click();$('ai-reference-file').onchange=e=>chooseFile(e.target,'reference','ai-reference-preview');$('ai-clear-reference').onclick=()=>{state.reference=null;$('ai-reference-file').value='';preview('ai-reference-preview',null,'＋','Persona, ropa o estilo');$('ai-clear-reference').disabled=true};
  document.querySelectorAll('[data-ai-action]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-ai-action]').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.mode=b.dataset.aiMode||'image_edit';if(state.mode==='change_clothes'){try{window.PhotoWardrobeEngine?.enter?.()}catch(_){}}$('ai-prompt').value=b.dataset.aiAction;$('ai-prompt').focus();toast(`Modo inteligente: ${b.textContent.trim()}`)});
- $('ai-save-settings').onclick=saveSettings;$('ai-test-server').onclick=async()=>{saveSettings();await testConnection()};$('ai-generate').onclick=generate;$('ai-cancel-job').onclick=async()=>{state.controller?.abort();try{if(state.settings.url)await fetch(`${state.settings.url}/api/v1/interrupt`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{}})}catch{}};$('ai-clear-history').onclick=()=>{state.history=[];save();renderHistory();toast('Historial del Estudio IA limpiado')};
+ $('ai-save-settings').onclick=saveSettings;$('ai-test-server').onclick=async()=>{saveSettings();await testConnection()};$('ai-generate').onclick=generate;$('ai-cancel-job').onclick=async()=>{state.controller?.abort();try{if(state.activeUrl||state.settings.url)await fetch(`${state.activeUrl||state.settings.url}/api/v1/interrupt`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{}})}catch{}};$('ai-clear-history').onclick=()=>{state.history=[];save();renderHistory();toast('Historial del Estudio IA limpiado')};
  window.addEventListener('photoia-ready',()=>{if(app()?.state?.photo)useCanvas(true)},{once:true});document.addEventListener('photoia:image-loaded',()=>useCanvas(true));document.addEventListener('photoia:image-cleared',()=>{state.main=null;state.reference=null;$('ai-reference-file').value='';preview('ai-reference-preview',null,'＋','Persona, ropa o estilo');$('ai-clear-reference').disabled=true});if(state.settings.url)testConnection();}
 document.addEventListener('DOMContentLoaded',init);
 })();
