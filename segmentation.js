@@ -582,6 +582,7 @@ function closeResult(result){
   try{result?.confidenceMasks?.forEach(m=>m.close?.());}catch(_){ }
 }
 async function segmentProfile(mode='person'){
+  if(state.suspendedByWardrobe)return;
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
   const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro preciso',skin:'Piel',hair:'Cabello',clothing:'Ropa'};const label=labels[mode]||labels.person;
   const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);setStatus('Preparando una copia optimizada de la foto…','loading');
@@ -597,7 +598,10 @@ async function segmentProfile(mode='person'){
     }else mask=person;
     if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
     const selected=mask.reduce((n,v)=>n+(v>80),0);if(selected<work.width*work.height*.006)throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
-    await setMask(mask,work.width,work.height,label);const q=mask?._photoIAQuality;const confidence=q?Math.max(1,Math.min(99,Math.round(q.score))):null;setStatus(mode==='bust'&&confidence?`${label} seleccionado con análisis multipaso (${confidence}% de confianza). Puedes refinar bordes si lo deseas.`:`${label} seleccionado. Puedes editarlo, refinar la máscara o quitar el fondo.`,'ready');api().toast(mode==='bust'?'Busto analizado y seleccionado':`${label} listo`);
+    if(state.suspendedByWardrobe)throw makeError('Selección local suspendida.','CANCELLED');
+    await setMask(mask,work.width,work.height,label);
+    if(state.suspendedByWardrobe)throw makeError('Selección local suspendida.','CANCELLED');
+    const q=mask?._photoIAQuality;const confidence=q?Math.max(1,Math.min(99,Math.round(q.score))):null;setStatus(mode==='bust'&&confidence?`${label} seleccionado con análisis multipaso (${confidence}% de confianza). Puedes refinar bordes si lo deseas.`:`${label} seleccionado. Puedes editarlo, refinar la máscara o quitar el fondo.`,'ready');api().toast(mode==='bust'?'Busto analizado y seleccionado':mode==='skin'?'Selección de piel lista':`${label} listo`);
   }catch(err){const msg=friendlyError(err);logDebug(`SEGMENTAR ${mode}: ERROR`,err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}finally{finishOperation(operation);}
 }
 const segmentPerson=()=>segmentProfile('person');
@@ -631,6 +635,7 @@ function maskCanvas(mask,width,height,mode='overlay'){
 }
 function removeMaskOverlay(){const canvas=api()?.state?.canvas;if(!canvas)return;canvas.getObjects().filter(o=>o.layerType==='vision-mask').forEach(o=>canvas.remove(o));state.maskOverlay=null;canvas.requestRenderAll();api().renderLayers?.();}
 async function setMask(mask,width,height,label){
+  if(state.suspendedByWardrobe){removeMaskOverlay();state.mask=null;state.maskKind='';return;}
   removeMaskOverlay();state.mask={data:mask,width,height,label};state.maskKind=label;
   const url=maskCanvas(mask,width,height,'overlay').toDataURL('image/png');
   await timeout(new Promise((resolve,reject)=>{
@@ -682,6 +687,22 @@ function exportMaskDataUrl(){
   ctx.putImageData(img,0,0);return canvas.toDataURL('image/png');
 }
 function exportSourceDataUrl(){return state.workCanvas?.toDataURL?.('image/png')||'';}
+
+function suspendForWardrobe(){
+  state.suspendedByWardrobe=true;
+  try{cancelCurrent(false)}catch(_){}
+  try{removeMaskOverlay()}catch(_){}
+  state.mask=null;state.maskKind='';state.tapMode=false;
+  try{api()?.processing(false)}catch(_){}
+  updateUI();
+}
+function resumeAfterWardrobe(){
+  state.suspendedByWardrobe=false;
+  updateUI();
+}
+document.addEventListener('photoia:wardrobe-engine-enter',suspendForWardrobe);
+document.addEventListener('photoia:wardrobe-engine-leave',resumeAfterWardrobe);
+
 window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get mask(){return state.mask}};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();

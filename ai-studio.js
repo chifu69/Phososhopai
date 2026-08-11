@@ -2,6 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const STORE='photoia-ai-studio-v4';
+const ENGINE_VERSION='15.0';
 const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(location.protocol==='http:'&&location.port==='8189'))?location.origin:'';
 const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},online:false,mode:'image_edit'};
 function app(){return window.PhotoIA}
@@ -160,15 +161,9 @@ async function prepareTask(prompt){
  const originalSource=state.main;
  let source=state.main,personMask='',identityMask='',faceMask='',skinMask='',clothingMask='';
 
- // v14.1: wardrobe edits are server-owned. Do NOT pre-segment skin/person on
- // the iPhone and do NOT send local masks. The Alienware semantic parser has
- // the higher-quality human/face/skin/clothing masks and must define the ROI.
- if(task==='wardrobe_only'){
-  // v14.2: wardrobe flow is fully server-owned.
-  // Remove any old local selection/mask overlay before sending the original photo.
-  try{segmentation?.clearMask?.();}catch(_){}
-  setStatus('processing','Alienware','Enviando la fotografía original completa para cambiar la ropa…',8);
- }else if(task==='background_only'||task==='scene_and_wardrobe'){
+ // Wardrobe-only edits are handled exclusively by Wardrobe Engine 15.0.
+ if(task==='wardrobe_only')throw new Error('Wardrobe Engine no tomó control de la tarea.');
+ if(task==='background_only'||task==='scene_and_wardrobe'){
   setStatus('processing','Semantic Face & Skin Engine','Separando persona y construyendo mapa semántico…',6);
   await segmentation?.segmentPerson?.();
   personMask=segmentation?.exportMaskDataUrl?.()||'';
@@ -188,8 +183,7 @@ async function prepareTask(prompt){
  let directed=prompt;
  if(task==='background_only'){
   directed=`${prompt}\n\nIDENTITY LOCK — CAMBIO DE FONDO:\nCambia únicamente el ambiente y el fondo. Conserva exactamente la misma persona, rostro, cabello, expresión, cuerpo, pose, manos y ropa. No reconstruyas ni embellezcas la cara. Ajusta de forma realista la dirección de la luz, temperatura de color, sombras y reflejos para integrar a la persona con el nuevo paisaje.`;
- }else if(task==='wardrobe_only'){
-  directed=`${prompt}\n\nCAMBIO DE ROPA:\nUsa tu segmentación semántica del Alienware para localizar a la persona y el vestuario. Reemplaza la ropa solicitada de forma completa y realista, siguiendo el cuerpo, pose, perspectiva, oclusiones y pliegues naturales. Conserva la identidad y el rostro de la persona y conserva el fondo original. No uses una máscara de piel enviada por el teléfono: determina localmente en el Alienware qué píxeles son ropa y cuáles son anatomía.`;
+
  }else if(task==='scene_and_wardrobe'){
   directed=`${prompt}\n\nSEMANTIC IDENTITY GUARD — ESCENARIO Y VESTUARIO:\nConserva la identidad, edad y rasgos faciales de la persona. Puedes cambiar el paisaje y adaptar la ropa de manera lógica al ambiente solicitado. Ajusta iluminación, temperatura de color, sombras y reflejos de forma natural.`;
  }else{
@@ -197,7 +191,66 @@ async function prepareTask(prompt){
  }
  return {prompt:directed,task,source,originalSource,personMask,identityMask,faceMask,skinMask,clothingMask};
 }
+
+async function generateWardrobe(prompt){
+ const engine=window.PhotoWardrobeEngine;
+ if(!engine)throw new Error('Wardrobe Engine 15.0 no está cargado.');
+ useCanvas(true);
+ if(!state.main)throw new Error('Abre una foto primero.');
+
+ state.controller=new AbortController();
+ $('ai-generate').disabled=true;
+ $('ai-cancel-job').hidden=false;
+
+ let progressTimer=null;
+ try{
+  engine.enter();
+  // Refresh from the visible canvas after removing any old selection overlay.
+  useCanvas(true);
+  const original=state.main;
+
+  let displayed=16;
+  progressTimer=setInterval(()=>{
+   if(displayed<88){
+    displayed=Math.min(88,displayed+Math.max(1,Math.random()*4));
+    setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando el vestuario…',displayed);
+   }
+  },1200);
+
+  const out=await engine.run({
+   url:state.settings.url,
+   token:state.settings.token,
+   source:original,
+   prompt,
+   reference:state.reference,
+   signal:state.controller.signal,
+   onProgress:(pct,title,detail)=>setStatus('processing',title,detail,pct)
+  });
+
+  if(progressTimer){clearInterval(progressTimer);progressTimer=null}
+  setStatus('done','Edición terminada','El Alienware procesó el cambio de ropa sin máscaras locales del iPhone.',100);
+  state.history.unshift({image:out.image,prompt,date:Date.now(),task:'wardrobe_only'});
+  state.history=state.history.slice(0,8);
+  save();renderHistory();
+  await app()?.setMainImage?.(out.image,'Resultado Estudio IA');
+  toast('Cambio de ropa recibido del Alienware');
+ }catch(e){
+  if(progressTimer){clearInterval(progressTimer);progressTimer=null}
+  if(e?.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);
+  else{
+   setStatus('error','No se pudo completar',e?.message||'Error desconocido.',0);
+   toast(e?.message||'Error del servidor');
+  }
+ }finally{
+  try{engine?.leave?.()}catch(_){}
+  $('ai-generate').disabled=false;
+  $('ai-cancel-job').hidden=true;
+  state.controller=null;
+ }
+}
+
 async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
+ if(window.PhotoWardrobeEngine?.matches?.(state.mode,prompt)){await generateWardrobe(prompt);return}
  state.controller=new AbortController();$('ai-generate').disabled=true;$('ai-cancel-job').hidden=false;setStatus('processing','Enviando fotografías','Preparando la tarea para FLUX.2 Klein…',12);
  try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile',task.task);form.append('task',task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('server_semantic_parser',String(task.task==='wardrobe_only'));form.append('client_masks_authoritative',String(task.task!=='wardrobe_only'));form.append('allow_wardrobe_change',String(task.task==='wardrobe_only'||task.task==='scene_and_wardrobe'));form.append('adapt_face_lighting','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.personMask)form.append('mask',await sourceBlob(task.personMask),'person-mask.png');if(task.identityMask)form.append('identity_mask',await sourceBlob(task.identityMask),'identity-mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
  const progress=setInterval(()=>{const current=parseInt($('ai-progress-text').textContent)||12;if(current<88)setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando la edición…',current+Math.random()*5)},1200);
@@ -207,10 +260,7 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
  if(task.task==='background_only'&&task.personMask){
   setStatus('processing','Semantic Face & Skin Engine','Recomponiendo la persona desde los píxeles originales…',94);
   result=await compositeLockedRegion(result,task.originalSource,task.personMask,{lightingStrength:.24});
- }else if(task.task==='wardrobe_only'){
-  // v14.1: accept the Alienware result directly. The server parser owns the
-  // wardrobe ROI; recompositing with the iPhone mask would restore old clothes.
-  setStatus('processing','Alienware','Recibiendo la edición terminada…',94);
+
  }else if(task.task==='scene_and_wardrobe'&&task.identityMask){
   setStatus('processing','Semantic Face & Skin Engine','Restaurando rostro, cabello y piel desde el original…',94);
   result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.28});
@@ -220,7 +270,7 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
  }catch(e){if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
 function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();
  $('ai-choose-reference').onclick=()=>$('ai-reference-file').click();$('ai-reference-file').onchange=e=>chooseFile(e.target,'reference','ai-reference-preview');$('ai-clear-reference').onclick=()=>{state.reference=null;$('ai-reference-file').value='';preview('ai-reference-preview',null,'＋','Persona, ropa o estilo');$('ai-clear-reference').disabled=true};
- document.querySelectorAll('[data-ai-action]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-ai-action]').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.mode=b.dataset.aiMode||'image_edit';$('ai-prompt').value=b.dataset.aiAction;$('ai-prompt').focus();toast(`Modo inteligente: ${b.textContent.trim()}`)});
+ document.querySelectorAll('[data-ai-action]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-ai-action]').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.mode=b.dataset.aiMode||'image_edit';if(state.mode==='change_clothes'){try{window.PhotoWardrobeEngine?.enter?.()}catch(_){}}$('ai-prompt').value=b.dataset.aiAction;$('ai-prompt').focus();toast(`Modo inteligente: ${b.textContent.trim()}`)});
  $('ai-save-settings').onclick=saveSettings;$('ai-test-server').onclick=async()=>{saveSettings();await testConnection()};$('ai-generate').onclick=generate;$('ai-cancel-job').onclick=async()=>{state.controller?.abort();try{if(state.settings.url)await fetch(`${state.settings.url}/api/v1/interrupt`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{}})}catch{}};$('ai-clear-history').onclick=()=>{state.history=[];save();renderHistory();toast('Historial del Estudio IA limpiado')};
  window.addEventListener('photoia-ready',()=>{if(app()?.state?.photo)useCanvas(true)},{once:true});document.addEventListener('photoia:image-loaded',()=>useCanvas(true));document.addEventListener('photoia:image-cleared',()=>{state.main=null;state.reference=null;$('ai-reference-file').value='';preview('ai-reference-preview',null,'＋','Persona, ropa o estilo');$('ai-clear-reference').disabled=true});if(state.settings.url)testConnection();}
 document.addEventListener('DOMContentLoaded',init);
