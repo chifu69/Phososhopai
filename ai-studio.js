@@ -5,7 +5,7 @@ const STORE='photoia-ai-studio-v4';
 const ENGINE_VERSION='15.2';
 const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(location.protocol==='http:'&&location.port==='8189'))?location.origin:'';
 const TAILSCALE_URL='https://100.79.114.52:8443';
-const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},activeUrl:'',online:false,mode:'image_edit'};
+const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},activeUrl:'',online:false,activeUrl:'',activeRouteKind:'',mode:'image_edit'};
 function app(){return window.PhotoIA}
 function toast(m){app()?.toast?.(m)}
 function read(){
@@ -58,19 +58,35 @@ async function probeServer(raw,timeoutMs=10000){
  }finally{clearTimeout(timer)}
 }
 async function testConnection(){
- const candidates=connectionCandidates();if(!candidates.length){setBadge('offline','Falta dirección');return toast('Escribe la dirección del servidor.')}
- setBadge('testing','Probando…');$('ai-connection-note').textContent='Buscando PHOTO IA Bridge por red local o Tailscale…';state.online=false;state.activeUrl='';
- let lastError=null;
- for(const raw of candidates){
-  try{
-   const info=await probeServer(raw);const ready=info.ready!==false;state.activeUrl=raw;state.online=ready;
-   setBadge(ready?'online':'testing',ready?'PC lista':'Falta configurar');
-   const via=raw===TAILSCALE_URL?'Tailscale':'red local';
-   $('ai-connection-note').textContent=`Conectada por ${via}${info.gpu?` • ${info.gpu}`:''}${info.model?` • ${info.model}`:''}${info.workflowReady===false?' • Falta workflow API':''}`;
-   toast(ready?`Alienware conectado por ${via}`:'Servidor conectado; falta terminar el workflow');return true;
-  }catch(e){lastError=e;if((e?.message||'').toLowerCase().includes('token'))break}
+ const router=window.PhotoConnectionRouter;
+ if(!router){toast('Connection Router no está cargado.');return false}
+ saveSettings();
+ const btn=$('ai-test');
+ if(btn)btn.disabled=true;
+ setStatus('processing','Buscando Alienware','Probando red local…',6);
+ try{
+  const route=await router.resolve({
+   primary:state.settings.url,
+   token:state.settings.token,
+   onTry:(c)=>{
+    setStatus('processing','Buscando Alienware',c.kind==='tailscale'?'Probando Tailscale…':'Probando red local…',c.kind==='tailscale'?12:7);
+   }
+  });
+  if(!route.ok){
+   state.online=false;
+   setStatus('error','Alienware no disponible','No respondió por red local ni por Tailscale.',0);
+   toast('No se pudo conectar');
+   return false;
+  }
+  state.online=true;
+  state.activeUrl=route.url;
+  state.activeRouteKind=route.kind;
+  setStatus('done','Conectado',`Conectado por ${route.label}.`,100);
+  toast(`Conectado por ${route.label}`);
+  return true;
+ }finally{
+  if(btn)btn.disabled=false;
  }
- setBadge('offline','PC desconectada');const msg=lastError?.name==='AbortError'?'Tiempo de espera agotado':(lastError?.message||'Servidor no disponible');$('ai-connection-note').textContent=`${msg}. Se probaron red local y Tailscale.`;toast(msg);return false;
 }
 function saveSettings(){
  state.settings.url=$('ai-server-url').value.trim().replace(/\/$/,'');
@@ -247,7 +263,7 @@ async function generateWardrobe(prompt){
   },1200);
 
   const out=await engine.run({
-   url:state.settings.url,
+   url:state.activeUrl||state.settings.url,
    token:state.settings.token,
    source:original,
    prompt,

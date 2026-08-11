@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const VERSION='15.1';
+const VERSION='15.3';
 
 function normalize(value){
   return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -72,9 +72,18 @@ function leave(){
   document.dispatchEvent(new CustomEvent('photoia:wardrobe-engine-leave'));
 }
 async function run({url,token,source,prompt,reference,signal,onProgress}){
-  if(!url) throw new Error('Falta la dirección del Alienware.');
+  const router=window.PhotoConnectionRouter;
+  if(!router)throw new Error('Connection Router 15.3 no está cargado.');
   enter();
-  onProgress?.(8,'Preparando cambio de ropa','Enviando la fotografía original al Alienware…');
+  onProgress?.(5,'Buscando Alienware','Probando red local y Tailscale…');
+  const route=await router.resolve({
+    primary:url,
+    token,
+    onTry:(c)=>onProgress?.(c.kind==='lan'?7:11,'Buscando Alienware',c.kind==='tailscale'?'Probando Tailscale…':'Probando red local…')
+  });
+  if(!route.ok)throw new Error(route.error||'No se pudo conectar al Alienware.');
+  const activeUrl=route.url;
+  onProgress?.(14,'Alienware conectado',`Conectado por ${route.label}.`);
 
   const form=new FormData();
   form.append('prompt',buildPrompt(prompt));
@@ -100,7 +109,7 @@ async function run({url,token,source,prompt,reference,signal,onProgress}){
 
   onProgress?.(16,'Procesando en Alienware','El servidor está localizando persona y vestuario…');
 
-  const response=await fetch(`${String(url).replace(/\/$/,'')}/api/v1/edit`,{
+  const response=await fetch(`${activeUrl}/api/v1/edit`,{
     method:'POST',
     headers:token?{'X-PhotoIA-Token':token}:{},
     body:form,
@@ -121,6 +130,7 @@ async function run({url,token,source,prompt,reference,signal,onProgress}){
   const result=await responseToDataUrl(response);
   return {
     image:result,
+    route:{url:activeUrl,kind:route.kind,label:route.label},
     headers:{
       mode:response.headers.get('X-PhotoIA-Edit-Mode')||'',
       identity:response.headers.get('X-PhotoIA-Identity-Protect')||response.headers.get('X-PhotoIA-Identity-Lock')||'',
