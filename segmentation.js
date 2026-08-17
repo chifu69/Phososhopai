@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='3.4-mobile-watchdog-local-id';
+const VERSION='3.5-ios-stable-local-semantic';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -20,7 +20,7 @@ const PERSON_CLASS_ID=1;
 const IS_IOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
 const LOAD_TIMEOUT=IS_IOS?9000:30000;
 const RUN_TIMEOUT=IS_IOS?8000:30000;
-const PROFILE_WATCHDOG=IS_IOS?10500:36000;
+const PROFILE_WATCHDOG=IS_IOS?7000:36000;
 const state={
   module:null,fileset:null,imageSegmenter:null,multiclassSegmenter:null,interactiveSegmenter:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
@@ -240,9 +240,25 @@ async function smartBustMask(canvas,base){
   }
   const clipped=new Uint8Array(result.length);for(let i=0;i<clipped.length;i++)clipped[i]=(result[i]>70&&guard[i])?result[i]:0;
   result=blurMask(closeMask(largestCenterComponent(clipped,w,h),w,h,1),w,h,1);
-  const finalQ=scoreBustMask(result,w,h,anchor),ratio=result.reduce((n,v)=>n+(v>80),0)/(w*h);
+  let finalQ=scoreBustMask(result,w,h,anchor),ratio=result.reduce((n,v)=>n+(v>80),0)/(w*h);
   logDebug('BUST winner',{name:best.name,...finalQ,guardedRatio:ratio});
-  if(ratio<.025||ratio>.58)throw makeError('No pude aislar cabeza, cuello y hombros con suficiente precisión. Prueba Rostro preciso u Objeto por toque.','BUST_UNSAFE_MASK');
+  if(ratio<.025||ratio>.58){
+    // Stable recovery for mobile: return a conservative anatomical head/neck/shoulder region
+    // instead of failing completely. This is intentionally smaller than a full-person mask.
+    const recoveryPrior=buildAnatomicalBustPrior(anchor,w,h);
+    let recovery=thresholdMask(recoveryPrior,118);
+    recovery=largestCenterComponent(closeMask(recovery,w,h,1),w,h);
+    recovery=blurMask(recovery,w,h,1);
+    const rr=recovery.reduce((n,v)=>n+(v>80),0)/(w*h);
+    if(rr>=.018&&rr<=.50){
+      result=recovery;
+      finalQ=scoreBustMask(result,w,h,anchor);
+      ratio=rr;
+      logDebug('BUST anatomical recovery accepted',{...finalQ,ratio});
+    }else{
+      throw makeError('No pude localizar el busto con seguridad. Prueba con la cara más centrada.','BUST_UNSAFE_MASK');
+    }
+  }
   result._photoIAQuality=finalQ;return result;
 }
 
@@ -408,7 +424,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.10'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.11'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -723,28 +739,24 @@ async function segmentProfile(mode='person'){
         operation
       );
     }else if(mode==='face'||mode==='skin'||mode==='hair'||mode==='clothing'){
-      // Try real MediaPipe first, but on iPhone abandon it quickly and fall back locally.
-      try{
-        const multi=await timeout(
-          mediaPipeMulticlassMasks(work,operation),
-          IS_IOS?7000:RUN_TIMEOUT,
-          'MediaPipe no respondió a tiempo en el teléfono.',
-          operation
-        );
-        mask=mode==='face'?multi.face:mode==='skin'?multi.skin:mode==='hair'?multi.hair:multi.clothing;
-      }catch(mpErr){
-        logDebug('MULTICLASS MediaPipe fallback rápido',mpErr);
-        engine='Fallback local';
+      if(IS_IOS){
+        // Safari/iPhone: do not enter MediaPipe inference on the main thread.
+        // Use the local semantic engine directly to keep the UI responsive.
+        engine='Motor semántico local';
         let person;
         try{
           person=offlinePortraitMask(work);
-        }catch(_){
+        }catch(localPersonErr){
+          logDebug('IOS semantic person fallback',localPersonErr);
           person=new Uint8Array(work.width*work.height);
-          for(let i=0;i<person.length;i++)person[i]=255;
+          // Conservative central-person prior only as a last resort.
+          const lx=Math.floor(work.width*.08),rx=Math.ceil(work.width*.92);
+          const ty=Math.floor(work.height*.02),by=Math.ceil(work.height*.96);
+          for(let y=ty;y<by;y++)for(let x=lx;x<rx;x++)person[y*work.width+x]=255;
         }
         const semantic=await timeout(
           semanticMasks(work,person),
-          IS_IOS?3500:7000,
+          4200,
           'El análisis local tardó demasiado.',
           operation
         );
@@ -752,20 +764,55 @@ async function segmentProfile(mode='person'){
              mode==='skin'?semantic.skinMask:
              mode==='hair'?semantic.hairMask:
              semantic.clothingMask;
+      }else{
+        // Desktop/other browsers: use real MediaPipe first, then local semantic fallback.
+        try{
+          const multi=await timeout(
+            mediaPipeMulticlassMasks(work,operation),
+            RUN_TIMEOUT,
+            'MediaPipe no respondió a tiempo.',
+            operation
+          );
+          mask=mode==='face'?multi.face:mode==='skin'?multi.skin:mode==='hair'?multi.hair:multi.clothing;
+        }catch(mpErr){
+          logDebug('MULTICLASS MediaPipe fallback',mpErr);
+          engine='Fallback local';
+          let person;
+          try{ person=offlinePortraitMask(work); }
+          catch(_){
+            person=new Uint8Array(work.width*work.height);
+            for(let i=0;i<person.length;i++)person[i]=255;
+          }
+          const semantic=await timeout(
+            semanticMasks(work,person),
+            7000,
+            'El análisis local tardó demasiado.',
+            operation
+          );
+          mask=mode==='face'?semantic.faceMask:
+               mode==='skin'?semantic.skinMask:
+               mode==='hair'?semantic.hairMask:
+               semantic.clothingMask;
+        }
       }
     }else{
-      // Person selection: MediaPipe when responsive, otherwise fast local portrait segmentation.
-      try{
-        mask=await timeout(
-          mediaPipePersonMask(work,operation),
-          IS_IOS?6500:RUN_TIMEOUT,
-          'MediaPipe no respondió a tiempo.',
-          operation
-        );
-      }catch(mpErr){
-        logDebug('PERSON MediaPipe fallback rápido',mpErr);
+      if(IS_IOS){
+        engine='Motor local de persona';
         mask=offlinePortraitMask(work);
-        engine='Fallback local';
+      }else{
+        // Desktop/other browsers: MediaPipe when responsive, otherwise fast local portrait segmentation.
+        try{
+          mask=await timeout(
+            mediaPipePersonMask(work,operation),
+            RUN_TIMEOUT,
+            'MediaPipe no respondió a tiempo.',
+            operation
+          );
+        }catch(mpErr){
+          logDebug('PERSON MediaPipe fallback',mpErr);
+          mask=offlinePortraitMask(work);
+          engine='Fallback local';
+        }
       }
     }
 

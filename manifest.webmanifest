@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 15.10 Hybrid Mobile AI",
+  "name": "PHOTO IA 15.11 Hybrid Mobile AI",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con edición por capas, Multi-Pass Selection, Identity Guard y Alienware opcional.",
-  "start_url": "./?v=15.10-local-id",
+  "start_url": "./?v=15.11-local-id",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",

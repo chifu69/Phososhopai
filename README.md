@@ -1,14 +1,18 @@
-# PHOTO IA 13.1 —  Mobile Pro UI
+# PHOTO IA 15.11 — iPhone Stable Local AI
 
-- La foto adapta automáticamente el alto del lienzo a su proporción.
-- Ocupa prácticamente todo el cuadro sin deformarse ni recortarse.
-- Fotos cuadradas, verticales y horizontales usan un tamaño distinto.
-- Doble toque en el lienzo vuelve a centrar y ajustar la foto.
-- Conserva Portrait Retouch 11.5 y la conexión Alienware sin cambios.
+Esta versión prioriza estabilidad en iPhone/Safari.
 
-## Nuevo en 12.0
-- Barra superior de herramientas convertida en Dock compacto estilo macOS.
-- Los botones inactivos permanecen pequeños.
-- La herramienta seleccionada se agranda y muestra su nombre.
-- La barra ocupa menos altura y deja más área visible para la fotografía.
-- Desplazamiento horizontal preparado para agregar más herramientas.
+## Selección IA local
+- Busto / identificación: motor local + recuperación anatómica.
+- Rostro preciso: motor semántico local en iPhone.
+- Piel: motor semántico local en iPhone.
+- Cabello: motor semántico local en iPhone.
+- Ropa: motor semántico local en iPhone.
+- Persona completa: motor local en iPhone.
+- Objeto por toque: mantiene Interactive Segmenter/fallback donde aplique.
+
+## Estabilidad
+En iPhone las funciones anteriores ya no intentan ejecutar primero MediaPipe multiclase en el hilo principal de Safari, evitando los congelamientos observados. MediaPipe sigue disponible para otros navegadores/equipos y ONNX Runtime Web permanece integrado para futuros modelos.
+
+## Alienware
+El Alienware sigue siendo opcional para tareas generativas pesadas. Las selecciones indicadas arriba están diseñadas para funcionar en el teléfono.

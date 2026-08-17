@@ -1,0 +1,5 @@
+PHOTO IA 15.11
+- Corrige congelamiento de Piel/Cabello/Rostro/Ropa en iPhone.
+- iPhone usa motor semántico local directamente.
+- Busto/ID usa recuperación anatómica si la primera máscara no pasa validación.
+- Se eliminaron README históricos; queda solo README.md + esta nota.
