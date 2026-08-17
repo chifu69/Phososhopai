@@ -1,25 +1,29 @@
-const CACHE='photo-ia-15-5-profile-compatibility';
-const VERSION='15.5';
+const CACHE='photo-ia-15-8-hybrid-segmentation';
+const VERSION='15.8';
 const CORE=[
- './','./index.html','./styles.css?v=15.5-profile-compatibility','./ui-layout.js?v=15.5-profile-compatibility','./app.js?v=15.5-profile-compatibility',
- './creative-tools.js?v=15.5-profile-compatibility','./brain.js?v=15.5-profile-compatibility',
- './opencv-engine.js?v=15.5-profile-compatibility','./smart-core.js?v=15.5-profile-compatibility','./wardrobe-engine.js?v=15.5-profile-compatibility','./ai-studio.js?v=15.5-profile-compatibility',
- './vision.js?v=15.5-profile-compatibility','./segmentation.js?v=15.5-profile-compatibility','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=15.8-hybrid-ai','./ui-layout.js?v=15.8-hybrid-ai','./app.js?v=15.8-hybrid-ai',
+ './creative-tools.js?v=15.8-hybrid-ai','./brain.js?v=15.8-hybrid-ai',
+ './opencv-engine.js?v=15.8-hybrid-ai','./smart-core.js?v=15.8-hybrid-ai','./wardrobe-engine.js?v=15.8-hybrid-ai','./ai-studio.js?v=15.8-hybrid-ai',
+ './vision.js?v=15.8-hybrid-ai','./onnx-engine.js?v=15.8-hybrid-ai','./segmentation.js?v=15.8-hybrid-ai','./manifest.webmanifest'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=15.5-profile-compatibility',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=15.5-profile-compatibility',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=15.5-profile-compatibility',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=15.5-profile-compatibility',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=15.5-profile-compatibility',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=15.5-profile-compatibility',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/vendor/fabric.min.js?v=15.8-hybrid-ai',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=15.8-hybrid-ai',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=15.8-hybrid-ai',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=15.8-hybrid-ai',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=15.8-hybrid-ai',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=15.8-hybrid-ai',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
  {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe opcional',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.js',name:'WASM compatible',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.wasm',name:'Motor WASM compatible',required:false},
  {local:'./assets/models/selfie_segmenter_landscape.tflite',remote:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite',name:'Modelo de persona opcional',required:false},
- {local:'./assets/models/interactive_segmenter.tflite',remote:'https://storage.googleapis.com/mediapipe-tasks/interactive_segmenter/ptm_512_hdt_ptm_woid.tflite',name:'Modelo interactivo opcional',required:false}
+ {local:'./assets/models/interactive_segmentation.task',remote:'https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/latest/interactive_segmentation.task',name:'Modelo interactivo MediaPipe',required:false},
+ {local:'./assets/models/selfie_multiclass_256x256.tflite',remote:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',name:'MediaPipe multiclase: cabello, piel, rostro y ropa',required:false,timeout:60000},
+ {local:'./assets/vendor/ort.min.js?v=15.8',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort.min.js',name:'ONNX Runtime Web',required:false,timeout:30000},
+ {local:'./assets/onnx/ort-wasm-simd-threaded.mjs',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort-wasm-simd-threaded.mjs',name:'ONNX WASM loader',required:false,timeout:30000},
+ {local:'./assets/onnx/ort-wasm-simd-threaded.wasm',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort-wasm-simd-threaded.wasm',name:'ONNX WASM runtime',required:false,timeout:30000}
 ];
 const localKey=url=>new URL(url,self.registration.scope).href;
 async function fetchWithTimeout(url,ms=25000){
@@ -29,7 +33,7 @@ async function fetchWithTimeout(url,ms=25000){
  finally{clearTimeout(timer)}
 }
 async function cacheRemote(asset){
- const response=await fetchWithTimeout(asset.remote,asset.required?25000:12000);
+ const response=await fetchWithTimeout(asset.remote,asset.timeout|| (asset.required?25000:12000));
  if(!response.ok) throw new Error(`${response.status} ${asset.remote}`);
  const cache=await caches.open(CACHE);
  await cache.put(localKey(asset.local),response.clone());

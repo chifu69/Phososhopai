@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='13.1-photo-critic-regional-intelligence';
+const VERSION='15.8';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];

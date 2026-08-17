@@ -1,20 +1,28 @@
 (() => {
 'use strict';
-const VERSION='3.0-semantic-face-skin-engine';
+const VERSION='3.3-mediapipe-multiclass-onnx';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
 const MEDIAPIPE_ESM='./assets/mediapipe/tasks-vision.esm.js';
+const MEDIAPIPE_ESM_REMOTE='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm';
 const MEDIAPIPE_WASM='./assets/mediapipe/wasm';
+const MEDIAPIPE_WASM_REMOTE='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm';
 const PERSON_MODEL='./assets/models/selfie_segmenter_landscape.tflite';
-const INTERACTIVE_MODEL='./assets/models/interactive_segmenter.tflite';
+const INTERACTIVE_MODEL='./assets/models/interactive_segmentation.task';
+const MULTICLASS_MODEL='./assets/models/selfie_multiclass_256x256.tflite';
+const MODEL_REMOTE=new Map([
+  [PERSON_MODEL,'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite'],
+  [INTERACTIVE_MODEL,'https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/latest/interactive_segmentation.task'],
+  [MULTICLASS_MODEL,'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite']
+]);
 const PERSON_CLASS_ID=1;
 const LOAD_TIMEOUT=30000;
 const RUN_TIMEOUT=45000;
 const state={
-  module:null,fileset:null,imageSegmenter:null,interactiveSegmenter:null,
+  module:null,fileset:null,imageSegmenter:null,multiclassSegmenter:null,interactiveSegmenter:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
-  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null,semantic:{faceAnchor:null,faceMask:null,skinMask:null,hairMask:null,clothingMask:null,confidence:{}}
+  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,multiclassModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null,semantic:{faceAnchor:null,faceMask:null,skinMask:null,hairMask:null,clothingMask:null,confidence:{}}
 };
 
 const DEBUG_KEY='photoia-segmentation-debug-v1380';
@@ -218,8 +226,21 @@ async function smartBustMask(canvas,base){
       const fused=new Uint8Array(base.length);for(let i=0;i<fused.length;i++){const g=grab[i],h=heuristic[i],a=prior[i];fused[i]=(g>80&&h>80)?255:((g>80||h>80)&&a>150?220:0);}let f=blurMask(closeMask(largestCenterComponent(fused,canvas.width,canvas.height),canvas.width,canvas.height,1),canvas.width,canvas.height,1);const fq=scoreBustMask(f,canvas.width,canvas.height,anchor);candidates.push({name:'fused',mask:f,quality:fq});if(fq.score>best.quality.score)best=candidates[candidates.length-1];
     }
   }
-  let result=edgeAwareRefine(best.mask,canvas,anchor);const finalQ=scoreBustMask(result,canvas.width,canvas.height,anchor);logDebug('BUST winner',{name:best.name,...finalQ});
-  // Never stop at validation. Return the best recoverable mask and tell the UI confidence separately.
+  let result=edgeAwareRefine(best.mask,canvas,anchor);
+  // ID/bust is intentionally conservative: never allow the selection to spill across the photo.
+  // Intersect the candidate with a head/neck/shoulders envelope anchored to the detected face.
+  const w=canvas.width,h=canvas.height,guard=new Uint8Array(w*h);
+  const cx=anchor.x+anchor.w*.5,top=Math.max(0,anchor.y-anchor.h*.42),bottom=Math.min(h-1,anchor.y+anchor.h*2.18);
+  for(let y=Math.floor(top);y<=Math.floor(bottom);y++){
+    const below=Math.max(0,(y-(anchor.y+anchor.h))/Math.max(1,anchor.h));
+    const half=anchor.w*(y<anchor.y ? .68 : y<=anchor.y+anchor.h ? .72 : Math.min(1.42,.78+.34*below));
+    for(let x=Math.max(0,Math.floor(cx-half));x<=Math.min(w-1,Math.ceil(cx+half));x++) guard[y*w+x]=255;
+  }
+  const clipped=new Uint8Array(result.length);for(let i=0;i<clipped.length;i++)clipped[i]=(result[i]>70&&guard[i])?result[i]:0;
+  result=blurMask(closeMask(largestCenterComponent(clipped,w,h),w,h,1),w,h,1);
+  const finalQ=scoreBustMask(result,w,h,anchor),ratio=result.reduce((n,v)=>n+(v>80),0)/(w*h);
+  logDebug('BUST winner',{name:best.name,...finalQ,guardedRatio:ratio});
+  if(ratio<.025||ratio>.58)throw makeError('No pude aislar cabeza, cuello y hombros con suficiente precisión. Prueba Rostro preciso u Objeto por toque.','BUST_UNSAFE_MASK');
   result._photoIAQuality=finalQ;return result;
 }
 
@@ -347,7 +368,7 @@ function environmentInfo(){
     version:VERSION,url:location.href,online:navigator.onLine,userAgent:navigator.userAgent,
     platform:navigator.platform,language:navigator.language,hardwareConcurrency:navigator.hardwareConcurrency,
     deviceMemory:navigator.deviceMemory||'unknown',crossOriginIsolated:self.crossOriginIsolated,
-    webAssembly:typeof WebAssembly!=='undefined',webGL:!!document.createElement('canvas').getContext('webgl'),
+    webAssembly:typeof WebAssembly!=='undefined',onnxRuntime:window.PhotoONNX?.status?.()||{loaded:!!window.ort},webGL:!!document.createElement('canvas').getContext('webgl'),
     webGL2:!!document.createElement('canvas').getContext('webgl2'),screen:`${screen.width}x${screen.height}`
   };
 }
@@ -384,6 +405,8 @@ async function runConnectionTests(){
   setStatus('Ejecutando pruebas de conexión…','loading');
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
+  results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.8'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -392,17 +415,19 @@ async function runConnectionTests(){
   setStatus(results.every(Boolean)?'Todas las direcciones respondieron. Prueba Separar persona.':'Una o más descargas fallaron. Abre el diagnóstico.','error');
 }
 async function fetchModelBuffer(url,operation,label){
-  logDebug(`${label}: descarga binaria inicio`,url);
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(),20000);
-  try{
-    const response=await fetch(url,{cache:'force-cache',signal:controller.signal});
-    if(!response.ok)throw makeError(`${label}: HTTP ${response.status}`,'MODEL_FETCH');
-    const buffer=await response.arrayBuffer();
-    logDebug(`${label}: descarga binaria correcta`,{bytes:buffer.byteLength});
-    if(operation?.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
-    return new Uint8Array(buffer);
-  }finally{clearTimeout(timer)}
+  const candidates=[url,MODEL_REMOTE.get(url)].filter(Boolean);let lastErr=null;
+  for(const candidate of candidates){
+    logDebug(`${label}: descarga binaria inicio`,candidate);
+    const controller=new AbortController();const timer=setTimeout(()=>controller.abort(),candidate===url?22000:60000);
+    try{
+      const response=await fetch(candidate,{cache:'force-cache',signal:controller.signal});
+      if(!response.ok)throw makeError(`${label}: HTTP ${response.status}`,'MODEL_FETCH');
+      const buffer=await response.arrayBuffer();logDebug(`${label}: descarga binaria correcta`,{url:candidate,bytes:buffer.byteLength});
+      if(operation?.cancelled)throw makeError('Proceso cancelado.','CANCELLED');return new Uint8Array(buffer);
+    }catch(err){lastErr=err;logDebug(`${label}: fuente falló`,{url:candidate,error:String(err?.message||err)});}
+    finally{clearTimeout(timer)}
+  }
+  throw lastErr||makeError(`${label}: no disponible.`,'MODEL_FETCH');
 }
 
 window.addEventListener('error',e=>logDebug('ERROR GLOBAL',{message:e.message,source:e.filename,line:e.lineno,column:e.colno,error:serialize(e.error)}));
@@ -489,10 +514,10 @@ async function loadModule(operation){
     state.modulePromise=(async()=>{
       setStatus('Descargando motor de segmentación…','loading');
       logDebug('IMPORT ESM: inicio',MEDIAPIPE_ESM);
-      const mod=await import(MEDIAPIPE_ESM);
+      let mod;try{mod=await import(MEDIAPIPE_ESM);}catch(localErr){logDebug('IMPORT ESM local falló',localErr);mod=await import(MEDIAPIPE_ESM_REMOTE);}
       logDebug('IMPORT ESM: correcto',{exports:Object.keys(mod)});
       logDebug('FILESET WASM: inicio',MEDIAPIPE_WASM);
-      const fileset=await mod.FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);
+      let fileset;try{fileset=await mod.FilesetResolver.forVisionTasks(MEDIAPIPE_WASM);}catch(localErr){logDebug('WASM local falló',localErr);fileset=await mod.FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_REMOTE);}
       logDebug('FILESET WASM: correcto',fileset);
       state.module=mod;state.fileset=fileset;return mod;
     })().catch(err=>{logDebug('CARGA DEL MOTOR: ERROR',err);state.modulePromise=null;state.module=null;state.fileset=null;throw err;});
@@ -545,6 +570,75 @@ async function ensurePersonSegmenter(operation){
   logDebug('SET OPTIONS: persona correcto');
   return state.imageSegmenter;
 }
+
+async function ensureMulticlassSegmenter(operation){
+  logDebug('MULTICLASS SEGMENTER: ensure inicio');
+  await loadModule(operation);if(state.multiclassSegmenter)return state.multiclassSegmenter;
+  if(!state.multiclassModelBuffer)state.multiclassModelBuffer=await fetchModelBuffer(MULTICLASS_MODEL,operation,'MODELO MULTICLASE');
+  setStatus('Preparando rostro, piel, cabello y ropa…','loading');
+  state.multiclassSegmenter=await timeout(
+    state.module.ImageSegmenter.createFromModelBuffer(state.fileset,state.multiclassModelBuffer),
+    LOAD_TIMEOUT,'No se pudo crear el segmentador multiclase.',operation
+  );
+  await timeout(state.multiclassSegmenter.setOptions({
+    runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false
+  }),LOAD_TIMEOUT,'No se pudo configurar el segmentador multiclase.',operation);
+  logDebug('MULTICLASS SEGMENTER: listo');
+  return state.multiclassSegmenter;
+}
+function mediaPipeMaskBytes(mpMask){
+  if(!mpMask)return null;
+  if(typeof mpMask.getAsUint8Array==='function')return new Uint8Array(mpMask.getAsUint8Array());
+  if(mpMask.data instanceof Uint8Array)return new Uint8Array(mpMask.data);
+  return null;
+}
+function mediaPipeConfidenceBytes(mpMask){
+  if(!mpMask)return null;
+  let src=null;
+  if(typeof mpMask.getAsFloat32Array==='function')src=mpMask.getAsFloat32Array();
+  else if(mpMask.data instanceof Float32Array)src=mpMask.data;
+  if(!src)return null;
+  const out=new Uint8Array(src.length);for(let i=0;i<src.length;i++)out[i]=Math.max(0,Math.min(255,Math.round(src[i]*255)));return out;
+}
+function cleanSemanticClass(raw,w,h){
+  let m=closeMask(raw,w,h,1);m=openMask(m,w,h,1);return blurMask(m,w,h,1);
+}
+function classMaskFromCategory(category,classes){
+  const out=new Uint8Array(category.length),set=new Set(classes);
+  for(let i=0;i<category.length;i++)if(set.has(category[i]))out[i]=255;
+  return out;
+}
+async function mediaPipeMulticlassMasks(canvas,operation){
+  const seg=await ensureMulticlassSegmenter(operation);
+  setStatus('MediaPipe está separando cabello, piel, rostro y ropa…','loading');
+  const result=await runTask(()=>seg.segment(canvas),operation);
+  try{
+    const cat=mediaPipeMaskBytes(result?.categoryMask);
+    if(!cat||cat.length!==canvas.width*canvas.height)throw makeError('MediaPipe no devolvió una máscara multiclase válida.','MULTICLASS_EMPTY');
+    const w=canvas.width,h=canvas.height;
+    const hair=cleanSemanticClass(classMaskFromCategory(cat,[1]),w,h);
+    const bodySkin=cleanSemanticClass(classMaskFromCategory(cat,[2]),w,h);
+    const face=cleanSemanticClass(classMaskFromCategory(cat,[3]),w,h);
+    const skin=cleanSemanticClass(classMaskFromCategory(cat,[2,3]),w,h);
+    const clothing=cleanSemanticClass(classMaskFromCategory(cat,[4]),w,h);
+    const accessories=cleanSemanticClass(classMaskFromCategory(cat,[5]),w,h);
+    const person=cleanSemanticClass(classMaskFromCategory(cat,[1,2,3,4,5]),w,h);
+    const counts={};for(let c=0;c<=5;c++)counts[c]=cat.reduce((n,v)=>n+(v===c),0);
+    logDebug('MULTICLASS resultado',{counts,total:cat.length});
+    return {person,hair,bodySkin,face,skin,clothing,accessories,category:cat};
+  }finally{closeResult(result);}
+}
+async function mediaPipePersonMask(canvas,operation){
+  const seg=await ensurePersonSegmenter(operation);
+  setStatus('MediaPipe está separando a la persona…','loading');
+  const result=await runTask(()=>seg.segment(canvas),operation);
+  try{
+    const cat=mediaPipeMaskBytes(result?.categoryMask);
+    if(!cat||cat.length!==canvas.width*canvas.height)throw makeError('MediaPipe no devolvió una máscara de persona válida.','PERSON_MP_EMPTY');
+    const out=new Uint8Array(cat.length);for(let i=0;i<cat.length;i++)if(cat[i]===PERSON_CLASS_ID)out[i]=255;
+    let clean=closeMask(out,canvas.width,canvas.height,1);clean=largestCenterComponent(clean,canvas.width,canvas.height);return blurMask(clean,canvas.width,canvas.height,1);
+  }finally{closeResult(result);}
+}
 async function ensureInteractiveSegmenter(operation){
   await loadModule(operation);if(state.interactiveSegmenter)return state.interactiveSegmenter;
   if(!state.interactiveModelBuffer)state.interactiveModelBuffer=await fetchModelBuffer(INTERACTIVE_MODEL,operation,'MODELO INTERACTIVO');
@@ -556,10 +650,7 @@ async function ensureInteractiveSegmenter(operation){
   );
   logDebug('CREATE FROM MODEL BUFFER: interactivo correcto');
   logDebug('SET OPTIONS: interactivo inicio');
-  await timeout(state.interactiveSegmenter.setOptions({
-    outputCategoryMask:false,outputConfidenceMasks:true
-  }),LOAD_TIMEOUT,'No se pudieron configurar las opciones de selección inteligente.',operation);
-  logDebug('SET OPTIONS: interactivo correcto');
+  logDebug('INTERACTIVE SEGMENTER: listo');
   return state.interactiveSegmenter;
 }
 async function letOverlayPaint(){
@@ -587,21 +678,32 @@ async function segmentProfile(mode='person'){
   const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro preciso',skin:'Piel',hair:'Cabello',clothing:'Ropa'};const label=labels[mode]||labels.person;
   const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);setStatus('Preparando una copia optimizada de la foto…','loading');
   try{
-    const work=await getWorkCanvas(operation);setStatus(`Detectando ${label.toLowerCase()}…`,'loading');await letOverlayPaint();
-    await letOverlayPaint();const person=offlinePortraitMask(work);await letOverlayPaint();
-    let mask;
-    if(mode==='bust')mask=await smartBustMask(work,person);
-    else if(mode==='face'||mode==='skin'||mode==='hair'||mode==='clothing'){
-      setStatus('Analizando rostro, piel, cabello y ropa por capas…','loading');
-      const semantic=await semanticMasks(work,person);
-      mask=mode==='face'?semantic.faceMask:mode==='skin'?semantic.skinMask:mode==='hair'?semantic.hairMask:semantic.clothingMask;
-    }else mask=person;
+    const work=await getWorkCanvas(operation);let mask=null,engine='MediaPipe';
+    if(mode==='bust'){
+      // Legacy mask remains only for explicit "selecciona busto" commands. The ID button uses full-image Portrait ID mode.
+      let person;try{person=await mediaPipePersonMask(work,operation);}catch(err){logDebug('PERSON MediaPipe fallback',err);person=offlinePortraitMask(work);engine='Fallback local';}
+      mask=await smartBustMask(work,person);
+    }else if(mode==='face'||mode==='skin'||mode==='hair'||mode==='clothing'){
+      try{
+        const multi=await mediaPipeMulticlassMasks(work,operation);
+        mask=mode==='face'?multi.face:mode==='skin'?multi.skin:mode==='hair'?multi.hair:multi.clothing;
+      }catch(mpErr){
+        logDebug('MULTICLASS MediaPipe fallback',mpErr);engine='Fallback local';
+        let person;try{person=await mediaPipePersonMask(work,operation);}catch(_){person=offlinePortraitMask(work);}
+        const semantic=await semanticMasks(work,person);
+        mask=mode==='face'?semantic.faceMask:mode==='skin'?semantic.skinMask:mode==='hair'?semantic.hairMask:semantic.clothingMask;
+      }
+    }else{
+      try{mask=await mediaPipePersonMask(work,operation);}catch(mpErr){logDebug('PERSON MediaPipe fallback',mpErr);mask=offlinePortraitMask(work);engine='Fallback local';}
+    }
     if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
-    const selected=mask.reduce((n,v)=>n+(v>80),0);if(selected<work.width*work.height*.006)throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
+    const selected=mask.reduce((n,v)=>n+(v>80),0),ratio=selected/(work.width*work.height);
+    if(selected<work.width*work.height*.004)throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
+    if(ratio>.82&&mode!=='person')throw makeError(`${label} tomó demasiado de la imagen. Intenta otra foto o usa Objeto por toque.`,'PROFILE_MASK_LARGE');
     if(state.suspendedByWardrobe)throw makeError('Selección local suspendida.','CANCELLED');
     await setMask(mask,work.width,work.height,label);
     if(state.suspendedByWardrobe)throw makeError('Selección local suspendida.','CANCELLED');
-    const q=mask?._photoIAQuality;const confidence=q?Math.max(1,Math.min(99,Math.round(q.score))):null;setStatus(mode==='bust'&&confidence?`${label} seleccionado con análisis multipaso (${confidence}% de confianza). Puedes refinar bordes si lo deseas.`:`${label} seleccionado. Puedes editarlo, refinar la máscara o quitar el fondo.`,'ready');api().toast(mode==='bust'?'Busto analizado y seleccionado':mode==='skin'?'Selección de piel lista':`${label} listo`);
+    setStatus(`${label} seleccionado con ${engine}. Puedes refinar la máscara si lo deseas.`,'ready');api().toast(`${label} listo`);
   }catch(err){const msg=friendlyError(err);logDebug(`SEGMENTAR ${mode}: ERROR`,err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}finally{finishOperation(operation);}
 }
 const segmentPerson=()=>segmentProfile('person');
@@ -618,11 +720,32 @@ function canvasPointToNormalized(pointer){
   return {x:Math.max(0,Math.min(1,x)),y:Math.max(0,Math.min(1,y)),inside:x>=0&&x<=1&&y>=0&&y<=1};
 }
 async function segmentAtPoint(x,y){
-  const operation=beginOperation('Creando selección inteligente…');setStatus('Analizando colores y bordes cercanos…','loading');
+  const operation=beginOperation('Creando selección inteligente…');setStatus('MediaPipe está buscando el objeto que tocaste…','loading');
   try{
-    const work=await getWorkCanvas(operation);await letOverlayPaint();
-    const mask=magicWandMask(work,x,y);await setMask(mask,work.width,work.height,'Objeto');
-    setStatus('Objeto seleccionado. Si tomó demasiado o muy poco, toca otra zona.','ready');api().toast('Selección inteligente lista');
+    const work=await getWorkCanvas(operation);await letOverlayPaint();let mask=null,engine='MediaPipe Interactive';
+    try{
+      const seg=await ensureInteractiveSegmenter(operation);
+      let mpMask;
+      // Current MediaPipe API: setImage() then segment() with a positive point stroke.
+      if(typeof seg.setImage==='function'){
+        seg.setImage(work);
+        const positive=state.module?.BrushMode?.POSITIVE ?? 1;
+        mpMask=await runTask(()=>seg.segment([{brushMode:positive,point:[{x,y}],isCompleted:true}]),operation);
+      }else{
+        // Compatibility path for older Tasks Vision builds.
+        const result=await runTask(()=>seg.segment(work,{keypoint:{x,y}}),operation);
+        mpMask=result?.confidenceMasks?.[0]||result?.confidenceMask||result;
+      }
+      mask=mediaPipeConfidenceBytes(mpMask);
+      try{mpMask?.close?.()}catch(_){}
+      if(!mask||mask.length!==work.width*work.height)throw makeError('El segmentador interactivo no devolvió una máscara válida.','INTERACTIVE_EMPTY');
+      mask=thresholdMask(mask,112);mask=largestCenterComponentForSeed(mask,work.width,work.height,Math.round(x*(work.width-1)),Math.round(y*(work.height-1)));mask=blurMask(closeMask(mask,work.width,work.height,1),work.width,work.height,1);
+      const count=mask.reduce((n,v)=>n+(v>80),0);if(count<100||count>work.width*work.height*.72)throw makeError('La selección interactiva no fue confiable.','INTERACTIVE_UNSAFE');
+    }catch(mpErr){
+      logDebug('INTERACTIVE MediaPipe fallback',mpErr);engine='Selección local';mask=magicWandMask(work,x,y);
+    }
+    await setMask(mask,work.width,work.height,'Objeto');
+    setStatus(`Objeto seleccionado con ${engine}. Si tomó demasiado o muy poco, toca otra zona.`,'ready');api().toast('Selección inteligente lista');
   }catch(err){const msg=friendlyError(err);logDebug('SELECCIÓN INTELIGENTE: ERROR',err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
   finally{finishOperation(operation);}
 }
@@ -666,7 +789,7 @@ async function createCutout(){
   }catch(err){const msg=friendlyError(err);console.error(err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
   finally{finishOperation(operation);}
 }
-function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/identificacion|credencial|selecciona.*busto/.test(t)){segmentBust();return true;}if(/selecciona.*rostro|solo.*cara|solo.*rostro/.test(t)){segmentFace();return true;}if(/selecciona.*piel|solo.*piel/.test(t)){segmentSkin();return true;}if(/selecciona.*cabello|solo.*cabello|pelo/.test(t)){segmentHair();return true;}if(/selecciona.*ropa|solo.*ropa|vestuario|prenda/.test(t)){segmentClothing();return true;}if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/regresa.*fondo|restaura.*fondo|muestra.*imagen completa/.test(t)){restoreBackground();return true;}if(/refina.*mascara|mejora.*mascara/.test(t)){refineCurrentMask();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
+function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/identificacion|credencial/.test(t)){window.PhotoAIStudio?.enterPortraitIdMode?.();return true;}if(/selecciona.*busto/.test(t)){segmentBust();return true;}if(/selecciona.*rostro|solo.*cara|solo.*rostro/.test(t)){segmentFace();return true;}if(/selecciona.*piel|solo.*piel/.test(t)){segmentSkin();return true;}if(/selecciona.*cabello|solo.*cabello|pelo/.test(t)){segmentHair();return true;}if(/selecciona.*ropa|solo.*ropa|vestuario|prenda/.test(t)){segmentClothing();return true;}if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/regresa.*fondo|restaura.*fondo|muestra.*imagen completa/.test(t)){restoreBackground();return true;}if(/refina.*mascara|mejora.*mascara/.test(t)){refineCurrentMask();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
 function boot(){
   if(!$('segment-person'))return;
   $('segment-person').onclick=segmentPerson;$('segment-tap').onclick=beginTapMode;$('segment-show').onclick=()=>showMask(true);$('segment-hide').onclick=()=>showMask(false);$('segment-clear').onclick=clearMask;$('segment-cutout').onclick=createCutout;

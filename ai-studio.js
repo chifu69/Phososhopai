@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const STORE='photoia-ai-studio-v4';
-const ENGINE_VERSION='15.5';
+const ENGINE_VERSION='15.8';
 const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(location.protocol==='http:'&&location.port==='8189'))?location.origin:'';
 const TAILSCALE_URL='https://100.79.114.52:8443';
 const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},activeUrl:'',online:false,activeUrl:'',activeRouteKind:'',mode:'image_edit'};
@@ -143,6 +143,7 @@ function normalizedText(value){
 }
 function classifyEdit(prompt){
  const t=normalizedText(prompt);
+ if(state.mode==='portrait_id')return 'portrait_id';
  const clothing=/\b(ropa|camisa|playera|pantalon|vestido|traje|chaqueta|chamarra|abrigo|sueter|sudadera|uniforme|zapatos|botas|gorra|sombrero|ponme|visteme|cambia.*ropa|wear|shirt|pants|dress|jacket|coat|sweater|outfit|uniform|shoes|boots|hat)\b/.test(t);
  const scene=/\b(fondo|paisaje|playa|alaska|nieve|montana|bosque|ciudad|calle|atardecer|amanecer|desierto|campo|oficina|estudio|background|beach|snow|mountain|forest|city|sunset|desert|landscape)\b/.test(t)||state.mode==='replace_background';
  if(scene&&clothing)return 'scene_and_wardrobe';
@@ -208,6 +209,12 @@ async function prepareTask(prompt){
 
  // Wardrobe-only edits are handled exclusively by Wardrobe Engine 15.0.
  if(task==='wardrobe_only')throw new Error('Wardrobe Engine no tomó control de la tarea.');
+ // Portrait/ID deliberately uses the FULL original image as context.
+ // No client-side bust mask is generated or attached.
+ if(task==='portrait_id'){
+  try{segmentation?.clearMask?.()}catch(_){}
+  source=originalSource;
+ }
  if(task==='background_only'||task==='scene_and_wardrobe'){
   setStatus('processing','Semantic Face & Skin Engine','Separando persona y construyendo mapa semántico…',6);
   await segmentation?.segmentPerson?.();
@@ -226,7 +233,35 @@ async function prepareTask(prompt){
  }
 
  let directed=prompt;
- if(task==='background_only'){
+ if(task==='portrait_id'){
+  directed=`${prompt || 'Mejora este retrato para una fotografía de identificación natural y profesional.'}
+
+PORTRAIT / ID EDIT MODE — FULL IMAGE CONTEXT:
+Usa la fotografía ORIGINAL COMPLETA como referencia principal. No recortes ni regeneres a la persona desde cero.
+
+FOCUS:
+- rostro, cabeza, cuello y hombros
+- exposición y balance de blancos naturales
+- tono de piel realista
+- detalle moderado y textura fotográfica real
+
+PRESERVE EXACTLY:
+- identidad y geometría facial
+- edad aparente, expresión y cabello
+- proporciones del cuerpo y pose
+- ropa y accesorios
+- fondo, perspectiva, encuadre y composición
+
+DO NOT:
+- cambiar la cara o embellecerla artificialmente
+- remodelar cuerpo, cuello u hombros
+- cambiar ropa o fondo
+- inventar rasgos, cabello, manos u objetos
+- suavizar la piel en exceso
+- sobresaturar, sobreenfocar o crear apariencia de imagen generada
+
+EDIT STRENGTH: LOW. Resultado fotorealista, natural y lo más cercano posible a la fotografía original.`;
+ }else if(task==='background_only'){
   directed=`${prompt}\n\nIDENTITY LOCK — CAMBIO DE FONDO:\nCambia únicamente el ambiente y el fondo. Conserva exactamente la misma persona, rostro, cabello, expresión, cuerpo, pose, manos y ropa. No reconstruyas ni embellezcas la cara. Ajusta de forma realista la dirección de la luz, temperatura de color, sombras y reflejos para integrar a la persona con el nuevo paisaje.`;
 
  }else if(task==='scene_and_wardrobe'){
@@ -234,7 +269,7 @@ async function prepareTask(prompt){
  }else{
   directed=`${prompt}\n\nIDENTITY LOCK:\nPreserva exactamente el rostro, identidad, cabello, edad y expresión salvo que el usuario pida explícitamente editar el rostro. Realiza únicamente el cambio solicitado.`;
  }
- return {prompt:directed,task,source,originalSource,personMask,identityMask,faceMask,skinMask,clothingMask};
+ return {prompt:directed,task,source,originalSource,personMask,identityMask,faceMask,skinMask,clothingMask,editIntent:task==='portrait_id'?'portrait_id':''};
 }
 
 async function generateWardrobe(prompt){
@@ -297,7 +332,7 @@ async function generateWardrobe(prompt){
 async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
  if(window.PhotoWardrobeEngine?.matches?.(state.mode,prompt)){await generateWardrobe(prompt);return}
  state.controller=new AbortController();$('ai-generate').disabled=true;$('ai-cancel-job').hidden=false;setStatus('processing','Enviando fotografías','Preparando la tarea para FLUX.2 Klein…',12);
- try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile','smart_edit');form.append('task',task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('server_semantic_parser',String(task.task==='wardrobe_only'));form.append('client_masks_authoritative',String(task.task!=='wardrobe_only'));form.append('allow_wardrobe_change',String(task.task==='wardrobe_only'||task.task==='scene_and_wardrobe'));form.append('adapt_face_lighting','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.personMask)form.append('mask',await sourceBlob(task.personMask),'person-mask.png');if(task.identityMask)form.append('identity_mask',await sourceBlob(task.identityMask),'identity-mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
+ try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile','smart_edit');form.append('task',task.task==='portrait_id'?'general_edit':task.task);form.append('edit_intent',task.editIntent||task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('preserve_body',String(task.task==='portrait_id'));form.append('preserve_clothing',String(task.task==='portrait_id'));form.append('preserve_background',String(task.task==='portrait_id'));form.append('focus_region',task.task==='portrait_id'?'face_head_neck_shoulders':'');form.append('edit_strength',task.task==='portrait_id'?'low':'auto');form.append('server_semantic_parser',String(task.task==='wardrobe_only'));form.append('client_masks_authoritative',String(task.task!=='wardrobe_only'&&task.task!=='portrait_id'));form.append('allow_wardrobe_change',String(task.task==='wardrobe_only'||task.task==='scene_and_wardrobe'));form.append('adapt_face_lighting','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.personMask)form.append('mask',await sourceBlob(task.personMask),'person-mask.png');if(task.identityMask)form.append('identity_mask',await sourceBlob(task.identityMask),'identity-mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
  const progress=setInterval(()=>{const current=parseInt($('ai-progress-text').textContent)||12;if(current<88)setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando la edición…',current+Math.random()*5)},1200);
  const targetUrl=state.activeUrl||state.settings.url;
  const r=await fetch(`${targetUrl}/api/v1/edit`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},body:form,signal:state.controller.signal});clearInterval(progress);if(!r.ok){let msg='';try{msg=(await r.json()).error||''}catch{}throw new Error(msg||`Error ${r.status}`)}
@@ -311,9 +346,24 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
   setStatus('processing','Semantic Face & Skin Engine','Restaurando rostro, cabello y piel desde el original…',94);
   result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.28});
  }
- const doneDetail=task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Cambio de ropa procesado en el Alienware sobre la fotografía original.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
+ const doneDetail=task.task==='portrait_id'?'Retrato/ID mejorado usando la fotografía completa; identidad, ropa y fondo protegidos.':task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Cambio de ropa procesado en el Alienware sobre la fotografía original.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
  setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
  }catch(e){if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
+function enterPortraitIdMode(){
+ useCanvas(true);
+ if(!state.main){toast('Abre una foto primero.');return false}
+ try{window.PhotoSegmentation?.clearMask?.()}catch(_){}
+ state.mode='portrait_id';
+ document.querySelectorAll('[data-ai-action]').forEach(x=>x.classList.remove('active'));
+ const prompt=$('ai-prompt');
+ if(prompt){
+  prompt.value='Mejora este retrato de forma natural para identificación. Conserva exactamente la identidad, rostro, cabello, cuerpo, pose, ropa, fondo y composición. Corrige solo luz, balance de blancos, tono de piel, ruido y detalle moderado. No regeneres a la persona ni cambies sus rasgos.';
+ }
+ setStatus('ready','Modo Retrato / ID','Foto completa preparada. Sin máscara de busto; identidad y composición protegidas.',0);
+ toast('Modo Retrato / ID: se usará la foto completa, sin máscara azul.');
+ return true;
+}
+window.PhotoAIStudio={version:ENGINE_VERSION,enterPortraitIdMode,get mode(){return state.mode}};
 function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();
  $('ai-choose-reference').onclick=()=>$('ai-reference-file').click();$('ai-reference-file').onchange=e=>chooseFile(e.target,'reference','ai-reference-preview');$('ai-clear-reference').onclick=()=>{state.reference=null;$('ai-reference-file').value='';preview('ai-reference-preview',null,'＋','Persona, ropa o estilo');$('ai-clear-reference').disabled=true};
  document.querySelectorAll('[data-ai-action]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-ai-action]').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.mode=b.dataset.aiMode||'image_edit';if(state.mode==='change_clothes'){try{window.PhotoWardrobeEngine?.enter?.()}catch(_){}}$('ai-prompt').value=b.dataset.aiAction;$('ai-prompt').focus();toast(`Modo inteligente: ${b.textContent.trim()}`)});
