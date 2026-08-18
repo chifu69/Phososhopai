@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.30.1'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.30.2'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -666,7 +666,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.30.1`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.30.2`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -1229,8 +1229,9 @@ async function adjustSkinTone(amount){
  }
 }
 
-let garmentColorBaseDataUrl='',garmentColorBaseImage=null,garmentPreviewSeq=0;
+let garmentColorBaseDataUrl='',garmentColorBaseImage=null,garmentPreviewSeq=0,garmentColorSessionActive=false;
 async function beginGarmentColorSession(){
+  garmentColorSessionActive=true;
   const photo=api()?.state?.photo,el=photo?.getElement?.()||photo?._element;
   if(!el)throw makeError('No pude leer la fotografía actual.');
   const W=el.naturalWidth||el.width||photo.width||0,H=el.naturalHeight||el.height||photo.height||0;
@@ -1238,7 +1239,7 @@ async function beginGarmentColorSession(){
   const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d',{alpha:false}).drawImage(el,0,0,W,H);
   garmentColorBaseDataUrl=c.toDataURL('image/jpeg',.97);garmentColorBaseImage=await loadImage(garmentColorBaseDataUrl);
 }
-function endGarmentColorSession(){garmentColorBaseDataUrl='';garmentColorBaseImage=null}
+function endGarmentColorSession(){garmentColorBaseDataUrl='';garmentColorBaseImage=null;garmentColorSessionActive=false}
 function hexRgb(hex){const h=String(hex||'#000000').replace('#',''),n=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);return{r:(n>>16)&255,g:(n>>8)&255,b:n&255}}
 function rgbToHsl2(r,g,b){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h=0,s=0,l=(mx+mn)/2;if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);switch(mx){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4}h/=6}return{h,s,l}}
 function hslToRgb2(h,s,l){let r,g,b;if(!s)r=g=b=l;else{const f=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p};const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;r=f(p,q,h+1/3);g=f(p,q,h);b=f(p,q,h-1/3)}return{r:r*255,g:g*255,b:b*255}}
@@ -1263,7 +1264,19 @@ function garmentColorDataUrl(hex,intensity){
 }
 async function previewGarmentColor(hex,intensity){const seq=++garmentPreviewSeq;try{showMask(false);if(!garmentColorBaseImage)await beginGarmentColorSession();const url=garmentColorDataUrl(hex,intensity);if(seq!==garmentPreviewSeq)return;await api().applyProcessedImageDataUrl(url,false)}catch(e){console.error(e);api()?.toast(friendlyError(e))}}
 async function cancelGarmentColorPreview(){garmentPreviewSeq++;try{if(garmentColorBaseDataUrl)await api().applyProcessedImageDataUrl(garmentColorBaseDataUrl,false);if(state.mask)showMask(true)}finally{endGarmentColorSession()}}
-async function applyGarmentColor(hex,intensity){garmentPreviewSeq++;try{showMask(false);if(!garmentColorBaseImage)await beginGarmentColorSession();const url=garmentColorDataUrl(hex,intensity);await api().applyProcessedImageDataUrl(url,true);clearMask();api().toast('Color de prenda aplicado')}catch(e){console.error(e);api()?.toast(friendlyError(e))}finally{endGarmentColorSession()}}
+async function applyGarmentColor(hex,intensity){
+  garmentPreviewSeq++;
+  try{
+    if(!state.mask)return api()?.toast('Selecciona una prenda primero.');
+    showMask(false);
+    if(!garmentColorBaseImage)await beginGarmentColorSession();
+    const url=garmentColorDataUrl(hex,intensity);
+    await api().applyProcessedImageDataUrl(url,true);
+    clearMask();
+    api().toast('Color de prenda aplicado');
+  }catch(e){console.error(e);api()?.toast(friendlyError(e))}
+  finally{endGarmentColorSession()}
+}
 
 function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/identificacion|credencial/.test(t)){segmentBust();return true;}if(/selecciona.*busto/.test(t)){segmentBust();return true;}if(/selecciona.*rostro|solo.*cara|solo.*rostro/.test(t)){segmentFace();return true;}if(/selecciona.*piel|solo.*piel/.test(t)){segmentSkin();return true;}if(/selecciona.*cabello|solo.*cabello|pelo/.test(t)){segmentHair();return true;}if(/selecciona.*ropa|solo.*ropa|vestuario|prenda/.test(t)){segmentClothing();return true;}if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/regresa.*fondo|restaura.*fondo|muestra.*imagen completa/.test(t)){restoreBackground();return true;}if(/refina.*mascara|mejora.*mascara/.test(t)){refineCurrentMask();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
 function boot(){
@@ -1274,7 +1287,7 @@ function boot(){
   if($('segment-debug-download'))$('segment-debug-download').onclick=downloadDebug;
   if($('segment-debug-test'))$('segment-debug-test').onclick=runConnectionTests;
   if($('processing-cancel'))$('processing-cancel').onclick=()=>cancelCurrent(true);
-  api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(e.target?.photoRole==='main')clearMask();});
+  api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(e.target?.photoRole==='main'&&!garmentColorSessionActive&&!skinToneBaseImage)clearMask();});
   logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor de selección listo.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
