@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.25';
+const VERSION='15.26';
 const categoryMap={
  home:['.command-panel','.quick-actions'],smart:['.smart-core-panel','.vision-panel'],adjust:['.tools','.transform'],
  create:['.creative-panel','#object-inspector','.layers-panel'],ai:['#ai-studio'],export:['.export']
@@ -55,22 +55,67 @@ function initAdaptiveWorkspace(){
   g.append(createCard('🪄','Eliminar objeto','Marca un área y envíala a Alienware',()=>{openCategory('ai');window.PhotoIA?.toast('Describe el objeto que quieres eliminar.')}),createCard('👤','Eliminar persona','Usa Selección IA y Alienware',()=>{window.PhotoSegmentation?.segmentPerson?.();window.PhotoIA?.toast('Persona seleccionada. Usa Alienware para rellenar el fondo.')}),createCard('📝','Eliminar texto','Detectar y reparar texto',()=>{openCategory('ai');window.PhotoIA?.toast('Escribe: elimina el texto de la foto.')}),createCard('🖌','Borrador manual','Borra capas creadas manualmente',()=>{window.PhotoIA?.setCanvasMode?.('erase',{openPanel:true});openCategory('create')}),createCard('↩️','Deshacer','Regresa un paso',()=>window.PhotoIA?.undo?.()),createCard('↪️','Rehacer','Recupera el paso siguiente',()=>window.PhotoIA?.redo?.()),createCard('💾','Guardar cambios','Descarga la imagen actual',()=>window.PhotoIA?.download?.()),createCard('📷','Cambiar foto','Borra la actual y abre otra',()=>document.getElementById('new-photo-btn')?.click()),createCard('🔄','Restaurar original','Quita todas las ediciones',()=>window.PhotoIA?.reset?.()));return n}
  
 function openSkinTonePanel(){
- const existing=document.getElementById('photoia-skin-tone-panel');if(existing)existing.remove();
+ const existing=document.getElementById('photoia-skin-tone-panel');
+ if(existing)existing.remove();
+
  if(!window.PhotoSegmentation?.mask||window.PhotoSegmentation?.maskKind!=='skin'){
-   window.PhotoIA?.toast?.('Primero selecciona Piel.');window.PhotoSegmentation?.segmentSkin?.();return;
+   window.PhotoIA?.toast?.('Seleccionando piel primero…');
+   window.PhotoSegmentation?.segmentSkin?.().then(()=>{
+     if(window.PhotoSegmentation?.maskKind==='skin')openSkinTonePanel();
+   });
+   return;
  }
- const panel=document.createElement('div');panel.id='photoia-skin-tone-panel';panel.className='pro-sheet skin-tone-sheet';panel.dataset.snap='compact';
- panel.innerHTML=`<div class="sheet-grabber"></div><div class="sheet-head"><div><small>PHOTO IA 15.25</small><h2>Retoque de piel</h2></div><button type="button" class="sheet-close">×</button></div>
- <div style="padding:8px 18px 24px"><p class="module-intro">Aclara u oscurece únicamente la piel seleccionada, conservando textura, sombras y luces.</p>
- <label style="font-weight:800;display:flex;justify-content:space-between">Tono de piel <span id="skin-tone-value">0</span></label>
- <input id="skin-tone-range" type="range" min="-35" max="35" value="0" step="1" style="width:100%;margin:18px 0 8px">
- <div style="display:flex;justify-content:space-between;font-weight:700;color:#64748b"><span>Oscurecer</span><span>Natural</span><span>Aclarar</span></div>
- <button id="skin-tone-apply" type="button" style="width:100%;margin-top:20px;padding:14px;border-radius:14px;font-weight:800">Aplicar a piel</button></div>`;
+
+ window.PhotoSegmentation?.showMask?.(false);
+
+ const panel=document.createElement('div');
+ panel.id='photoia-skin-tone-panel';
+ panel.className='pro-sheet skin-tone-sheet';
+ panel.dataset.snap='compact';
+ panel.innerHTML=`<div class="sheet-grabber"></div>
+ <div class="sheet-head"><div><small>PHOTO IA 15.26</small><h2>Retoque de piel</h2></div><button type="button" class="sheet-close" aria-label="Cancelar">×</button></div>
+ <div style="padding:8px 18px 24px">
+   <p class="module-intro">Aclara u oscurece únicamente la piel seleccionada. La textura, sombras y color natural se conservan.</p>
+   <label style="font-weight:800;display:flex;justify-content:space-between;align-items:center">
+     <span>Tono de piel</span><strong id="skin-tone-value" style="font-size:1.25rem">0</strong>
+   </label>
+   <input id="skin-tone-range" type="range" min="-100" max="100" value="0" step="1" style="width:100%;margin:18px 0 8px">
+   <div style="display:flex;justify-content:space-between;font-weight:700;color:#64748b"><span>Oscurecer</span><span>Natural</span><span>Aclarar</span></div>
+   <div style="display:grid;grid-template-columns:1fr 1.25fr;gap:10px;margin-top:20px">
+     <button id="skin-tone-cancel" type="button" class="secondary" style="padding:14px;border-radius:14px;font-weight:800">Cancelar</button>
+     <button id="skin-tone-apply" type="button" class="primary" style="padding:14px;border-radius:14px;font-weight:800">Aplicar</button>
+   </div>
+ </div>`;
  document.body.appendChild(panel);
- const r=panel.querySelector('#skin-tone-range'),v=panel.querySelector('#skin-tone-value');
- r.oninput=()=>v.textContent=(+r.value>0?'+':'')+r.value;
- panel.querySelector('.sheet-close').onclick=()=>panel.remove();
- panel.querySelector('#skin-tone-apply').onclick=async()=>{const amount=Number(r.value);if(!amount)return window.PhotoIA?.toast?.('Elige una intensidad.');await window.PhotoSegmentation?.adjustSkinTone?.(amount);panel.remove();};
+
+ const r=panel.querySelector('#skin-tone-range');
+ const v=panel.querySelector('#skin-tone-value');
+ let timer=0,closed=false;
+
+ const cancel=async()=>{
+   if(closed)return;closed=true;
+   clearTimeout(timer);
+   await window.PhotoSegmentation?.cancelSkinTonePreview?.();
+   panel.remove();
+ };
+ const apply=async()=>{
+   if(closed)return;
+   const amount=Number(r.value);
+   if(!amount)return window.PhotoIA?.toast?.('Mueve el control para elegir una intensidad.');
+   closed=true;clearTimeout(timer);
+   await window.PhotoSegmentation?.adjustSkinTone?.(amount);
+   panel.remove();
+ };
+
+ r.oninput=()=>{
+   const n=Number(r.value);
+   v.textContent=(n>0?'+':'')+n;
+   clearTimeout(timer);
+   timer=setTimeout(()=>window.PhotoSegmentation?.previewSkinTone?.(n),90);
+ };
+ panel.querySelector('.sheet-close').onclick=cancel;
+ panel.querySelector('#skin-tone-cancel').onclick=cancel;
+ panel.querySelector('#skin-tone-apply').onclick=apply;
 }
 function buildSelection(){const n=document.createElement('section');n.className='module-grid-wrap';n.innerHTML='<p class="module-intro">Selecciona la parte exacta que quieres editar. La imagen completa puede volver a mostrarse sin perder los cambios.</p><div class="module-grid"></div>';const g=n.querySelector('.module-grid');
   g.append(createCard('🧍','Persona completa','Conserva todo el cuerpo visible',()=>window.PhotoSegmentation?.segmentPerson?.()),createCard('🪪','Busto / identificación','Silueta Persona + recorte por rostro',()=>window.PhotoSegmentation?.segmentBust?.()),createCard('🙂','Rostro preciso','Cara separada de cabello, piel y ropa',()=>window.PhotoSegmentation?.segmentFace?.()),createCard('✨','Piel','Piel facial + corporal por IA',()=>window.PhotoSegmentation?.segmentSkin?.()),createCard('☀️','Aclarar / oscurecer piel','Ajusta solo la piel seleccionada',()=>openSkinTonePanel()),createCard('💇','Cabello','Protección independiente del cabello',()=>window.PhotoSegmentation?.segmentHair?.()),createCard('👕','Ropa','Selecciona vestuario sin cara ni piel',()=>window.PhotoSegmentation?.segmentClothing?.()),createCard('☝️','Objeto por toque','Toca el objeto en la foto',()=>window.PhotoSegmentation?.beginTapMode?.()),createCard('✂️','Refinar máscara','Recupera bordes y suaviza halos',()=>window.PhotoSegmentation?.refineCurrentMask?.()),createCard('👁','Mostrar máscara','Visualiza la selección',()=>window.PhotoSegmentation?.showMask?.(true)),createCard('🌄','Regresar fondo','Muestra la imagen completa y conserva cambios',()=>window.PhotoSegmentation?.restoreBackground?.()),createCard('🧹','Limpiar máscara','Elimina la selección actual',()=>window.PhotoSegmentation?.clearMask?.()),createCard('🩺','Diagnóstico motor','Worker, modelo, resolución y tiempos',()=>window.PhotoSegmentation?.showWorkerDiagnostics?.()));return n}
