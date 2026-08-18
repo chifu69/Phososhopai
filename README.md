@@ -1,11 +1,13 @@
-# PHOTO IA 15.20 — True Selfie Bust + Stable Worker
+# PHOTO IA 15.21 — Confidence Selfie Bust + Stable Worker
 
 - Ropa y Cabello NO se modificaron.
-- Worker, MediaPipe, WASM y modelos se mantienen como en 15.19.
-- Busto/ID:
-  - Cabeza/rostro: Face Landmarker.
-  - Desde mandíbula hacia abajo: la silueta real de Selfie Segmentation manda.
-  - La ventana horizontal es deliberadamente amplia para no cortar hombros.
-  - Se eliminó la forma geométrica de hombros como autoridad.
-  - El borde inferior se desvanece suavemente; no debe aparecer una línea horizontal dura.
-- El diagnóstico de motores se conserva.
+- Worker/MediaPipe/WASM permanecen como en 15.20.
+- Selfie Segmentation para Persona/Busto ahora solicita confidence masks.
+- Se usa la confianza suave de “person” para conservar hombros y bordes que se perdían al convertir todo a categoryMask binario.
+- categoryMask queda como fallback.
+- Busto usa esa máscara suave debajo de la mandíbula y amplía ligeramente la ventana a pecho superior.
+- Diagnóstico añade:
+  - origen de la máscara Selfie (CONFIDENCE/CATEGORY)
+  - coverage %
+  - bounds reales de la silueta
+  - índice/labels cuando estén disponibles

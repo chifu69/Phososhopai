@@ -1,7 +1,7 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.20-true-selfie-bust';
+const WORKER_VERSION='15.21-confidence-selfie-bust';
 const MP_VERSION='1.0.1';
 const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -15,7 +15,7 @@ const FACE_MODEL_LOCAL='./assets/models/face_landmarker.task';
 const FACE_MODEL_REMOTE='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task';
 let PERSON_MODEL=PERSON_MODEL_LOCAL,MULTICLASS_MODEL=MULTICLASS_MODEL_LOCAL,FACE_MODEL=FACE_MODEL_LOCAL;
 let mp=null,fileset=null;
-let diag={worker:'READY',workerVersion:WORKER_VERSION,workerKind:'classic',module:'NOT_LOADED',wasm:'NOT_LOADED',personModel:'NOT_LOADED',multiclassModel:'NOT_LOADED',faceModel:'NOT_LOADED',lastTask:'-',lastPhase:'idle',lastMs:0,input:'-',engine:'MediaPipe Worker',error:''};
+let diag={worker:'READY',workerVersion:WORKER_VERSION,workerKind:'classic',module:'NOT_LOADED',wasm:'NOT_LOADED',personModel:'NOT_LOADED',multiclassModel:'NOT_LOADED',faceModel:'NOT_LOADED',lastTask:'-',lastPhase:'idle',lastMs:0,input:'-',engine:'MediaPipe Worker',personMaskSource:'-',personConfidenceIndex:-1,personLabels:'-',personCoverage:0,personBounds:'-',personMaskMax:0,error:''};
 const now=()=>performance.now();
 function phase(name,extra={}){diag.lastPhase=name;Object.assign(diag,extra);postMessage({type:'phase',phase:name,diag:{...diag}})}
 function errText(e){return String(e?.message||e||'Error desconocido')}
@@ -54,8 +54,12 @@ async function loadMP(){
 }
 
 async function createSegmenterWithFallback(localPath,remotePath,extra={}){
-  try{return await mp.ImageSegmenter.createFromOptions(fileset,{baseOptions:{modelAssetPath:localPath},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false,...extra});}
-  catch(localErr){phase('Modelo local no disponible; probando remoto…');return await mp.ImageSegmenter.createFromOptions(fileset,{baseOptions:{modelAssetPath:remotePath},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false,...extra});}
+  const opts={baseOptions:{modelAssetPath:localPath},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false,...extra};
+  try{return await mp.ImageSegmenter.createFromOptions(fileset,opts);}
+  catch(localErr){
+    phase('Modelo local no disponible; probando remoto…');
+    return await mp.ImageSegmenter.createFromOptions(fileset,{...opts,baseOptions:{modelAssetPath:remotePath}});
+  }
 }
 async function createFaceWithFallback(){
   const opts=path=>({baseOptions:{modelAssetPath:path},runningMode:'IMAGE',numFaces:1,minFaceDetectionConfidence:.40,minFacePresenceConfidence:.40,minTrackingConfidence:.40,outputFaceBlendshapes:false,outputFacialTransformationMatrixes:false});
@@ -65,10 +69,119 @@ async function createFaceWithFallback(){
 function closeResult(r){try{r?.categoryMask?.close?.()}catch(_){} try{r?.confidenceMasks?.forEach(m=>m.close?.())}catch(_){}}
 function maskBytes(m){if(!m)return null;try{const a=m.getAsUint8Array?.();if(a)return new Uint8Array(a)}catch(_){} try{const a=m.getAsFloat32Array?.();if(a)return Uint8Array.from(a,v=>Math.round(Math.max(0,Math.min(1,v))*255))}catch(_){} return null}
 function classMask(cat,ids){const set=new Set(ids),out=new Uint8Array(cat.length);for(let i=0;i<cat.length;i++)if(set.has(cat[i]))out[i]=255;return out}
+
+function floatMask(m){
+  if(!m)return null;
+  try{
+    const a=m.getAsFloat32Array?.();
+    if(a)return new Float32Array(a);
+  }catch(_){}
+  try{
+    const a=m.getAsUint8Array?.();
+    if(a)return Float32Array.from(a,v=>v/255);
+  }catch(_){}
+  return null;
+}
+function maskStats(mask,w,h){
+  if(!mask||!mask.length)return {coverage:0,bounds:null,min:0,max:0};
+  let n=0,minV=255,maxV=0,minX=w,minY=h,maxX=-1,maxY=-1;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const v=mask[y*w+x];
+    minV=Math.min(minV,v);maxV=Math.max(maxV,v);
+    if(v>=80){
+      n++;
+      if(x<minX)minX=x;if(x>maxX)maxX=x;
+      if(y<minY)minY=y;if(y>maxY)maxY=y;
+    }
+  }
+  return {
+    coverage:+((n/Math.max(1,w*h))*100).toFixed(1),
+    bounds:maxX>=0?{x:minX,y:minY,w:maxX-minX+1,h:maxY-minY+1}:null,
+    min:minV===255&&maxV===0?0:minV,
+    max:maxV
+  };
+}
+function confidenceToPersonMask(conf){
+  const out=new Uint8Array(conf.length);
+  for(let i=0;i<conf.length;i++){
+    const p=Math.max(0,Math.min(1,conf[i]));
+    // Preserve soft shoulders/edges instead of binary clipping.
+    out[i]=p>=.75?255:
+           p>=.55?230:
+           p>=.38?195:
+           p>=.24?145:
+           p>=.14?90:
+           p>=.08?48:0;
+  }
+  return out;
+}
+
 async function personMask(image){
-  await loadMP();const t=now();phase('Selfie Segmentation…');
-  phase('Cargando modelo Selfie Segmentation…',{personModel:'LOADING'});const seg=await createSegmenterWithFallback(PERSON_MODEL_LOCAL,PERSON_MODEL_REMOTE);diag.personModel='READY';diag.personModel='READY';phase('Selfie Segmentation READY',{personModel:'READY'});
-  let result;try{result=seg.segment(image);const cat=maskBytes(result?.categoryMask);if(!cat)throw new Error('Selfie Segmentation no devolvió máscara');const out=new Uint8Array(cat.length);for(let i=0;i<cat.length;i++)if(cat[i]===1)out[i]=255;diag.personMs=Math.round(now()-t);return out}finally{closeResult(result);try{seg.close?.()}catch(_){}}
+  await loadMP();
+  const t=now();
+  phase('Selfie Segmentation…');
+  phase('Cargando modelo Selfie Segmentation…',{personModel:'LOADING'});
+
+  // Person/Busto need soft confidence information. Hair/Clothing remain untouched.
+  const seg=await createSegmenterWithFallback(
+    PERSON_MODEL_LOCAL,
+    PERSON_MODEL_REMOTE,
+    {outputCategoryMask:true,outputConfidenceMasks:true}
+  );
+  diag.personModel='READY';
+  phase('Selfie Segmentation READY',{personModel:'READY'});
+
+  let result;
+  try{
+    result=seg.segment(image);
+
+    let out=null;
+    let source='CATEGORY';
+    let confidenceIndex=-1;
+
+    const labels=typeof seg.getLabels==='function' ? (seg.getLabels()||[]) : [];
+    const normLabels=labels.map(v=>String(v||'').toLowerCase());
+    let personIdx=normLabels.findIndex(v=>v.includes('person')||v.includes('foreground'));
+    if(personIdx<0 && result?.confidenceMasks?.length===2)personIdx=1;
+    if(personIdx<0 && result?.confidenceMasks?.length===1)personIdx=0;
+
+    if(personIdx>=0 && result?.confidenceMasks?.[personIdx]){
+      const conf=floatMask(result.confidenceMasks[personIdx]);
+      if(conf){
+        out=confidenceToPersonMask(conf);
+        source='CONFIDENCE';
+        confidenceIndex=personIdx;
+      }
+    }
+
+    // Fallback: category mask as before.
+    if(!out){
+      const cat=maskBytes(result?.categoryMask);
+      if(!cat)throw new Error('Selfie Segmentation no devolvió máscara');
+      out=new Uint8Array(cat.length);
+
+      // Determine actual person category when labels are present.
+      let catPerson=normLabels.findIndex(v=>v.includes('person')||v.includes('foreground'));
+      if(catPerson<0)catPerson=1;
+      for(let i=0;i<cat.length;i++)if(cat[i]===catPerson)out[i]=255;
+      source='CATEGORY';
+      confidenceIndex=-1;
+    }
+
+    const side=Math.round(Math.sqrt(out.length));
+    const stats=maskStats(out,side,Math.max(1,Math.round(out.length/side)));
+    diag.personMaskSource=source;
+    diag.personConfidenceIndex=confidenceIndex;
+    diag.personLabels=labels.join('|')||'-';
+    diag.personCoverage=stats.coverage;
+    diag.personBounds=stats.bounds?`${stats.bounds.x},${stats.bounds.y},${stats.bounds.w}×${stats.bounds.h}`:'-';
+    diag.personMaskMax=stats.max;
+    diag.personMs=Math.round(now()-t);
+    return out;
+  } finally {
+    closeResult(result);
+    try{seg.close?.()}catch(_){}
+  }
 }
 async function multiclass(image,mode){
   await loadMP();const t=now();phase(`Segmentación multiclase: ${mode}…`);
@@ -190,8 +303,8 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
   // TRUE BUST: below the jaw, the real Selfie Segmentation silhouette is authoritative.
   // We only restrict vertical extent and a generous horizontal safety window.
   const bustTop=Math.max(0,Math.floor(jawY-fh*.04));
-  const bustBottom=Math.min(h-1,Math.floor(jawY+fh*2.15));
-  const maxHalf=Math.min(w*.49,fw*2.35);
+  const bustBottom=Math.min(h-1,Math.floor(jawY+fh*2.45));
+  const maxHalf=Math.min(w*.495,fw*2.80);
 
   for(let y=bustTop;y<=bustBottom;y++){
     const t=Math.max(0,Math.min(1,(y-bustTop)/Math.max(1,bustBottom-bustTop)));
@@ -205,13 +318,14 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
       if(!personMask||personMask.length!==out.length)continue;
 
       const pv=personMask[i];
-      if(pv<32)continue;
+      if(pv<40)continue;
 
       // Use Selfie confidence directly.
-      let v = pv>=170 ? 255 :
-              pv>=120 ? 235 :
-              pv>=80  ? 205 :
-              pv>=50  ? 155 : 100;
+      let v = pv>=220 ? 255 :
+              pv>=180 ? 240 :
+              pv>=135 ? 220 :
+              pv>=90  ? 195 :
+              pv>=55  ? 160 : 115;
 
       // Soft lower fade only at the very bottom; no horizontal hard line.
       if(t>.90){
@@ -253,6 +367,12 @@ function resetTaskDiagnostics(task){
   diag.faceMs=0;
   diag.multiclassMs=0;
   diag.error='';
+  diag.personMaskSource='-';
+  diag.personConfidenceIndex=-1;
+  diag.personLabels='-';
+  diag.personCoverage=0;
+  diag.personBounds='-';
+  diag.personMaskMax=0;
 }
 
 self.onmessage=async e=>{

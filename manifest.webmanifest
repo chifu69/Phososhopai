@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 15.20 True Selfie Bust + Stable Worker AI",
+  "name": "PHOTO IA 15.21 Confidence Selfie Bust + Stable Worker AI",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con edición por capas, Multi-Pass Selection, Identity Guard y Alienware opcional.",
-  "start_url": "./?v=15.20-worker",
+  "start_url": "./?v=15.21-worker",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
