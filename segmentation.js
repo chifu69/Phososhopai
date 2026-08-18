@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='3.5-ios-stable-local-semantic';
+const VERSION='3.6-adaptive-skin-id-geometry';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -344,17 +344,142 @@ function buildHairMask(canvas,base,faceMask,anchor){
 function subtractMasks(base,...cuts){
   const out=new Uint8Array(base.length);for(let i=0;i<base.length;i++){if(base[i]<55)continue;let cut=0;for(const m of cuts)if(m)cut=Math.max(cut,m[i]||0);out[i]=Math.max(0,base[i]-Math.min(255,cut));}return out;
 }
+
+function median(values){
+  if(!values?.length)return null;
+  const a=[...values].sort((x,y)=>x-y),m=(a.length-1)/2;
+  return Number.isInteger(m)?a[m]:(a[Math.floor(m)]+a[Math.ceil(m)])/2;
+}
+function mad(values,center){
+  if(!values?.length)return 1;
+  return Math.max(1,median(values.map(v=>Math.abs(v-center)))||1);
+}
+function learnPersonalSkinFromAnchor(canvas,anchor){
+  if(!anchor)return null;
+  const w=canvas.width,h=canvas.height;
+  const data=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+  const cbs=[],crs=[],ys=[];
+  const cx=anchor.x+anchor.w*.5, cy=anchor.y+anchor.h*.56;
+  const rx=Math.max(4,anchor.w*.33), ry=Math.max(4,anchor.h*.38);
+  const y0=Math.max(0,Math.floor(anchor.y+anchor.h*.18));
+  const y1=Math.min(h,Math.ceil(anchor.y+anchor.h*.88));
+  const x0=Math.max(0,Math.floor(anchor.x+anchor.w*.16));
+  const x1=Math.min(w,Math.ceil(anchor.x+anchor.w*.84));
+  for(let y=y0;y<y1;y++)for(let x=x0;x<x1;x++){
+    const ex=(x-cx)/rx,ey=(y-cy)/ry;
+    if(ex*ex+ey*ey>1)continue;
+    const j=(y*w+x)*4,r=data[j],g=data[j+1],b=data[j+2],c=ycbcr(r,g,b);
+    if(c.y<45||c.y>238)continue;
+    const mx=Math.max(r,g,b),mn=Math.min(r,g,b);
+    if(mx-mn>115)continue;
+    cbs.push(c.cb);crs.push(c.cr);ys.push(c.y);
+  }
+  if(cbs.length<28)return null;
+  const cb=median(cbs),cr=median(crs),yy=median(ys);
+  return {
+    cb,cr,y:yy,
+    cbMad:Math.max(3.5,mad(cbs,cb)),
+    crMad:Math.max(3.5,mad(crs,cr)),
+    yMad:Math.max(10,mad(ys,yy)),
+    n:cbs.length
+  };
+}
+function personalSkinScore(r,g,b,m){
+  const c=ycbcr(r,g,b);
+  if(!m)return skinConfidence(r,g,b)?1:0;
+  const dcb=Math.abs(c.cb-m.cb)/Math.max(7,m.cbMad*3.2);
+  const dcr=Math.abs(c.cr-m.cr)/Math.max(8,m.crMad*3.2);
+  const chroma=Math.sqrt(dcb*dcb+dcr*dcr);
+  const yOk=c.y>Math.max(28,m.y-115)&&c.y<Math.min(252,m.y+125);
+  if(!yOk)return 0;
+  if(chroma<.72)return 1;
+  if(chroma<1.05)return .86;
+  if(chroma<1.34&&skinConfidence(r,g,b))return .70;
+  return 0;
+}
+function skinSearchEnvelope(anchor,w,h,x,y){
+  if(!anchor)return 1;
+  const cx=anchor.x+anchor.w*.5;
+  const faceBottom=anchor.y+anchor.h;
+  const fx=(x-cx)/(anchor.w*.67), fy=(y-(anchor.y+anchor.h*.53))/(anchor.h*.66);
+  if(fx*fx+fy*fy<=1.0)return 1;
+  if(y>=faceBottom-anchor.h*.02 && y<=faceBottom+anchor.h*.78 &&
+     Math.abs(x-cx)<=anchor.w*.48)return .95;
+  if(y>=faceBottom+anchor.h*.20 && y<=Math.min(h,faceBottom+anchor.h*3.4) &&
+     Math.abs(x-cx)>=anchor.w*.45 && Math.abs(x-cx)<=anchor.w*1.85)return .78;
+  return 0;
+}
+function buildAdaptivePersonalSkinMask(canvas,anchor){
+  const w=canvas.width,h=canvas.height;
+  const rgba=canvas.getContext('2d',{willReadFrequently:true}).getImageData(0,0,w,h).data;
+  const model=learnPersonalSkinFromAnchor(canvas,anchor);
+  if(!model)throw makeError('No pude aprender el tono de piel de esta foto.','SKIN_MODEL_EMPTY');
+  const out=new Uint8Array(w*h);
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+    const prior=skinSearchEnvelope(anchor,w,h,x,y);
+    if(prior<=0)continue;
+    const j=(y*w+x)*4;
+    const s=personalSkinScore(rgba[j],rgba[j+1],rgba[j+2],model)*prior;
+    if(s>.61)out[y*w+x]=255;
+    else if(s>.48)out[y*w+x]=165;
+  }
+  let m=closeMask(out,w,h,1);
+  m=openMask(m,w,h,1);
+  m=blurMask(m,w,h,1);
+  return m;
+}
+function buildStableIdRegion(anchor,w,h){
+  const out=new Uint8Array(w*h);
+  const cx=anchor.x+anchor.w*.5;
+  const faceCy=anchor.y+anchor.h*.52;
+  const headRx=anchor.w*.72, headRy=anchor.h*.78;
+  const neckTop=anchor.y+anchor.h*.80;
+  const shoulderBottom=Math.min(h-1,anchor.y+anchor.h*2.45);
+  for(let y=Math.max(0,Math.floor(anchor.y-anchor.h*.28));y<=shoulderBottom;y++){
+    let half=0;
+    if(y<=anchor.y+anchor.h*1.08){
+      const dy=(y-faceCy)/headRy;
+      if(Math.abs(dy)<=1)half=headRx*Math.sqrt(Math.max(0,1-dy*dy));
+    }else{
+      const t=(y-(anchor.y+anchor.h*1.02))/Math.max(1,shoulderBottom-(anchor.y+anchor.h*1.02));
+      half=anchor.w*(.50+1.12*Math.pow(Math.max(0,t),.72));
+    }
+    if(y>=neckTop&&y<=anchor.y+anchor.h*1.48)half=Math.max(half,anchor.w*.43);
+    const left=Math.max(0,Math.floor(cx-half)),right=Math.min(w-1,Math.ceil(cx+half));
+    for(let x=left;x<=right;x++){
+      const edge=half?Math.abs(x-cx)/half:1;
+      out[y*w+x]=edge<.90?255:Math.round(255*Math.max(0,(1-edge)/.10));
+    }
+  }
+  return blurMask(closeMask(out,w,h,1),w,h,1);
+}
+
 async function semanticMasks(canvas,person){
   const w=canvas.width,h=canvas.height,anchor=await detectFaceAnchor(canvas,person);
   if(!anchor)throw makeError('No pude localizar el rostro con suficiente precisión.','SEMANTIC_NO_FACE');
   const face=buildFaceMaskFromAnchor(canvas,person,anchor);
   if(!face||!maskBounds(face,w,h))throw makeError('No pude construir una máscara facial confiable.','SEMANTIC_FACE_EMPTY');
-  const skin=buildSemanticSkinMask(canvas,person,face,anchor),hair=buildHairMask(canvas,person,face,anchor);
-  let clothing=subtractMasks(person,skin,hair,face);clothing=closeMask(clothing,w,h,1);clothing=openMask(clothing,w,h,1);clothing=blurMask(clothing,w,h,1);
-  const faceArea=face.reduce((n,v)=>n+(v>100),0),personArea=person.reduce((n,v)=>n+(v>100),0),skinArea=skin.reduce((n,v)=>n+(v>100),0);
-  const confidence=Math.max(1,Math.min(99,Math.round(62+(anchor.source==='FaceDetector'?24:anchor.source==='skin-anchor'?11:2)-Math.abs((faceArea/Math.max(1,personArea))-.08)*80)));
-  state.semantic={faceAnchor:anchor,faceMask:face,skinMask:skin,hairMask:hair,clothingMask:clothing,confidence:{face:confidence,skin:Math.max(1,Math.min(99,Math.round(54+Math.min(.25,skinArea/Math.max(1,personArea))*120)))}};
-  logDebug('SEMANTIC FACE/SKIN',{anchor,confidence:state.semantic.confidence,personArea,faceArea,skinArea});return state.semantic;
+  let skin;
+  try{ skin=buildAdaptivePersonalSkinMask(canvas,anchor); }
+  catch(err){
+    logDebug('SKIN adaptive fallback',err);
+    skin=buildSemanticSkinMask(canvas,person,face,anchor);
+  }
+  const hair=buildHairMask(canvas,person,face,anchor);
+  let clothing=subtractMasks(person,skin,hair,face);
+  clothing=closeMask(clothing,w,h,1);clothing=openMask(clothing,w,h,1);clothing=blurMask(clothing,w,h,1);
+  const faceArea=face.reduce((n,v)=>n+(v>100),0);
+  const personArea=person.reduce((n,v)=>n+(v>100),0);
+  const skinArea=skin.reduce((n,v)=>n+(v>100),0);
+  const confidence=Math.max(1,Math.min(99,Math.round(
+    68+(anchor.source==='FaceDetector'?20:anchor.source==='skin-anchor'?12:4)
+  )));
+  state.semantic={
+    faceAnchor:anchor,faceMask:face,skinMask:skin,hairMask:hair,clothingMask:clothing,
+    confidence:{face:confidence,skin:Math.max(30,Math.min(98,Math.round(58+Math.min(.32,skinArea/Math.max(1,w*h))*105)))}
+  };
+  logDebug('SEMANTIC 15.12',{anchor,confidence:state.semantic.confidence,personArea,faceArea,skinArea});
+  return state.semantic;
 }
 
 function profileMask(base,w,h,mode='person',canvas=null){if(mode==='person')return base;const box=maskBounds(base,w,h);if(!box)return base;const out=new Uint8Array(base.length),cx=box.x+box.w/2;
@@ -424,7 +549,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.11'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.12'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -716,28 +841,22 @@ async function segmentProfile(mode='person'){
     let mask=null,engine='MediaPipe';
 
     if(mode==='bust'){
-      // ID/Busto MUST work offline on iPhone. Do not wait for MediaPipe here.
-      // Build a conservative local person mask, then crop anatomically to head/neck/shoulders.
-      setStatus('Detectando cabeza, cuello y hombros en el teléfono…','loading');
+      setStatus('Localizando rostro y construyendo área ID…','loading');
       let person;
-      try{
-        person=offlinePortraitMask(work);
-        engine='Motor local rápido';
-      }catch(localErr){
-        logDebug('BUST local portrait fallback',localErr);
-        // Last-resort center prior: smartBustMask can still anchor from visible skin/person bounds.
+      try{ person=offlinePortraitMask(work); }
+      catch(_){
         person=new Uint8Array(work.width*work.height);
-        const left=Math.floor(work.width*.12),right=Math.ceil(work.width*.88);
-        const top=Math.floor(work.height*.03),bottom=Math.ceil(work.height*.92);
-        for(let y=top;y<bottom;y++)for(let x=left;x<right;x++)person[y*work.width+x]=255;
-        engine='Motor anatómico local';
+        for(let i=0;i<person.length;i++)person[i]=255;
       }
-      mask=await timeout(
-        smartBustMask(work,person),
-        IS_IOS?4500:9000,
-        'La selección de identificación tardó demasiado.',
+      const anchor=await timeout(
+        detectFaceAnchor(work,person),
+        2600,
+        'No pude localizar el rostro a tiempo.',
         operation
       );
+      if(!anchor)throw makeError('No pude localizar el rostro.','BUST_NO_FACE');
+      mask=buildStableIdRegion(anchor,work.width,work.height);
+      engine='Geometría facial local';
     }else if(mode==='face'||mode==='skin'||mode==='hair'||mode==='clothing'){
       if(IS_IOS){
         // Safari/iPhone: do not enter MediaPipe inference on the main thread.
@@ -823,7 +942,7 @@ async function segmentProfile(mode='person'){
     const ratio=selected/(work.width*work.height);
     if(selected<work.width*work.height*.004)
       throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
-    if(ratio>.82&&mode!=='person')
+    if(ratio>.82&&mode!=='person'&&mode!=='bust')
       throw makeError(`${label} tomó demasiado de la imagen. Intenta otra foto o usa Objeto por toque.`,'PROFILE_MASK_LARGE');
 
     if(state.suspendedByWardrobe)throw makeError('Selección local suspendida.','CANCELLED');

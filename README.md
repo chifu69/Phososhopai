@@ -1,18 +1,7 @@
-# PHOTO IA 15.11 — iPhone Stable Local AI
+# PHOTO IA 15.12 — Adaptive Skin + Stable ID
 
-Esta versión prioriza estabilidad en iPhone/Safari.
-
-## Selección IA local
-- Busto / identificación: motor local + recuperación anatómica.
-- Rostro preciso: motor semántico local en iPhone.
-- Piel: motor semántico local en iPhone.
-- Cabello: motor semántico local en iPhone.
-- Ropa: motor semántico local en iPhone.
-- Persona completa: motor local en iPhone.
-- Objeto por toque: mantiene Interactive Segmenter/fallback donde aplique.
-
-## Estabilidad
-En iPhone las funciones anteriores ya no intentan ejecutar primero MediaPipe multiclase en el hilo principal de Safari, evitando los congelamientos observados. MediaPipe sigue disponible para otros navegadores/equipos y ONNX Runtime Web permanece integrado para futuros modelos.
-
-## Alienware
-El Alienware sigue siendo opcional para tareas generativas pesadas. Las selecciones indicadas arriba están diseñadas para funcionar en el teléfono.
+- Piel aprende el tono de piel de la cara de la persona en la foto.
+- Busto / identificación usa geometría del rostro para crear cabeza + cuello + hombros.
+- En iPhone se mantiene la ruta local para evitar congelamientos.
+- MediaPipe y ONNX siguen integrados para expansión futura.
+- Solo queda un README.
