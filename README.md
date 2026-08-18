@@ -1,16 +1,4 @@
-# PHOTO IA 15.24 — Direct Person Bust + Semantic Skin
-
-Cambios:
-- Persona completa NO se modifica.
-- Ropa NO se modifica.
-- Cabello NO se modifica.
-- Busto/ID:
-  - usa directamente la máscara real de Persona completa;
-  - Face Landmarker solo determina hasta dónde cortar verticalmente;
-  - conserva cabeza, cuello, hombros y pecho superior con la silueta real;
-  - elimina la geometría inventada de hombros.
-- Piel:
-  - usa directamente las clases semánticas de piel facial + piel corporal del modelo multiclase;
-  - YCbCr deja de ser la autoridad principal;
-  - ojos, cejas, cabello y ropa quedan fuera según las clases del modelo.
-- Worker/MediaPipe/WASM/modelos permanecen intactos.
+# PHOTO IA 15.25 — Skin Tone Local Retouch
+Mantiene el pipeline estable de 15.24 y añade Aclarar / oscurecer piel local.
+El ajuste usa únicamente la máscara Piel, preserva textura mediante ajuste adaptativo de luminancia, tiene intensidad -35 a +35 y guarda el resultado en Undo/Redo.
+Después de aplicar limpia la máscara anterior para evitar reutilizar una selección desactualizada.
