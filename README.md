@@ -1,15 +1,8 @@
-# PHOTO IA 15.30 — Garment Color by Pose
+# PHOTO IA 15.30.1 — Garment Menu Wiring Fix
 
-Nuevo:
-- 🎨 Color de ropa.
-- Separación automática de 👕 Camisa/Top, 👖 Pantalón/Shorts y 👟 Zapatos.
-- Pipeline: Selfie Multiclass (Ropa) → Pose Landmarker Lite → región anatómica → intersección con Ropa → limpieza de máscara.
-- Pose Landmarker se carga solo al usar Color de ropa.
-- Selector de color + intensidad + preview + Aplicar/Cancelar.
-- El recoloreado conserva luminancia, sombras, pliegues y textura en vez de pintar plano.
-- ☝️ Tocar prenda conserva el Interactive Segmenter actual como fallback/refinamiento.
-
-Preservado:
-- Piel y su slider 15.29.
-- Persona completa, Busto/ID, Rostro, Cabello y Ropa existentes.
-- Worker clásico y MediaPipe/WASM estables.
+Corrección:
+- 15.30 exportaba segmentGarmentUpper / segmentGarmentLower / segmentGarmentShoes sin haber creado esas funciones.
+- Eso generaba un ReferenceError al cargar segmentation.js y dejaba sin inicializar window.PhotoSegmentation.
+- 15.30.1 define correctamente los tres wrappers antes de exportarlos.
+- Camisa/Top, Pantalón/Shorts y Zapatos vuelven a apuntar al Worker con los modos garment-upper / garment-lower / garment-shoes.
+- No se modificaron los modelos, Piel, Cabello, Ropa, Persona, Busto/ID ni el pipeline del Worker.

@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 15.30 Skin Tone Local Retouch AI",
+  "name": "PHOTO IA 15.30.1 Skin Tone Local Retouch AI",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado con edición por capas, Multi-Pass Selection, Identity Guard y Alienware opcional.",
-  "start_url": "./?v=15.30-worker",
+  "start_url": "./?v=15.30.1-worker",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",

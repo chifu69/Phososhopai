@@ -1,19 +1,19 @@
 const CACHE='photo-ia-15-27-skin-tone-flow-fix';
-const VERSION='15.30';
+const VERSION='15.30.1';
 const CORE=[
- './','./index.html','./styles.css?v=15.30-worker','./ui-layout.js?v=15.30-worker','./app.js?v=15.30-worker',
- './creative-tools.js?v=15.30-worker','./brain.js?v=15.30-worker',
- './opencv-engine.js?v=15.30-worker','./smart-core.js?v=15.30-worker','./wardrobe-engine.js?v=15.30-worker','./ai-studio.js?v=15.30-worker',
- './vision.js?v=15.30-worker','./onnx-engine.js?v=15.30-worker','./segmentation.js?v=15.30-worker','./segmentation-worker.js?v=15.30','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=15.30.1-worker','./ui-layout.js?v=15.30.1-worker','./app.js?v=15.30.1-worker',
+ './creative-tools.js?v=15.30.1-worker','./brain.js?v=15.30.1-worker',
+ './opencv-engine.js?v=15.30.1-worker','./smart-core.js?v=15.30.1-worker','./wardrobe-engine.js?v=15.30.1-worker','./ai-studio.js?v=15.30.1-worker',
+ './vision.js?v=15.30.1-worker','./onnx-engine.js?v=15.30.1-worker','./segmentation.js?v=15.30.1-worker','./segmentation-worker.js?v=15.30.1','./manifest.webmanifest'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=15.30-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=15.30-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=15.30-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=15.30-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=15.30-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=15.30-worker',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
- {local:'./assets/mediapipe/vision_bundle.mjs?v=15.30',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
+ {local:'./assets/vendor/fabric.min.js?v=15.30.1-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=15.30.1-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=15.30.1-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=15.30.1-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=15.30.1-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=15.30.1-worker',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/mediapipe/vision_bundle.mjs?v=15.30.1',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_nosimd_internal.js',name:'WASM compatible',required:false},
