@@ -1,7 +1,7 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.17.1-id-landmark-authority';
+const WORKER_VERSION='15.18-natural-bust-geometry';
 const MP_VERSION='1.0.1';
 const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -155,55 +155,94 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
   if(!landmarks||landmarks.length<50)throw new Error('Face Landmarker did not return enough landmarks');
   const pts=landmarks.map(p=>({x:(p.x<=1?p.x*w:p.x),y:(p.y<=1?p.y*h:p.y)}));
 
-  // Use robust face bounds from all landmarks, then construct head/neck/shoulders.
   let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
-  for(const p of pts){minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}
+  for(const p of pts){
+    minX=Math.min(minX,p.x); minY=Math.min(minY,p.y);
+    maxX=Math.max(maxX,p.x); maxY=Math.max(maxY,p.y);
+  }
+
   const fw=Math.max(12,maxX-minX), fh=Math.max(12,maxY-minY);
   const cx=(minX+maxX)/2;
-  const faceTop=minY, faceBottom=maxY;
+  const faceBottom=maxY;
 
-  // Landmark-derived head ellipse, including ears/hairline margin.
-  const headTop=Math.max(0,faceTop-fh*.20);
-  const headBottom=Math.min(h-1,faceBottom+fh*.17);
-  const headRx=fw*.68;
-  const headCy=(headTop+headBottom)/2;
-  const headRy=(headBottom-headTop)/2;
+  // Keep the top conservative. Face Landmarker does not know the hat/hair boundary,
+  // so only extend slightly above the facial landmark cloud.
+  const topY=Math.max(0,minY-fh*.10);
+  const templeHalf=fw*.58;
 
-  // Neck and shoulders grow from jaw width rather than a generic oval.
-  const neckTop=faceBottom-fh*.03;
-  const neckBottom=Math.min(h-1,faceBottom+fh*.62);
-  const shoulderBottom=Math.min(h-1,faceBottom+fh*1.55);
+  const neckTop=faceBottom-fh*.02;
+  const neckBottom=Math.min(h-1,faceBottom+fh*.58);
+  const shoulderBottom=Math.min(h-1,faceBottom+fh*1.75);
 
   const mask=new Uint8Array(w*h);
-  for(let y=Math.max(0,Math.floor(headTop));y<=shoulderBottom;y++){
-    let half=0;
-    if(y<=headBottom){
-      const dy=(y-headCy)/(headRy||1);
-      if(Math.abs(dy)<=1)half=headRx*Math.sqrt(Math.max(0,1-dy*dy));
-    }else if(y<=neckBottom){
-      const t=(y-headBottom)/Math.max(1,neckBottom-headBottom);
-      half=fw*(.34+.10*t);
-    }else{
-      const t=(y-neckBottom)/Math.max(1,shoulderBottom-neckBottom);
-      half=fw*(.44+1.18*Math.pow(t,.72));
-    }
+
+  // 1) Head/face region: compact oval, intentionally not large enough to engulf a cap.
+  const headCy=(topY+faceBottom+fh*.12)/2;
+  const headRy=Math.max(8,(faceBottom+fh*.12-topY)/2);
+  const headRx=Math.max(8,templeHalf);
+  for(let y=Math.floor(topY);y<=Math.min(h-1,Math.ceil(faceBottom+fh*.12));y++){
+    const dy=(y-headCy)/(headRy||1);
+    if(Math.abs(dy)>1)continue;
+    const half=headRx*Math.sqrt(Math.max(0,1-dy*dy));
     const lx=Math.max(0,Math.floor(cx-half));
     const rx=Math.min(w-1,Math.ceil(cx+half));
     for(let x=lx;x<=rx;x++){
       const edge=half?Math.abs(x-cx)/half:1;
-      let v=edge<.92?255:Math.round(255*Math.max(0,(1-edge)/.08));
-      if(personMask&&personMask.length===mask.length){
-        const pv=personMask[y*w+x];
-        // Face/head remains authoritative. Below the chin, use person segmentation as clipping aid only.
-        if(y>faceBottom+fh*.08){
-          if(pv<35)v=Math.round(v*.28);
-          else if(pv<90)v=Math.round(v*.65);
-        }
-      }
-      if(v>mask[y*w+x])mask[y*w+x]=v;
+      mask[y*w+x]=edge<.92?255:Math.round(255*Math.max(0,(1-edge)/.08));
     }
   }
-  return featherRegion(mask,w,h,2);
+
+  // 2) Neck + shoulders: derive the shape from the real person segmentation.
+  // The geometric prior only tells us where to search; personMask determines the real silhouette.
+  for(let y=Math.max(0,Math.floor(neckTop));y<=shoulderBottom;y++){
+    const t=Math.max(0,Math.min(1,(y-neckTop)/Math.max(1,shoulderBottom-neckTop)));
+    // Gradually widen from neck to shoulders/chest.
+    const half=fw*(.38 + 1.42*Math.pow(t,.78));
+    const lx=Math.max(0,Math.floor(cx-half));
+    const rx=Math.min(w-1,Math.ceil(cx+half));
+
+    for(let x=lx;x<=rx;x++){
+      const i=y*w+x;
+      const edge=half?Math.abs(x-cx)/half:1;
+      let prior=edge<.93?255:Math.round(255*Math.max(0,(1-edge)/.07));
+
+      if(personMask&&personMask.length===mask.length){
+        const pv=personMask[i];
+        // For shoulders/chest, require actual person pixels rather than invented geometry.
+        if(pv<28) prior=0;
+        else if(pv<70) prior=Math.round(prior*.35);
+        else if(pv<125) prior=Math.round(prior*.72);
+      }
+
+      // Taper lower corners naturally so the mask does not end as a rectangle.
+      if(t>.72){
+        const lower=(t-.72)/.28;
+        const corner=Math.max(0,1-Math.pow(edge,2.8)*lower*.55);
+        prior=Math.round(prior*corner);
+      }
+
+      if(prior>mask[i])mask[i]=prior;
+    }
+  }
+
+  // 3) Remove obvious cap/background above the face when segmentation says "not person".
+  // Do this softly because hair may be under-segmented.
+  if(personMask&&personMask.length===mask.length){
+    for(let y=0;y<Math.max(0,Math.floor(minY));y++){
+      for(let x=0;x<w;x++){
+        const i=y*w+x;
+        if(mask[i] && personMask[i]<22)mask[i]=Math.round(mask[i]*.18);
+      }
+    }
+  }
+
+  // 4) Smooth/feather the final region so editing transitions are natural.
+  let out=featherRegion(mask,w,h,2);
+
+  // Final cleanup of tiny isolated selections.
+  if(typeof closeMask==='function')out=closeMask(out,w,h,1);
+  if(typeof blurMask==='function')out=blurMask(out,w,h,1);
+  return out;
 }
 
 self.onmessage=async e=>{
