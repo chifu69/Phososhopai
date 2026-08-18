@@ -1,9 +1,12 @@
-# PHOTO IA 15.18 — Natural Bust ID + Stable Worker
+# PHOTO IA 15.19 — Selfie-Authority Bust + Stable Worker
 
-Cambios principales:
-- Mantiene intacta la arquitectura estable de 15.16/15.17.1.
-- Busto/ID usa Face Landmarker para posicionar la cabeza y el rostro.
-- La parte superior es más conservadora para no incluir gorra/fondo innecesariamente.
-- Cuello, hombros y pecho superior se recortan usando la máscara real de Selfie Segmentation.
-- El borde inferior deja de ser una línea recta y se estrecha/feather de forma natural.
-- Selfie Segmentation ayuda a dar forma; Face Landmarker sigue siendo la autoridad para localizar el ID.
+- Ropa y Cabello NO se modificaron.
+- Mantiene Worker clásico, MediaPipe local, WASM local y modelos estables de 15.18.
+- Busto/ID:
+  - Face Landmarker manda en la cabeza/rostro.
+  - Debajo de la mandíbula, Selfie Segmentation manda en cuello, hombros y pecho.
+  - Se exige silueta real de persona en la parte inferior.
+  - Se suaviza la unión mandíbula-cuello y el borde inferior.
+- Diagnóstico:
+  - Los tiempos se reinician al iniciar cada tarea.
+  - Ya no debe aparecer un tiempo viejo de Multiclase después de ejecutar Busto.

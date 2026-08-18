@@ -1,7 +1,7 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.18-natural-bust-geometry';
+const WORKER_VERSION='15.19-selfie-authority-bust';
 const MP_VERSION='1.0.1';
 const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -161,26 +161,22 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
     maxX=Math.max(maxX,p.x); maxY=Math.max(maxY,p.y);
   }
 
-  const fw=Math.max(12,maxX-minX), fh=Math.max(12,maxY-minY);
+  const fw=Math.max(12,maxX-minX);
+  const fh=Math.max(12,maxY-minY);
   const cx=(minX+maxX)/2;
-  const faceBottom=maxY;
+  const jawY=maxY;
 
-  // Keep the top conservative. Face Landmarker does not know the hat/hair boundary,
-  // so only extend slightly above the facial landmark cloud.
-  const topY=Math.max(0,minY-fh*.10);
-  const templeHalf=fw*.58;
+  const out=new Uint8Array(w*h);
 
-  const neckTop=faceBottom-fh*.02;
-  const neckBottom=Math.min(h-1,faceBottom+fh*.58);
-  const shoulderBottom=Math.min(h-1,faceBottom+fh*1.75);
+  // HEAD: Face Landmarker is authoritative.
+  // Keep this intentionally close to the real facial geometry.
+  const headTop=Math.max(0,minY-fh*.08);
+  const headBottom=Math.min(h-1,jawY+fh*.08);
+  const headCy=(headTop+headBottom)/2;
+  const headRy=Math.max(8,(headBottom-headTop)/2);
+  const headRx=Math.max(8,fw*.60);
 
-  const mask=new Uint8Array(w*h);
-
-  // 1) Head/face region: compact oval, intentionally not large enough to engulf a cap.
-  const headCy=(topY+faceBottom+fh*.12)/2;
-  const headRy=Math.max(8,(faceBottom+fh*.12-topY)/2);
-  const headRx=Math.max(8,templeHalf);
-  for(let y=Math.floor(topY);y<=Math.min(h-1,Math.ceil(faceBottom+fh*.12));y++){
+  for(let y=Math.floor(headTop);y<=Math.ceil(headBottom);y++){
     const dy=(y-headCy)/(headRy||1);
     if(Math.abs(dy)>1)continue;
     const half=headRx*Math.sqrt(Math.max(0,1-dy*dy));
@@ -188,61 +184,72 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
     const rx=Math.min(w-1,Math.ceil(cx+half));
     for(let x=lx;x<=rx;x++){
       const edge=half?Math.abs(x-cx)/half:1;
-      mask[y*w+x]=edge<.92?255:Math.round(255*Math.max(0,(1-edge)/.08));
+      out[y*w+x]=edge<.94?255:Math.round(255*Math.max(0,(1-edge)/.06));
     }
   }
 
-  // 2) Neck + shoulders: derive the shape from the real person segmentation.
-  // The geometric prior only tells us where to search; personMask determines the real silhouette.
-  for(let y=Math.max(0,Math.floor(neckTop));y<=shoulderBottom;y++){
-    const t=Math.max(0,Math.min(1,(y-neckTop)/Math.max(1,shoulderBottom-neckTop)));
-    // Gradually widen from neck to shoulders/chest.
-    const half=fw*(.38 + 1.42*Math.pow(t,.78));
+  // BODY/BUST: below jaw, Selfie Segmentation becomes authoritative.
+  // Search in a realistic bust window and keep only actual person pixels.
+  const bustTop=Math.max(0,Math.floor(jawY-fh*.02));
+  const bustBottom=Math.min(h-1,Math.floor(jawY+fh*1.85));
+
+  for(let y=bustTop;y<=bustBottom;y++){
+    const t=Math.max(0,Math.min(1,(y-jawY)/Math.max(1,bustBottom-jawY)));
+    // Wider as we go down to include shoulders/chest.
+    const half=fw*(.42+1.55*Math.pow(t,.72));
     const lx=Math.max(0,Math.floor(cx-half));
     const rx=Math.min(w-1,Math.ceil(cx+half));
 
     for(let x=lx;x<=rx;x++){
       const i=y*w+x;
+      const pv=personMask&&personMask.length===out.length?personMask[i]:0;
+      if(pv<45)continue; // below jaw: real person silhouette required
+
+      // Smooth confidence mapping from Selfie Segmentation.
+      let v=pv>=150?255:pv>=95?225:pv>=65?170:110;
+
+      // Natural side taper so the bust doesn't become a rectangle.
       const edge=half?Math.abs(x-cx)/half:1;
-      let prior=edge<.93?255:Math.round(255*Math.max(0,(1-edge)/.07));
+      if(edge>.88)v=Math.round(v*Math.max(0,(1-edge)/.12));
 
-      if(personMask&&personMask.length===mask.length){
-        const pv=personMask[i];
-        // For shoulders/chest, require actual person pixels rather than invented geometry.
-        if(pv<28) prior=0;
-        else if(pv<70) prior=Math.round(prior*.35);
-        else if(pv<125) prior=Math.round(prior*.72);
+      // Lower edge taper for a soft chest cutoff.
+      if(t>.82){
+        const fade=(1-(t-.82)/.18);
+        v=Math.round(v*Math.max(.20,fade));
       }
 
-      // Taper lower corners naturally so the mask does not end as a rectangle.
-      if(t>.72){
-        const lower=(t-.72)/.28;
-        const corner=Math.max(0,1-Math.pow(edge,2.8)*lower*.55);
-        prior=Math.round(prior*corner);
-      }
-
-      if(prior>mask[i])mask[i]=prior;
+      if(v>out[i])out[i]=v;
     }
   }
 
-  // 3) Remove obvious cap/background above the face when segmentation says "not person".
-  // Do this softly because hair may be under-segmented.
-  if(personMask&&personMask.length===mask.length){
-    for(let y=0;y<Math.max(0,Math.floor(minY));y++){
-      for(let x=0;x<w;x++){
-        const i=y*w+x;
-        if(mask[i] && personMask[i]<22)mask[i]=Math.round(mask[i]*.18);
-      }
+  // Blend head into neck so there isn't a hard jaw seam.
+  const blendTop=Math.max(0,Math.floor(jawY-fh*.08));
+  const blendBottom=Math.min(h-1,Math.floor(jawY+fh*.22));
+  for(let y=blendTop;y<=blendBottom;y++){
+    const half=fw*.46;
+    const lx=Math.max(0,Math.floor(cx-half));
+    const rx=Math.min(w-1,Math.ceil(cx+half));
+    for(let x=lx;x<=rx;x++){
+      const i=y*w+x;
+      if(out[i]<230)out[i]=230;
     }
   }
 
-  // 4) Smooth/feather the final region so editing transitions are natural.
-  let out=featherRegion(mask,w,h,2);
+  let mask=featherRegion(out,w,h,2);
+  if(typeof closeMask==='function')mask=closeMask(mask,w,h,1);
+  if(typeof blurMask==='function')mask=blurMask(mask,w,h,1);
+  return mask;
+}
 
-  // Final cleanup of tiny isolated selections.
-  if(typeof closeMask==='function')out=closeMask(out,w,h,1);
-  if(typeof blurMask==='function')out=blurMask(out,w,h,1);
-  return out;
+
+function resetTaskDiagnostics(task){
+  diag.lastTask=task||'-';
+  diag.lastPhase='starting';
+  diag.lastMs=0;
+  diag.selfieMs=0;
+  diag.faceMs=0;
+  diag.multiclassMs=0;
+  diag.error='';
 }
 
 self.onmessage=async e=>{
