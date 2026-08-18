@@ -1,10 +1,15 @@
-# PHOTO IA 15.13 — Landmarker + Selfie Pipeline
+# PHOTO IA 15.14 — Worker Isolated AI
 
-- Piel aprende el tono de piel de la cara de la persona en la foto.
-- Busto / identificación usa geometría del rostro para crear cabeza + cuello + hombros.
-- En iPhone se mantiene la ruta local para evitar congelamientos.
-- MediaPipe y ONNX siguen integrados para expansión futura.
-- Solo queda un README.
+Esta versión cambia la arquitectura de Selección IA para evitar congelamientos.
 
-## 15.13 selection pipeline
-For Piel, Rostro preciso and Busto/ID the preferred path is now: MediaPipe Face Landmarker (0.40 detection/presence confidence) -> MediaPipe Selfie/Person Segmentation -> mode-specific geometry -> adaptive skin/local semantic refinement. FaceDetector/color/person-bounds remain fallbacks only. The UI watchdog still cancels stalled mobile inference.
+- MediaPipe para Persona, Busto/ID, Rostro, Piel, Cabello y Ropa corre dentro de `segmentation-worker.js`, fuera del hilo de interfaz.
+- En teléfonos la imagen de análisis se reduce a 256 px en el lado mayor.
+- Los modelos se ejecutan secuencialmente, nunca en paralelo.
+- Busto/ID: Selfie Segmentation → Face Landmarker → región de cabeza/cuello/hombros.
+- Piel: Selfie Segmentation → Face Landmarker → tono de piel aprendido de la cara.
+- Rostro: Face Landmarker.
+- Cabello/Ropa: segmentación multiclase.
+- Si el worker se atasca, se termina el worker; la UI no debe congelarse.
+- Primera inferencia: hasta 18 s para permitir carga del modelo. Inferencias siguientes: 6.5 s antes de reiniciar el worker.
+- Se añadió “Diagnóstico motor” a Selección IA para ver Worker, MediaPipe, resolución y tiempos.
+- En móvil, Objeto por toque usa temporalmente la selección local segura para evitar ejecutar Interactive Segmenter en el hilo principal.

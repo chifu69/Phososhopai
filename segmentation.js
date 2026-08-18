@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='3.7-landmarker-person-pipeline';
+const VERSION='3.8-worker-isolated-pipeline';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -26,7 +26,8 @@ const PROFILE_WATCHDOG=IS_IOS?7000:36000;
 const state={
   module:null,fileset:null,imageSegmenter:null,multiclassSegmenter:null,interactiveSegmenter:null,faceLandmarker:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
-  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,multiclassModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null,semantic:{faceAnchor:null,faceMask:null,skinMask:null,hairMask:null,clothingMask:null,confidence:{}}
+  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,multiclassModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null,semantic:{faceAnchor:null,faceMask:null,skinMask:null,hairMask:null,clothingMask:null,confidence:{}},
+  mlWorker:null,workerSeq:0,workerPending:new Map(),workerWarm:false,workerDiag:{worker:'NOT_STARTED',module:'NOT_LOADED',lastTask:'-',lastPhase:'idle',lastMs:0,input:'-',engine:'Worker',error:''}
 };
 
 const DEBUG_KEY='photoia-segmentation-debug-v1380';
@@ -480,7 +481,7 @@ async function semanticMasks(canvas,person){
     faceAnchor:anchor,faceMask:face,skinMask:skin,hairMask:hair,clothingMask:clothing,
     confidence:{face:confidence,skin:Math.max(30,Math.min(98,Math.round(58+Math.min(.32,skinArea/Math.max(1,w*h))*105)))}
   };
-  logDebug('SEMANTIC 15.12',{anchor,confidence:state.semantic.confidence,personArea,faceArea,skinArea});
+  logDebug('SEMANTIC fallback',{anchor,confidence:state.semantic.confidence,personArea,faceArea,skinArea});
   return state.semantic;
 }
 
@@ -551,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.12'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.14'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -624,6 +625,7 @@ function finishOperation(operation){
 }
 function cancelCurrent(showMessage=true){
   if(state.operation)state.operation.cancelled=true;
+  if(state.mlWorker)terminateMLWorker('cancelado por el usuario');
   state.operation=null; state.loading=false; state.tapMode=false;
   api()?.processing(false); updateUI();
   setStatus(showMessage?'Proceso cancelado.':'Listo para segmentar.',showMessage?'error':'');
@@ -643,8 +645,8 @@ async function getWorkCanvas(operation){
   logDebug('Preparando canvas de trabajo');
   const photo=api()?.state?.photo;if(!photo)throw makeError('Abre una foto primero.');
   const img=await timeout(loadImage(api().state.originalDataUrl),8000,'La fotografía tardó demasiado en abrirse.',operation);
-  const isIOS=/iPad|iPhone|iPod/.test(navigator.userAgent);
-  const max=isIOS?256:512;
+  const isMobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const max=isMobile?256:512;
   const scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
   const canvas=document.createElement('canvas');
   canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));
@@ -653,6 +655,80 @@ async function getWorkCanvas(operation){
   ctx.drawImage(img,0,0,canvas.width,canvas.height);
   state.workCanvas=canvas; logDebug('Canvas listo',{width:canvas.width,height:canvas.height,originalWidth:img.naturalWidth,originalHeight:img.naturalHeight}); return canvas;
 }
+
+function workerSupported(){return typeof Worker!=='undefined'&&typeof ImageData!=='undefined';}
+function terminateMLWorker(reason='reset'){
+  try{state.mlWorker?.terminate?.();}catch(_){ }
+  state.mlWorker=null;state.workerWarm=false;
+  for(const [,p] of state.workerPending){clearTimeout(p.timer);p.reject(makeError(`Motor aislado reiniciado: ${reason}`,'WORKER_RESET'));}
+  state.workerPending.clear();state.workerDiag={...state.workerDiag,worker:'STOPPED',lastPhase:reason,error:reason};
+}
+function ensureMLWorker(){
+  if(state.mlWorker)return state.mlWorker;
+  if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
+  const w=new Worker(`./segmentation-worker.js?v=15.14`,{type:'module'});
+  state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
+  w.onmessage=e=>{
+    const d=e.data||{};
+    if(d.diag)state.workerDiag={...state.workerDiag,...d.diag};
+    if(d.type==='phase'){
+      state.workerDiag.lastPhase=d.phase||state.workerDiag.lastPhase;
+      if(state.loading&&d.phase)setStatus(d.phase,'loading');
+      return;
+    }
+    if(d.type==='ready'){state.workerDiag.worker='READY';return;}
+    if(d.type==='result'||d.type==='error'||d.type==='pong'){
+      const pending=state.workerPending.get(d.id);if(!pending)return;
+      clearTimeout(pending.timer);state.workerPending.delete(d.id);
+      if(d.type==='error')pending.reject(makeError(d.message||'El worker de IA falló.','WORKER_INFERENCE'));
+      else pending.resolve(d);
+    }
+  };
+  w.onerror=err=>{
+    const msg=String(err?.message||'Error del worker');state.workerDiag={...state.workerDiag,worker:'ERROR',error:msg,lastPhase:'error'};
+    terminateMLWorker(msg);
+  };
+  state.mlWorker=w;return w;
+}
+function workerProfile(work,mode,operation){
+  const worker=ensureMLWorker(),id=++state.workerSeq;
+  const ctx=work.getContext('2d',{willReadFrequently:true});
+  const img=ctx.getImageData(0,0,work.width,work.height);
+  const first=!state.workerWarm;
+  const timeoutMs=first?18000:6500;
+  state.workerDiag={...state.workerDiag,lastTask:mode,input:`${work.width}×${work.height}`,lastPhase:'queued',error:''};
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>{
+      state.workerPending.delete(id);
+      state.workerDiag={...state.workerDiag,lastPhase:'timeout',error:`Timeout ${timeoutMs}ms`};
+      try{worker.terminate();}catch(_){ }
+      state.mlWorker=null;state.workerWarm=false;
+      reject(makeError('El motor de IA tardó demasiado y fue detenido sin congelar la app.','WORKER_TIMEOUT'));
+    },timeoutMs);
+    state.workerPending.set(id,{resolve:d=>{state.workerWarm=true;resolve(d)},reject,timer});
+    const buf=img.data.buffer;
+    worker.postMessage({id,type:'profile',mode,width:work.width,height:work.height,rgba:buf},[buf]);
+    if(operation?.cancelled){clearTimeout(timer);state.workerPending.delete(id);reject(makeError('Proceso cancelado.','CANCELLED'));}
+  });
+}
+function showWorkerDiagnostics(){
+  const d=state.workerDiag||{};
+  const lines=[
+    'PHOTO IA · Motor de selección',
+    `Worker: ${d.worker||'-'}`,
+    `MediaPipe: ${d.module||'NOT_LOADED'}`,
+    `Última tarea: ${d.lastTask||'-'}`,
+    `Fase: ${d.lastPhase||'-'}`,
+    `Entrada: ${d.input||'-'}`,
+    `Tiempo total: ${d.lastMs?d.lastMs+' ms':'-'}`,
+    d.personMs?`Selfie Segmentation: ${d.personMs} ms`:null,
+    d.faceMs?`Face Landmarker: ${d.faceMs} ms`:null,
+    d.multiclassMs?`Multiclase: ${d.multiclassMs} ms`:null,
+    d.error?`Error: ${d.error}`:'Error: ninguno'
+  ].filter(Boolean);
+  alert(lines.join('\n'));
+}
+
 async function loadModule(operation){
   if(state.module&&state.fileset)return state.module;
   if(!state.modulePromise){
@@ -865,157 +941,37 @@ async function segmentProfile(mode='person'){
   const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro preciso',skin:'Piel',hair:'Cabello',clothing:'Ropa'};
   const label=labels[mode]||labels.person;
   const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);
-  setStatus('Preparando una copia optimizada de la foto…','loading');
-
-  // Watchdog global: ningún selector local debe dejar el spinner infinito.
-  let watchdog=setTimeout(()=>{
-    if(state.operation===operation && !operation.cancelled){
-      operation.cancelled=true;
-      state.loading=false;
-      api()?.processing(false);
-      updateUI();
-      setStatus('El análisis local tardó demasiado y fue detenido. Intenta de nuevo.','error');
-      api()?.toast('Selección detenida: tardó demasiado');
-      logDebug('WATCHDOG GLOBAL: operación detenida',{mode,id:operation.id});
-    }
-  },PROFILE_WATCHDOG);
-
+  setStatus('Preparando imagen ligera para el motor aislado…','loading');
   try{
     const work=await getWorkCanvas(operation);
-    let mask=null,engine='MediaPipe';
-
-    if(mode==='bust'||mode==='face'||mode==='skin'){
-      // 15.13: real mobile pipeline requested for ID/face/skin:
-      // Selfie Segmentation -> Face Landmarker -> semantic/color refinement.
-      const pipe=await timeout(landmarkerPersonPipeline(work,operation),PROFILE_WATCHDOG-800,'El pipeline facial tardó demasiado.',operation);
-      const {anchor,person}=pipe,w=work.width,h=work.height;
-      if(mode==='bust'){
-        const prior=landmarkerBustPrior(anchor,w,h);
-        mask=intersectMasks(person,prior);mask=blurMask(closeMask(mask,w,h,1),w,h,1);
-        engine='Selfie Segmentation + Face Landmarker';
-      }else{
-        const semantic=await timeout(semanticMasks(work,person),4200,'El refinamiento facial tardó demasiado.',operation);
-        if(mode==='face'){
-          const cx=anchor.x+anchor.w/2,cy=anchor.y+anchor.h*.52;
-          const geo=ellipseMask(w,h,cx,cy,anchor.w*.57,anchor.h*.60);
-          mask=intersectMasks(semantic.faceMask,geo);
-        }else{
-          // Keep the good 15.12 adaptive skin model, but constrain it with landmark geometry/person.
-          const cx=anchor.x+anchor.w/2,cy=anchor.y+anchor.h*.70;
-          const geo=ellipseMask(w,h,cx,cy,anchor.w*.72,anchor.h*1.05);
-          mask=intersectMasks(intersectMasks(semantic.skinMask,person),geo);
-        }
-        engine='Face Landmarker + modelo adaptativo de piel';
-      }
-    }else if(mode==='hair'||mode==='clothing'){
-      if(IS_IOS){
-        // Safari/iPhone: do not enter MediaPipe inference on the main thread.
-        // Use the local semantic engine directly to keep the UI responsive.
-        engine='Motor semántico local';
-        let person;
-        try{
-          person=offlinePortraitMask(work);
-        }catch(localPersonErr){
-          logDebug('IOS semantic person fallback',localPersonErr);
-          person=new Uint8Array(work.width*work.height);
-          // Conservative central-person prior only as a last resort.
-          const lx=Math.floor(work.width*.08),rx=Math.ceil(work.width*.92);
-          const ty=Math.floor(work.height*.02),by=Math.ceil(work.height*.96);
-          for(let y=ty;y<by;y++)for(let x=lx;x<rx;x++)person[y*work.width+x]=255;
-        }
-        const semantic=await timeout(
-          semanticMasks(work,person),
-          4200,
-          'El análisis local tardó demasiado.',
-          operation
-        );
-        mask=mode==='face'?semantic.faceMask:
-             mode==='skin'?semantic.skinMask:
-             mode==='hair'?semantic.hairMask:
-             semantic.clothingMask;
-      }else{
-        // Desktop/other browsers: use real MediaPipe first, then local semantic fallback.
-        try{
-          const multi=await timeout(
-            mediaPipeMulticlassMasks(work,operation),
-            RUN_TIMEOUT,
-            'MediaPipe no respondió a tiempo.',
-            operation
-          );
-          mask=mode==='face'?multi.face:mode==='skin'?multi.skin:mode==='hair'?multi.hair:multi.clothing;
-        }catch(mpErr){
-          logDebug('MULTICLASS MediaPipe fallback',mpErr);
-          engine='Fallback local';
-          let person;
-          try{ person=offlinePortraitMask(work); }
-          catch(_){
-            person=new Uint8Array(work.width*work.height);
-            for(let i=0;i<person.length;i++)person[i]=255;
-          }
-          const semantic=await timeout(
-            semanticMasks(work,person),
-            7000,
-            'El análisis local tardó demasiado.',
-            operation
-          );
-          mask=mode==='face'?semantic.faceMask:
-               mode==='skin'?semantic.skinMask:
-               mode==='hair'?semantic.hairMask:
-               semantic.clothingMask;
-        }
-      }
-    }else{
-      if(IS_IOS){
-        engine='Motor local de persona';
-        mask=offlinePortraitMask(work);
-      }else{
-        // Desktop/other browsers: MediaPipe when responsive, otherwise fast local portrait segmentation.
-        try{
-          mask=await timeout(
-            mediaPipePersonMask(work,operation),
-            RUN_TIMEOUT,
-            'MediaPipe no respondió a tiempo.',
-            operation
-          );
-        }catch(mpErr){
-          logDebug('PERSON MediaPipe fallback',mpErr);
-          mask=offlinePortraitMask(work);
-          engine='Fallback local';
-        }
-      }
-    }
-
     if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
-    if(!mask||!mask.length)throw makeError(`No pude crear la selección de ${label.toLowerCase()}.`,'PROFILE_MASK_EMPTY');
-
-    const selected=mask.reduce((n,v)=>n+(v>80),0);
-    const ratio=selected/(work.width*work.height);
-    if(selected<work.width*work.height*.004)
-      throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
-    if(ratio>.82&&mode!=='person'&&mode!=='bust')
-      throw makeError(`${label} tomó demasiado de la imagen. Intenta otra foto o usa Objeto por toque.`,'PROFILE_MASK_LARGE');
-
-    if(state.suspendedByWardrobe)throw makeError('Selección local suspendida.','CANCELLED');
-    await setMask(mask,work.width,work.height,label);
-    if(state.suspendedByWardrobe)throw makeError('Selección local suspendida.','CANCELLED');
-
-    setStatus(`${label} seleccionado con ${engine}. Puedes refinar la máscara si lo deseas.`,'ready');
-    api().toast(`${label} listo`);
-  }catch(err){
-    const msg=friendlyError(err);
-    logDebug(`SEGMENTAR ${mode}: ERROR`,err);
-    setStatus(msg,'error');
-    if(err?.code!=='CANCELLED')api().toast(msg);
-  }finally{
-    clearTimeout(watchdog);
-    // Always release the overlay/spinner even when a browser ML promise misbehaves.
-    if(state.operation===operation){
-      state.loading=false;
-      api()?.processing(false);
-      updateUI();
+    let mask=null,engine='Web Worker';
+    try{
+      const result=await workerProfile(work,mode,operation);
+      mask=new Uint8Array(result.mask);
+      state.workerDiag={...state.workerDiag,...(result.diag||{}),worker:'READY'};
+      engine=result?.diag?.engine||'MediaPipe Web Worker';
+    }catch(workerErr){
+      logDebug('WORKER PROFILE ERROR',workerErr);
+      // A safe local fallback only for whole-person selection. For semantic
+      // profiles we prefer a visible error over returning another wrong mask.
+      if(mode==='person'){
+        mask=offlinePortraitMask(work);engine='Fallback local de persona';
+      }else{
+        throw workerErr;
+      }
     }
-    finishOperation(operation);
-  }
+    if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
+    if(!mask||mask.length!==work.width*work.height)throw makeError(`No pude crear la selección de ${label.toLowerCase()}.`,'PROFILE_MASK_EMPTY');
+    const selected=mask.reduce((n,v)=>n+(v>80),0),ratio=selected/(work.width*work.height);
+    if(selected<work.width*work.height*.003)throw makeError(`No pude detectar claramente ${label.toLowerCase()}.`,'PROFILE_MASK_SMALL');
+    if(ratio>.86&&mode!=='person')throw makeError(`${label} tomó demasiado de la imagen.`,'PROFILE_MASK_LARGE');
+    await setMask(mask,work.width,work.height,label);
+    setStatus(`${label} seleccionado con ${engine}.`,'ready');api().toast(`${label} listo`);
+  }catch(err){
+    const msg=friendlyError(err);logDebug(`SEGMENTAR ${mode}: ERROR`,err);setStatus(msg,'error');
+    if(err?.code!=='CANCELLED')api().toast(msg);
+  }finally{finishOperation(operation);}
 }
 const segmentPerson=()=>segmentProfile('person');
 const segmentBust=()=>segmentProfile('bust');
@@ -1033,8 +989,9 @@ function canvasPointToNormalized(pointer){
 async function segmentAtPoint(x,y){
   const operation=beginOperation('Creando selección inteligente…');setStatus('MediaPipe está buscando el objeto que tocaste…','loading');
   try{
-    const work=await getWorkCanvas(operation);await letOverlayPaint();let mask=null,engine='MediaPipe Interactive';
-    try{
+    const work=await getWorkCanvas(operation);await letOverlayPaint();let mask=null,engine='Selección local segura';
+    const mobile=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+    if(mobile){mask=magicWandMask(work,x,y);}else try{
       const seg=await ensureInteractiveSegmenter(operation);
       let mpMask;
       // Current MediaPipe API: setImage() then segment() with a positive point stroke.
@@ -1137,7 +1094,7 @@ function resumeAfterWardrobe(){
 document.addEventListener('photoia:wardrobe-engine-enter',suspendForWardrobe);
 document.addEventListener('photoia:wardrobe-engine-leave',resumeAfterWardrobe);
 
-window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get mask(){return state.mask}};
+window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,showWorkerDiagnostics,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get diagnostics(){return {...state.workerDiag}},get mask(){return state.mask}};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();
 })();
