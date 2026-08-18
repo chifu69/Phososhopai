@@ -1,7 +1,7 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.21-confidence-selfie-bust';
+const WORKER_VERSION='15.22-landmark-head-contour';
 const MP_VERSION='1.0.1';
 const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -281,34 +281,58 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
 
   const out=new Uint8Array(w*h);
 
-  // HEAD/FACE: keep Face Landmarker authoritative and conservative.
-  const headTop=Math.max(0,minY-fh*.07);
-  const headBottom=Math.min(h-1,jawY+fh*.10);
-  const headCy=(headTop+headBottom)/2;
-  const headRy=Math.max(8,(headBottom-headTop)/2);
-  const headRx=Math.max(8,fw*.61);
+  // HEAD/FACE: use the actual landmark cloud instead of a round ellipse.
+  const hull=convexHull(pts);
+  const centerY=(minY+maxY)/2;
+  const expanded=hull.map(p=>{
+    const dx=p.x-cx;
+    const dy=p.y-centerY;
+    const sx=dx*(dy<0?1.08:1.05);
+    const sy=dy*(dy<0?1.10:1.04);
+    return {
+      x:Math.max(0,Math.min(w-1,cx+sx)),
+      y:Math.max(0,Math.min(h-1,centerY+sy))
+    };
+  });
 
-  for(let y=Math.floor(headTop);y<=Math.ceil(headBottom);y++){
-    const dy=(y-headCy)/(headRy||1);
-    if(Math.abs(dy)>1)continue;
-    const half=headRx*Math.sqrt(Math.max(0,1-dy*dy));
-    const lx=Math.max(0,Math.floor(cx-half));
-    const rx=Math.min(w-1,Math.ceil(cx+half));
-    for(let x=lx;x<=rx;x++){
-      const edge=half?Math.abs(x-cx)/half:1;
-      out[y*w+x]=edge<.94?255:Math.round(255*Math.max(0,(1-edge)/.06));
+  // Conservative forehead/temple extension; intentionally small to avoid hats/background.
+  const topPad=Math.max(1,fh*.055);
+  const templePad=Math.max(1,fw*.045);
+  expanded.push({x:Math.max(0,minX-templePad), y:Math.max(0,minY+fh*.08)});
+  expanded.push({x:Math.max(0,cx-fw*.38), y:Math.max(0,minY-topPad)});
+  expanded.push({x:cx, y:Math.max(0,minY-topPad*1.15)});
+  expanded.push({x:Math.min(w-1,cx+fw*.38), y:Math.max(0,minY-topPad)});
+  expanded.push({x:Math.min(w-1,maxX+templePad), y:Math.max(0,minY+fh*.08)});
+
+  const headPoly=convexHull(expanded);
+  const polyMinY=Math.max(0,Math.floor(Math.min(...headPoly.map(p=>p.y))));
+  const polyMaxY=Math.min(h-1,Math.ceil(Math.max(...headPoly.map(p=>p.y))));
+  const scanMinX=Math.max(0,Math.floor(minX-fw*.15));
+  const scanMaxX=Math.min(w-1,Math.ceil(maxX+fw*.15));
+
+  for(let y=polyMinY;y<=polyMaxY;y++){
+    for(let x=scanMinX;x<=scanMaxX;x++){
+      if(pointInPoly(x+.5,y+.5,headPoly)){
+        const i=y*w+x;
+        let v=255;
+        if(personMask&&personMask.length===out.length && y<minY+fh*.12){
+          const pv=personMask[i];
+          if(pv<18)v=80;
+          else if(pv<42)v=150;
+          else if(pv<75)v=215;
+        }
+        if(v>out[i])out[i]=v;
+      }
     }
   }
 
-  // TRUE BUST: below the jaw, the real Selfie Segmentation silhouette is authoritative.
-  // We only restrict vertical extent and a generous horizontal safety window.
+  // TRUE BUST: preserve 15.21 lower-body confidence logic exactly.
   const bustTop=Math.max(0,Math.floor(jawY-fh*.04));
   const bustBottom=Math.min(h-1,Math.floor(jawY+fh*2.45));
   const maxHalf=Math.min(w*.495,fw*2.80);
 
   for(let y=bustTop;y<=bustBottom;y++){
     const t=Math.max(0,Math.min(1,(y-bustTop)/Math.max(1,bustBottom-bustTop)));
-    // Very generous horizontal window so real shoulders are not clipped.
     const half=Math.min(maxHalf, fw*(.55 + 1.75*Math.pow(t,.62)));
     const lx=Math.max(0,Math.floor(cx-half));
     const rx=Math.min(w-1,Math.ceil(cx+half));
@@ -320,14 +344,12 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
       const pv=personMask[i];
       if(pv<40)continue;
 
-      // Use Selfie confidence directly.
       let v = pv>=220 ? 255 :
               pv>=180 ? 240 :
               pv>=135 ? 220 :
               pv>=90  ? 195 :
               pv>=55  ? 160 : 115;
 
-      // Soft lower fade only at the very bottom; no horizontal hard line.
       if(t>.90){
         const fade=1-(t-.90)/.10;
         v=Math.round(v*Math.max(.15,fade));
@@ -337,7 +359,7 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
     }
   }
 
-  // Neck bridge: ensure continuity between landmark head and segmented torso.
+  // Neck bridge from 15.21.
   const bridgeTop=Math.max(0,Math.floor(jawY-fh*.10));
   const bridgeBottom=Math.min(h-1,Math.floor(jawY+fh*.28));
   const bridgeHalf=fw*.48;
@@ -351,7 +373,6 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
     }
   }
 
-  // Clean small holes but preserve the real shoulder silhouette.
   let mask=featherRegion(out,w,h,1);
   if(typeof closeMask==='function')mask=closeMask(mask,w,h,1);
   if(typeof blurMask==='function')mask=blurMask(mask,w,h,1);
