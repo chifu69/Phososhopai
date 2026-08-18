@@ -1,10 +1,10 @@
-# PHOTO IA 15.22 — Landmark Head Contour + Stable Worker
+# PHOTO IA 15.23 — Smooth Neck Transition + Stable Worker
 
 - Ropa y Cabello NO se modificaron.
-- Worker/MediaPipe/WASM/modelos permanecen como en 15.21.
+- Worker/MediaPipe/WASM/modelos permanecen como en 15.22.
 - Busto/ID:
-  - Mantiene intacta la lógica de cuello, hombros y pecho de 15.21.
-  - La parte superior ya no usa una elipse redonda.
-  - Usa el convex hull de los landmarks faciales con una expansión conservadora de sienes/frente.
-  - La máscara Selfie solo suaviza el borde superior cuando el modelo dice claramente “no person”.
-- Objetivo: contorno de cabeza más natural sin tragarse gorra/fondo.
+  - Cabeza/contorno superior de 15.22 se conserva.
+  - Hombros/pecho de 15.21/15.22 se conservan.
+  - Solo cambia la transición mandíbula → cuello → hombros.
+  - La unión ahora se ensancha gradualmente y mezcla landmarks con Selfie Segmentation.
+  - Se elimina el puente rectangular/horizontal y se aplica un blur local muy suave solo en esa banda.

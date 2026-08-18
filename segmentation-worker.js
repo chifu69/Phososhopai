@@ -1,7 +1,7 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.22-landmark-head-contour';
+const WORKER_VERSION='15.23-smooth-neck-transition';
 const MP_VERSION='1.0.1';
 const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -359,17 +359,63 @@ function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
     }
   }
 
-  // Neck bridge from 15.21.
-  const bridgeTop=Math.max(0,Math.floor(jawY-fh*.10));
-  const bridgeBottom=Math.min(h-1,Math.floor(jawY+fh*.28));
-  const bridgeHalf=fw*.48;
-  for(let y=bridgeTop;y<=bridgeBottom;y++){
-    const lx=Math.max(0,Math.floor(cx-bridgeHalf));
-    const rx=Math.min(w-1,Math.ceil(cx+bridgeHalf));
+  // Smooth jaw -> neck -> shoulder transition.
+  // Blend a tapered neck corridor into the Selfie silhouette instead of forcing a flat bridge.
+  const transTop=Math.max(0,Math.floor(jawY-fh*.16));
+  const transBottom=Math.min(h-1,Math.floor(jawY+fh*.62));
+  for(let y=transTop;y<=transBottom;y++){
+    const t=Math.max(0,Math.min(1,(y-transTop)/Math.max(1,transBottom-transTop)));
+
+    // Narrow near jaw, widen gradually into the real shoulder silhouette.
+    const half=fw*(.38 + .34*Math.pow(t,.85));
+    const lx=Math.max(0,Math.floor(cx-half));
+    const rx=Math.min(w-1,Math.ceil(cx+half));
+
     for(let x=lx;x<=rx;x++){
       const i=y*w+x;
       const pv=personMask&&personMask.length===out.length?personMask[i]:255;
-      if(pv>25 && out[i]<220)out[i]=220;
+      if(pv<22)continue;
+
+      const edge=half?Math.abs(x-cx)/half:1;
+      const centerWeight=Math.max(0,1-Math.pow(edge,2.2));
+
+      // Stronger close to jaw/center, progressively hand authority to Selfie below.
+      const jawInfluence=(1-t);
+      const selfieInfluence=t;
+      const selfieV = pv>=220 ? 255 :
+                      pv>=180 ? 240 :
+                      pv>=135 ? 220 :
+                      pv>=90  ? 195 :
+                      pv>=55  ? 160 : 115;
+
+      let target=Math.round(
+        (225 + 25*centerWeight)*jawInfluence +
+        selfieV*selfieInfluence
+      );
+
+      // Feather side edges so there is no visible horizontal shelf.
+      if(edge>.84){
+        const fade=Math.max(0,(1-edge)/.16);
+        target=Math.round(target*fade);
+      }
+
+      if(target>out[i])out[i]=target;
+    }
+  }
+
+  // One extra gentle local blur only around the transition band.
+  // This removes the visible step without softening the head or the shoulder silhouette globally.
+  const transitionCopy=out.slice();
+  for(let y=Math.max(1,transTop);y<Math.min(h-1,transBottom);y++){
+    for(let x=1;x<w-1;x++){
+      const i=y*w+x;
+      let sum=0,weight=0;
+      for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++){
+        const ww=(xx===0&&yy===0)?4:1;
+        sum+=transitionCopy[(y+yy)*w+(x+xx)]*ww;
+        weight+=ww;
+      }
+      out[i]=Math.max(out[i],Math.round(sum/weight));
     }
   }
 
