@@ -26,7 +26,7 @@ const PROFILE_WATCHDOG=IS_IOS?7000:36000;
 const state={
   module:null,fileset:null,imageSegmenter:null,multiclassSegmenter:null,interactiveSegmenter:null,faceLandmarker:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
-  tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,multiclassModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null,semantic:{faceAnchor:null,faceMask:null,skinMask:null,hairMask:null,clothingMask:null,confidence:{}},
+  tapMode:false,garmentTapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,multiclassModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null,semantic:{faceAnchor:null,faceMask:null,skinMask:null,hairMask:null,clothingMask:null,confidence:{}},
   mlWorker:null,workerSeq:0,workerPending:new Map(),workerWarm:false,workerDiag:{worker:'NOT_STARTED',module:'NOT_LOADED',lastTask:'-',lastPhase:'idle',lastMs:0,input:'-',engine:'Worker',error:''}
 };
 
@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.29'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.30'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -666,7 +666,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.29`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.30`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -723,6 +723,7 @@ function showWorkerDiagnostics(){
     `WASM: ${d.wasm||'NOT_LOADED'} (${d.wasmSource||'-'})`,
     `Selfie model: ${d.personModel||'NOT_LOADED'}`,
     `Face model: ${d.faceModel||'NOT_LOADED'}`,
+    `Pose model: ${d.poseModel||'NOT_LOADED'}`,
     `Multiclase: ${d.multiclassModel||'NOT_LOADED'}`, 
     `Última tarea: ${d.lastTask||'-'}`,
     `Fase: ${d.lastPhase||'-'}`,
@@ -730,6 +731,7 @@ function showWorkerDiagnostics(){
     `Tiempo total: ${d.lastMs?d.lastMs+' ms':'-'}`,
     d.personMs?`Selfie Segmentation: ${d.personMs} ms`:null,
     d.faceMs?`Face Landmarker: ${d.faceMs} ms`:null,
+    d.poseMs?`Pose Landmarker: ${d.poseMs} ms`:null,
     d.multiclassMs?`Multiclase: ${d.multiclassMs} ms`:null,
     d.error?`Error: ${d.error}`:'Error: ninguno'
   ].filter(Boolean);
@@ -945,7 +947,7 @@ function closeResult(result){
 async function segmentProfile(mode='person'){
   if(state.suspendedByWardrobe)return;
   if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');
-  const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro preciso',skin:'Piel',hair:'Cabello',clothing:'Ropa'};
+  const labels={person:'Persona completa',bust:'Busto para identificación',face:'Rostro preciso',skin:'Piel',hair:'Cabello',clothing:'Ropa','garment-upper':'Camisa / Top','garment-lower':'Pantalón / Shorts','garment-shoes':'Zapatos'};
   const label=labels[mode]||labels.person;
   const operation=beginOperation(`Seleccionando ${label.toLowerCase()}…`);
   setStatus('Preparando imagen ligera para el motor aislado…','loading');
@@ -1019,12 +1021,33 @@ async function segmentAtPoint(x,y){
     }catch(mpErr){
       logDebug('INTERACTIVE MediaPipe fallback',mpErr);engine='Selección local';mask=magicWandMask(work,x,y);
     }
-    await setMask(mask,work.width,work.height,'Objeto');
-    setStatus(`Objeto seleccionado con ${engine}. Si tomó demasiado o muy poco, toca otra zona.`,'ready');api().toast('Selección inteligente lista');
+    let finalLabel='Objeto';
+    if(state.garmentTapMode){
+      try{
+        const clothResult=await workerProfile(work,'clothing',operation);
+        const clothing=new Uint8Array(clothResult.mask);
+        const refined=new Uint8Array(mask.length);
+        for(let i=0;i<mask.length;i++)refined[i]=Math.min(mask[i],clothing[i]||0);
+        mask=blurMask(closeMask(refined,work.width,work.height,1),work.width,work.height,1);
+        const count2=mask.reduce((n,v)=>n+(v>70),0);
+        if(count2<work.width*work.height*.001)throw makeError('El punto no cayó sobre una prenda reconocida.','GARMENT_TOUCH_EMPTY');
+        finalLabel='Prenda';
+      }catch(e){
+        state.garmentTapMode=false;
+        throw e;
+      }
+    }
+    await setMask(mask,work.width,work.height,finalLabel);
+    setStatus(`${finalLabel} seleccionado con ${engine}.`,'ready');api().toast(`${finalLabel} listo`);
+    if(state.garmentTapMode){
+      state.garmentTapMode=false;
+      window.dispatchEvent(new CustomEvent('photoia-garment-touch-ready'));
+    }
   }catch(err){const msg=friendlyError(err);logDebug('SELECCIÓN INTELIGENTE: ERROR',err);setStatus(msg,'error');if(err?.code!=='CANCELLED')api().toast(msg);}
   finally{finishOperation(operation);}
 }
 function beginTapMode(){if(!api()?.state?.photo)return api()?.toast('Abre una foto primero.');if(state.loading)return;state.tapMode=true;setStatus('Toca el objeto que quieres seleccionar.','ready');updateUI();api().toast('Ahora toca el objeto en la foto');}
+function beginGarmentTapMode(){state.garmentTapMode=true;beginTapMode();setStatus('Toca la prenda que quieres recolorear.','ready');}
 async function handleCanvasTap(opt){if(!state.tapMode||state.loading)return;const p=api().state.canvas.getPointer(opt.e);const norm=canvasPointToNormalized(p);if(!norm.inside){api().toast('Toca dentro de la fotografía.');return;}state.tapMode=false;updateUI();await segmentAtPoint(norm.x,norm.y);}
 function maskCanvas(mask,width,height,mode='overlay'){
   const c=document.createElement('canvas');c.width=width;c.height=height;const ctx=c.getContext('2d');const img=ctx.createImageData(width,height);
@@ -1046,7 +1069,7 @@ async function setMask(mask,width,height,label){
   updateUI();
 }
 function showMask(show=true){if(!state.maskOverlay)return;state.maskOverlay.visible=show;api().state.canvas.requestRenderAll();setStatus(show?'Máscara visible':'Máscara oculta',show?'ready':'');}
-function clearMask(){removeMaskOverlay();state.mask=null;state.maskKind='';state.tapMode=false;setStatus('Sin máscara');updateUI();}
+function clearMask(){removeMaskOverlay();state.mask=null;state.maskKind='';state.tapMode=false;state.garmentTapMode=false;setStatus('Sin máscara');updateUI();}
 async function createCutout(){
   if(!state.mask||!state.workCanvas)return api()?.toast('Primero crea una máscara.');
   const operation=beginOperation('Quitando el fondo…');
@@ -1199,6 +1222,43 @@ async function adjustSkinTone(amount){
    endSkinToneSession();
  }
 }
+
+let garmentColorBaseDataUrl='',garmentColorBaseImage=null,garmentPreviewSeq=0;
+async function beginGarmentColorSession(){
+  const photo=api()?.state?.photo,el=photo?.getElement?.()||photo?._element;
+  if(!el)throw makeError('No pude leer la fotografía actual.');
+  const W=el.naturalWidth||el.width||photo.width||0,H=el.naturalHeight||el.height||photo.height||0;
+  if(!W||!H)throw makeError('La fotografía no tiene resolución válida.');
+  const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d',{alpha:false}).drawImage(el,0,0,W,H);
+  garmentColorBaseDataUrl=c.toDataURL('image/jpeg',.97);garmentColorBaseImage=await loadImage(garmentColorBaseDataUrl);
+}
+function endGarmentColorSession(){garmentColorBaseDataUrl='';garmentColorBaseImage=null}
+function hexRgb(hex){const h=String(hex||'#000000').replace('#',''),n=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);return{r:(n>>16)&255,g:(n>>8)&255,b:n&255}}
+function rgbToHsl2(r,g,b){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h=0,s=0,l=(mx+mn)/2;if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);switch(mx){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4}h/=6}return{h,s,l}}
+function hslToRgb2(h,s,l){let r,g,b;if(!s)r=g=b=l;else{const f=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p};const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;r=f(p,q,h+1/3);g=f(p,q,h);b=f(p,q,h-1/3)}return{r:r*255,g:g*255,b:b*255}}
+function garmentMaskAlpha(x,y,W,H){
+  const m=state.mask;if(!m)return 0;
+  const sx=Math.max(0,Math.min(m.width-1,(x+.5)*m.width/W-.5)),sy=Math.max(0,Math.min(m.height-1,(y+.5)*m.height/H-.5));
+  const x0=Math.floor(sx),y0=Math.floor(sy),x1=Math.min(m.width-1,x0+1),y1=Math.min(m.height-1,y0+1),fx=sx-x0,fy=sy-y0,d=m.data;
+  const a0=d[y0*m.width+x0]+(d[y0*m.width+x1]-d[y0*m.width+x0])*fx,a1=d[y1*m.width+x0]+(d[y1*m.width+x1]-d[y1*m.width+x0])*fx;
+  return(a0+(a1-a0)*fy)/255;
+}
+function garmentColorDataUrl(hex,intensity){
+  if(!state.mask)throw makeError('Selecciona una prenda primero.');
+  if(!garmentColorBaseImage)throw makeError('El cambio de color no está preparado.');
+  const trg=rgbToHsl2(...Object.values(hexRgb(hex))),amt=Math.max(0,Math.min(100,Number(intensity)||0))/100;
+  const src=garmentColorBaseImage,W=src.naturalWidth||src.width,H=src.naturalHeight||src.height,c=document.createElement('canvas');c.width=W;c.height=H;
+  const ctx=c.getContext('2d',{willReadFrequently:true,alpha:false});ctx.drawImage(src,0,0,W,H);const im=ctx.getImageData(0,0,W,H),p=im.data;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const a=garmentMaskAlpha(x,y,W,H);if(a<.015)continue;const j=(y*W+x)*4,o=rgbToHsl2(p[j],p[j+1],p[j+2]);
+    const targetSat=Math.max(.12,trg.s),sat=o.s*(1-amt)+targetSat*amt,rgb=hslToRgb2(trg.h,sat,o.l),aa=Math.pow(a,.82)*amt;
+    p[j]+= (rgb.r-p[j])*aa;p[j+1]+=(rgb.g-p[j+1])*aa;p[j+2]+=(rgb.b-p[j+2])*aa;
+  }
+  ctx.putImageData(im,0,0);return c.toDataURL('image/jpeg',.97);
+}
+async function previewGarmentColor(hex,intensity){const seq=++garmentPreviewSeq;try{showMask(false);if(!garmentColorBaseImage)await beginGarmentColorSession();const url=garmentColorDataUrl(hex,intensity);if(seq!==garmentPreviewSeq)return;await api().applyProcessedImageDataUrl(url,false)}catch(e){console.error(e);api()?.toast(friendlyError(e))}}
+async function cancelGarmentColorPreview(){garmentPreviewSeq++;try{if(garmentColorBaseDataUrl)await api().applyProcessedImageDataUrl(garmentColorBaseDataUrl,false);if(state.mask)showMask(true)}finally{endGarmentColorSession()}}
+async function applyGarmentColor(hex,intensity){garmentPreviewSeq++;try{showMask(false);if(!garmentColorBaseImage)await beginGarmentColorSession();const url=garmentColorDataUrl(hex,intensity);await api().applyProcessedImageDataUrl(url,true);clearMask();api().toast('Color de prenda aplicado')}catch(e){console.error(e);api()?.toast(friendlyError(e))}finally{endGarmentColorSession()}}
+
 function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/identificacion|credencial/.test(t)){segmentBust();return true;}if(/selecciona.*busto/.test(t)){segmentBust();return true;}if(/selecciona.*rostro|solo.*cara|solo.*rostro/.test(t)){segmentFace();return true;}if(/selecciona.*piel|solo.*piel/.test(t)){segmentSkin();return true;}if(/selecciona.*cabello|solo.*cabello|pelo/.test(t)){segmentHair();return true;}if(/selecciona.*ropa|solo.*ropa|vestuario|prenda/.test(t)){segmentClothing();return true;}if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/regresa.*fondo|restaura.*fondo|muestra.*imagen completa/.test(t)){restoreBackground();return true;}if(/refina.*mascara|mejora.*mascara/.test(t)){refineCurrentMask();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
 function boot(){
   if(!$('segment-person'))return;
@@ -1225,7 +1285,7 @@ function suspendForWardrobe(){
   state.suspendedByWardrobe=true;
   try{cancelCurrent(false)}catch(_){}
   try{removeMaskOverlay()}catch(_){}
-  state.mask=null;state.maskKind='';state.tapMode=false;
+  state.mask=null;state.maskKind='';state.tapMode=false;state.garmentTapMode=false;
   try{api()?.processing(false)}catch(_){}
   updateUI();
 }
@@ -1236,7 +1296,7 @@ function resumeAfterWardrobe(){
 document.addEventListener('photoia:wardrobe-engine-enter',suspendForWardrobe);
 document.addEventListener('photoia:wardrobe-engine-leave',resumeAfterWardrobe);
 
-window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,showWorkerDiagnostics,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get diagnostics(){return {...state.workerDiag}},get mask(){return state.mask},get maskKind(){return state.maskKind},isSkinMask,adjustSkinTone,previewSkinTone,cancelSkinTonePreview,beginSkinToneSession};
+window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,segmentGarmentUpper,segmentGarmentLower,segmentGarmentShoes,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,showWorkerDiagnostics,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get diagnostics(){return {...state.workerDiag}},get mask(){return state.mask},get maskKind(){return state.maskKind},isSkinMask,isGarmentMask,adjustSkinTone,previewSkinTone,cancelSkinTonePreview,beginSkinToneSession,beginGarmentColorSession,previewGarmentColor,cancelGarmentColorPreview,applyGarmentColor,beginGarmentTapMode};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();
 })();

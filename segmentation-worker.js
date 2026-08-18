@@ -1,7 +1,7 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.25-direct-person-bust-semantic-skin';
+const WORKER_VERSION='15.30-pose-garment-color';
 const MP_VERSION='1.0.1';
 const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -12,10 +12,12 @@ const PERSON_MODEL_REMOTE='https://storage.googleapis.com/mediapipe-models/image
 const MULTICLASS_MODEL_LOCAL='./assets/models/selfie_multiclass_256x256.tflite';
 const MULTICLASS_MODEL_REMOTE='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
 const FACE_MODEL_LOCAL='./assets/models/face_landmarker.task';
+const POSE_MODEL_LOCAL='./assets/models/pose_landmarker_lite.task';
 const FACE_MODEL_REMOTE='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task';
-let PERSON_MODEL=PERSON_MODEL_LOCAL,MULTICLASS_MODEL=MULTICLASS_MODEL_LOCAL,FACE_MODEL=FACE_MODEL_LOCAL;
+const POSE_MODEL_REMOTE='https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task';
+let PERSON_MODEL=PERSON_MODEL_LOCAL,MULTICLASS_MODEL=MULTICLASS_MODEL_LOCAL,FACE_MODEL=FACE_MODEL_LOCAL,POSE_MODEL=POSE_MODEL_LOCAL;
 let mp=null,fileset=null;
-let diag={worker:'READY',workerVersion:WORKER_VERSION,workerKind:'classic',module:'NOT_LOADED',wasm:'NOT_LOADED',personModel:'NOT_LOADED',multiclassModel:'NOT_LOADED',faceModel:'NOT_LOADED',lastTask:'-',lastPhase:'idle',lastMs:0,input:'-',engine:'MediaPipe Worker',personMaskSource:'-',personConfidenceIndex:-1,personLabels:'-',personCoverage:0,personBounds:'-',personMaskMax:0,error:''};
+let diag={worker:'READY',workerVersion:WORKER_VERSION,workerKind:'classic',module:'NOT_LOADED',wasm:'NOT_LOADED',personModel:'NOT_LOADED',multiclassModel:'NOT_LOADED',faceModel:'NOT_LOADED',poseModel:'NOT_LOADED',poseMs:0,lastTask:'-',lastPhase:'idle',lastMs:0,input:'-',engine:'MediaPipe Worker',personMaskSource:'-',personConfidenceIndex:-1,personLabels:'-',personCoverage:0,personBounds:'-',personMaskMax:0,error:''};
 const now=()=>performance.now();
 function phase(name,extra={}){diag.lastPhase=name;Object.assign(diag,extra);postMessage({type:'phase',phase:name,diag:{...diag}})}
 function errText(e){return String(e?.message||e||'Error desconocido')}
@@ -37,7 +39,7 @@ async function loadMP(){
     try{mp=await import(ESM_REMOTE);diag.moduleSource='CDN';}
     catch(remoteErr){diag.module='ERROR';throw new Error(`MediaPipe module local: ${errText(localErr)} | CDN: ${errText(remoteErr)}`);}
   }
-  if(!mp?.FilesetResolver||!mp?.ImageSegmenter||!mp?.FaceLandmarker){diag.module='ERROR';throw new Error('El bundle MediaPipe cargó incompleto.');}
+  if(!mp?.FilesetResolver||!mp?.ImageSegmenter||!mp?.FaceLandmarker||!mp?.PoseLandmarker){diag.module='ERROR';throw new Error('El bundle MediaPipe cargó incompleto.');}
   diag.module='READY';phase('MediaPipe módulo READY',{module:'READY'});
 
   try{
@@ -66,6 +68,114 @@ async function createFaceWithFallback(){
   try{return await mp.FaceLandmarker.createFromOptions(fileset,opts(FACE_MODEL_LOCAL));}
   catch(localErr){phase('Face model local no disponible; probando remoto…');return await mp.FaceLandmarker.createFromOptions(fileset,opts(FACE_MODEL_REMOTE));}
 }
+
+async function createPoseWithFallback(){
+  const options=(path)=>({
+    baseOptions:{modelAssetPath:path},
+    runningMode:'IMAGE',
+    numPoses:1,
+    minPoseDetectionConfidence:.35,
+    minPosePresenceConfidence:.35,
+    minTrackingConfidence:.35,
+    outputSegmentationMasks:false
+  });
+  try{return await mp.PoseLandmarker.createFromOptions(fileset,options(POSE_MODEL_LOCAL));}
+  catch(localErr){
+    phase('Pose local no disponible; probando remoto…',{poseModel:'LOADING'});
+    return await mp.PoseLandmarker.createFromOptions(fileset,options(POSE_MODEL_REMOTE));
+  }
+}
+async function poseLandmarks(image){
+  await loadMP();
+  const t=now();
+  phase('Pose Landmarker…',{poseModel:'LOADING'});
+  const pose=await createPoseWithFallback();
+  diag.poseModel='READY';
+  phase('Pose Landmarker READY',{poseModel:'READY'});
+  try{
+    const r=pose.detect(image);
+    const pts=r?.landmarks?.[0];
+    if(!pts||pts.length<33)throw new Error('Pose Landmarker no encontró el cuerpo completo');
+    diag.poseMs=Math.round(now()-t);
+    return pts.map(p=>({x:p.x,y:p.y,z:p.z||0,visibility:p.visibility??1,presence:p.presence??1}));
+  }finally{try{pose.close?.()}catch(_){}}
+}
+function clamp01(v){return Math.max(0,Math.min(1,v))}
+function polyMask(poly,w,h){
+  const out=new Uint8Array(w*h);
+  if(!poly||poly.length<3)return out;
+  let minX=w,minY=h,maxX=0,maxY=0;
+  for(const p of poly){minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}
+  minX=Math.max(0,Math.floor(minX));minY=Math.max(0,Math.floor(minY));
+  maxX=Math.min(w-1,Math.ceil(maxX));maxY=Math.min(h-1,Math.ceil(maxY));
+  for(let y=minY;y<=maxY;y++)for(let x=minX;x<=maxX;x++)if(pointInPoly(x+.5,y+.5,poly))out[y*w+x]=255;
+  return out;
+}
+function intersectMasks(a,b){
+  const out=new Uint8Array(a.length);
+  for(let i=0;i<a.length;i++)out[i]=Math.min(a[i],b[i]);
+  return out;
+}
+function morphGarment(mask,w,h){
+  // lightweight close/open/feather without touching the proven clothing model.
+  let a=mask;
+  if(typeof closeMask==='function')a=closeMask(a,w,h,1);
+  if(typeof openMask==='function')a=openMask(a,w,h,1);
+  if(typeof blurMask==='function')a=blurMask(a,w,h,1);
+  else a=featherRegion(a,w,h,1);
+  return a;
+}
+function garmentRegionFromPose(clothing,pts,w,h,part){
+  const px=i=>({x:clamp01(pts[i].x)*w,y:clamp01(pts[i].y)*h});
+  const ls=px(11),rs=px(12),lh=px(23),rh=px(24),lk=px(25),rk=px(26),la=px(27),ra=px(28),lheel=px(29),rheel=px(30),lfoot=px(31),rfoot=px(32);
+  const shoulderY=(ls.y+rs.y)/2, hipY=(lh.y+rh.y)/2, kneeY=(lk.y+rk.y)/2, ankleY=(la.y+ra.y)/2;
+  const bodyW=Math.max(12,Math.abs(rs.x-ls.x),Math.abs(rh.x-lh.x));
+  let region;
+
+  if(part==='upper'){
+    const padX=bodyW*.38;
+    const top=Math.max(0,shoulderY-bodyW*.34);
+    const bottom=Math.min(h-1,hipY+Math.max(6,(hipY-shoulderY)*.18));
+    const poly=[
+      {x:Math.min(ls.x,lh.x)-padX,y:top},
+      {x:Math.max(rs.x,rh.x)+padX,y:top},
+      {x:Math.max(rs.x,rh.x)+padX,y:bottom},
+      {x:Math.min(ls.x,lh.x)-padX,y:bottom}
+    ];
+    region=polyMask(poly,w,h);
+  }else if(part==='lower'){
+    const padX=bodyW*.30;
+    const top=Math.max(0,hipY-bodyW*.12);
+    const bottom=Math.min(h-1,ankleY+bodyW*.25);
+    const poly=[
+      {x:Math.min(lh.x,rh.x)-padX,y:top},
+      {x:Math.max(lh.x,rh.x)+padX,y:top},
+      {x:Math.max(la.x,ra.x)+padX*.60,y:bottom},
+      {x:Math.min(la.x,ra.x)-padX*.60,y:bottom}
+    ];
+    region=polyMask(poly,w,h);
+  }else{
+    const out=new Uint8Array(w*h);
+    const feet=[[la,lheel,lfoot],[ra,rheel,rfoot]];
+    for(const tri of feet){
+      const cx=(tri[0].x+tri[1].x+tri[2].x)/3, cy=(tri[0].y+tri[1].y+tri[2].y)/3;
+      const rx=Math.max(bodyW*.28,Math.max(...tri.map(p=>Math.abs(p.x-cx)))+bodyW*.16);
+      const ry=Math.max(bodyW*.18,Math.max(...tri.map(p=>Math.abs(p.y-cy)))+bodyW*.14);
+      for(let y=Math.max(0,Math.floor(cy-ry));y<Math.min(h,Math.ceil(cy+ry));y++)
+        for(let x=Math.max(0,Math.floor(cx-rx));x<Math.min(w,Math.ceil(cx+rx));x++){
+          const dx=(x-cx)/rx,dy=(y-cy)/ry;
+          if(dx*dx+dy*dy<=1)out[y*w+x]=255;
+        }
+    }
+    region=out;
+  }
+
+  const out=morphGarment(intersectMasks(clothing,region),w,h);
+  const n=out.reduce((acc,v)=>acc+(v>70),0);
+  if(n<w*h*.0015)throw new Error(`No pude aislar ${part==='upper'?'la camisa/top':part==='lower'?'el pantalón/shorts':'los zapatos'} en esta foto`);
+  return out;
+}
+
 function closeResult(r){try{r?.categoryMask?.close?.()}catch(_){} try{r?.confidenceMasks?.forEach(m=>m.close?.())}catch(_){}}
 function maskBytes(m){if(!m)return null;try{const a=m.getAsUint8Array?.();if(a)return new Uint8Array(a)}catch(_){} try{const a=m.getAsFloat32Array?.();if(a)return Uint8Array.from(a,v=>Math.round(Math.max(0,Math.min(1,v))*255))}catch(_){} return null}
 function classMask(cat,ids){const set=new Set(ids),out=new Uint8Array(cat.length);for(let i=0;i<cat.length;i++)if(set.has(cat[i]))out[i]=255;return out}
@@ -211,6 +321,12 @@ async function runProfile(mode,imageData){
   if(typeof OffscreenCanvas!=='undefined'){const c=new OffscreenCanvas(w,h);c.getContext('2d',{alpha:false}).putImageData(imageData,0,0);source=c;}
   if(mode==='person'){mask=await personMask(source)}
   else if(mode==='hair'||mode==='clothing'){mask=await multiclass(source,mode)}
+  else if(mode==='garment-upper'||mode==='garment-lower'||mode==='garment-shoes'){
+    const clothing=await multiclass(source,'clothing');
+    const pose=await poseLandmarks(source);
+    const part=mode==='garment-upper'?'upper':mode==='garment-lower'?'lower':'shoes';
+    mask=garmentRegionFromPose(clothing,pose,w,h,part);
+  }
   else if(mode==='face'){pts=await landmarks(source);mask=faceMask(pts,w,h)}
   else if(mode==='bust'){
     person=await personMask(source);
@@ -484,6 +600,7 @@ function resetTaskDiagnostics(task){
   diag.lastMs=0;
   diag.selfieMs=0;
   diag.faceMs=0;
+  diag.poseMs=0;
   diag.multiclassMs=0;
   diag.error='';
   diag.personMaskSource='-';

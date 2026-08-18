@@ -1,9 +1,15 @@
-# PHOTO IA 15.29 — Visible Skin Tone Slider
+# PHOTO IA 15.30 — Garment Color by Pose
 
-Corrección:
-- El botón Aclarar/Oscurecer piel abre un modal fijo por encima de toda la interfaz.
-- El slider -100 a +100 debe ser visible inmediatamente.
-- Ya no depende de la hoja/panel de Selección IA, evitando que quede oculto detrás.
-- Conserva preview, Cancelar, Aplicar y Undo.
-- El procesamiento sigue usando la foto actual a resolución completa con la máscara de piel reescalada.
-- No se modifican Persona, Busto/ID, Rostro, Piel, Cabello, Ropa, Worker, MediaPipe ni WASM.
+Nuevo:
+- 🎨 Color de ropa.
+- Separación automática de 👕 Camisa/Top, 👖 Pantalón/Shorts y 👟 Zapatos.
+- Pipeline: Selfie Multiclass (Ropa) → Pose Landmarker Lite → región anatómica → intersección con Ropa → limpieza de máscara.
+- Pose Landmarker se carga solo al usar Color de ropa.
+- Selector de color + intensidad + preview + Aplicar/Cancelar.
+- El recoloreado conserva luminancia, sombras, pliegues y textura en vez de pintar plano.
+- ☝️ Tocar prenda conserva el Interactive Segmenter actual como fallback/refinamiento.
+
+Preservado:
+- Piel y su slider 15.29.
+- Persona completa, Busto/ID, Rostro, Cabello y Ropa existentes.
+- Worker clásico y MediaPipe/WASM estables.
