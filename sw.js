@@ -1,19 +1,19 @@
 const CACHE='photo-ia-15-16-classic-worker-mediapipe';
-const VERSION='15.19';
+const VERSION='15.20';
 const CORE=[
- './','./index.html','./styles.css?v=15.19-worker','./ui-layout.js?v=15.19-worker','./app.js?v=15.19-worker',
- './creative-tools.js?v=15.19-worker','./brain.js?v=15.19-worker',
- './opencv-engine.js?v=15.19-worker','./smart-core.js?v=15.19-worker','./wardrobe-engine.js?v=15.19-worker','./ai-studio.js?v=15.19-worker',
- './vision.js?v=15.19-worker','./onnx-engine.js?v=15.19-worker','./segmentation.js?v=15.19-worker','./segmentation-worker.js?v=15.19','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=15.20-worker','./ui-layout.js?v=15.20-worker','./app.js?v=15.20-worker',
+ './creative-tools.js?v=15.20-worker','./brain.js?v=15.20-worker',
+ './opencv-engine.js?v=15.20-worker','./smart-core.js?v=15.20-worker','./wardrobe-engine.js?v=15.20-worker','./ai-studio.js?v=15.20-worker',
+ './vision.js?v=15.20-worker','./onnx-engine.js?v=15.20-worker','./segmentation.js?v=15.20-worker','./segmentation-worker.js?v=15.20','./manifest.webmanifest'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=15.19-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=15.19-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=15.19-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=15.19-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=15.19-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=15.19-worker',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
- {local:'./assets/mediapipe/vision_bundle.mjs?v=15.19',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
+ {local:'./assets/vendor/fabric.min.js?v=15.20-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=15.20-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=15.20-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=15.20-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=15.20-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=15.20-worker',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/mediapipe/vision_bundle.mjs?v=15.20',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_nosimd_internal.js',name:'WASM compatible',required:false},
