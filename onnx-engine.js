@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const VERSION='1.0-ort-web';
-const SCRIPT='./assets/vendor/ort.min.js?v=15.27';
+const SCRIPT='./assets/vendor/ort.min.js?v=15.29';
 const REMOTE='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort.min.js';
 const WASM_PATH='./assets/onnx/';
 let promise=null,lastError='';

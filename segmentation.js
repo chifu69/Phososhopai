@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.27'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.29'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -666,7 +666,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.27`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.29`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -1067,59 +1067,101 @@ async function createCutout(){
 
 function isSkinMask(){return !!state.mask && /^(skin|piel)$/i.test(String(state.maskKind||'').trim());}
 
+let skinPreviewSeq=0;
+let skinToneBaseDataUrl='';
+let skinToneBaseImage=null;
+
+function currentPhotoElement(){
+  const photo=api()?.state?.photo;
+  return photo?.getElement?.()||photo?._element||null;
+}
+async function beginSkinToneSession(){
+  const el=currentPhotoElement();
+  if(!el)throw makeError('No pude leer la fotografía actual.');
+  const w=el.naturalWidth||el.videoWidth||el.width||api()?.state?.photo?.width||0;
+  const h=el.naturalHeight||el.videoHeight||el.height||api()?.state?.photo?.height||0;
+  if(!w||!h)throw makeError('La fotografía no tiene resolución válida.');
+  const c=document.createElement('canvas');c.width=w;c.height=h;
+  c.getContext('2d',{alpha:false}).drawImage(el,0,0,w,h);
+  skinToneBaseDataUrl=c.toDataURL('image/jpeg',.97);
+  skinToneBaseImage=await loadImage(skinToneBaseDataUrl);
+  return true;
+}
+function endSkinToneSession(){
+  skinToneBaseDataUrl='';
+  skinToneBaseImage=null;
+}
+function scaledMaskAlpha(mask,x,y,outW,outH){
+  const sx=Math.max(0,Math.min(mask.width-1,(x+.5)*mask.width/outW-.5));
+  const sy=Math.max(0,Math.min(mask.height-1,(y+.5)*mask.height/outH-.5));
+  const x0=Math.floor(sx),y0=Math.floor(sy);
+  const x1=Math.min(mask.width-1,x0+1),y1=Math.min(mask.height-1,y0+1);
+  const fx=sx-x0,fy=sy-y0;
+  const d=mask.data;
+  const a00=d[y0*mask.width+x0],a10=d[y0*mask.width+x1];
+  const a01=d[y1*mask.width+x0],a11=d[y1*mask.width+x1];
+  const a0=a00+(a10-a00)*fx;
+  const a1=a01+(a11-a01)*fx;
+  return (a0+(a1-a0)*fy)/255;
+}
 function skinToneDataUrl(amount){
  if(!isSkinMask())throw makeError('Primero selecciona Piel.');
- if(!state.workCanvas)throw makeError('No pude leer la fotografía.');
+ if(!skinToneBaseImage)throw makeError('El retoque de piel no está preparado.');
 
  const ui=Math.max(-100,Math.min(100,Number(amount)||0));
- const {data,width,height}=state.mask,src=state.workCanvas;
+ const mask=state.mask;
+ const src=skinToneBaseImage;
+ const width=src.naturalWidth||src.width;
+ const height=src.naturalHeight||src.height;
+
  const out=document.createElement('canvas');out.width=width;out.height=height;
- const ctx=out.getContext('2d',{willReadFrequently:true});
+ const ctx=out.getContext('2d',{willReadFrequently:true,alpha:false});
  ctx.drawImage(src,0,0,width,height);
 
  const img=ctx.getImageData(0,0,width,height),p=img.data;
  const t=Math.abs(ui)/100;
 
- for(let i=0;i<data.length;i++){
-   const a=data[i]/255;
-   if(a<=.01)continue;
+ for(let y=0;y<height;y++){
+   for(let x=0;x<width;x++){
+     const a=scaledMaskAlpha(mask,x,y,width,height);
+     if(a<=.015)continue;
 
-   const j=i*4,r=p[j],g=p[j+1],b=p[j+2];
-   const y=.2126*r+.7152*g+.0722*b;
+     const j=(y*width+x)*4,r=p[j],g=p[j+1],b=p[j+2];
+     const lum=.2126*r+.7152*g+.0722*b;
+     const mid=1-Math.min(1,Math.abs(lum-128)/145);
+     const response=.44+.56*mid;
 
-   // Skin-safe luminance adjustment:
-   // change lightness while preserving local color/chroma and texture.
-   const mid=1-Math.min(1,Math.abs(y-128)/145);
-   const response=.42+.58*mid;
+     let newLum;
+     if(ui>0){
+       // Strong enough to be visible, still natural at moderate slider values.
+       newLum=lum+(255-lum)*(0.38*t*response);
+     }else{
+       newLum=lum-lum*(0.34*t*response);
+     }
 
-   let newY;
-   if(ui>0){
-     newY=y+(255-y)*(0.26*t*response);
-   }else{
-     newY=y-y*(0.22*t*response);
+     const chromaKeep=1-(0.08*t);
+     const rr=newLum+(r-lum)*chromaKeep;
+     const gg=newLum+(g-lum)*chromaKeep;
+     const bb=newLum+(b-lum)*chromaKeep;
+
+     // Preserve semantic feathering at boundaries.
+     const aa=Math.pow(a,.82);
+     p[j]=Math.max(0,Math.min(255,r+(rr-r)*aa));
+     p[j+1]=Math.max(0,Math.min(255,g+(gg-g)*aa));
+     p[j+2]=Math.max(0,Math.min(255,b+(bb-b)*aa));
    }
-
-   // Preserve chroma instead of adding equal RGB, which washes out skin.
-   const chromaKeep=1-(0.10*t);
-   const rr=newY+(r-y)*chromaKeep;
-   const gg=newY+(g-y)*chromaKeep;
-   const bb=newY+(b-y)*chromaKeep;
-
-   // Feather by semantic mask confidence.
-   p[j]=Math.max(0,Math.min(255,r+(rr-r)*a));
-   p[j+1]=Math.max(0,Math.min(255,g+(gg-g)*a));
-   p[j+2]=Math.max(0,Math.min(255,b+(bb-b)*a));
  }
+
  ctx.putImageData(img,0,0);
  return out.toDataURL('image/jpeg',.97);
 }
 
-let skinPreviewSeq=0;
 async function previewSkinTone(amount){
  if(!isSkinMask())return api()?.toast('Primero selecciona Piel.');
  const seq=++skinPreviewSeq;
  try{
    showMask(false);
+   if(!skinToneBaseImage)await beginSkinToneSession();
    const url=skinToneDataUrl(amount);
    if(seq!==skinPreviewSeq)return;
    await api().applyProcessedImageDataUrl(url,false);
@@ -1131,11 +1173,11 @@ async function previewSkinTone(amount){
 
 async function cancelSkinTonePreview(){
  skinPreviewSeq++;
- if(!state.workCanvas)return;
  try{
-   await api().applyProcessedImageDataUrl(state.workCanvas.toDataURL('image/jpeg',.97),false);
+   if(skinToneBaseDataUrl)await api().applyProcessedImageDataUrl(skinToneBaseDataUrl,false);
    if(state.mask)showMask(true);
  }catch(err){console.error(err);}
+ finally{endSkinToneSession();}
 }
 
 async function adjustSkinTone(amount){
@@ -1145,6 +1187,7 @@ async function adjustSkinTone(amount){
  try{
    skinPreviewSeq++;
    showMask(false);
+   if(!skinToneBaseImage)await beginSkinToneSession();
    const url=skinToneDataUrl(ui);
    await api().applyProcessedImageDataUrl(url,true);
    clearMask();
@@ -1152,6 +1195,8 @@ async function adjustSkinTone(amount){
  }catch(err){
    console.error(err);
    api()?.toast(friendlyError(err));
+ }finally{
+   endSkinToneSession();
  }
 }
 function command(raw){const t=String(raw||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');if(/identificacion|credencial/.test(t)){segmentBust();return true;}if(/selecciona.*busto/.test(t)){segmentBust();return true;}if(/selecciona.*rostro|solo.*cara|solo.*rostro/.test(t)){segmentFace();return true;}if(/selecciona.*piel|solo.*piel/.test(t)){segmentSkin();return true;}if(/selecciona.*cabello|solo.*cabello|pelo/.test(t)){segmentHair();return true;}if(/selecciona.*ropa|solo.*ropa|vestuario|prenda/.test(t)){segmentClothing();return true;}if(/segmenta.*persona|selecciona.*persona completa|separa.*persona/.test(t)){segmentPerson();return true;}if(/seleccion inteligente|toca.*objeto|segmenta.*objeto/.test(t)){beginTapMode();return true;}if(/regresa.*fondo|restaura.*fondo|muestra.*imagen completa/.test(t)){restoreBackground();return true;}if(/refina.*mascara|mejora.*mascara/.test(t)){refineCurrentMask();return true;}if(/quita.*fondo|elimina.*fondo|fondo transparente/.test(t)){if(state.mask)createCutout();else segmentPerson().then(()=>state.mask&&createCutout());return true;}if(/muestra.*mascara/.test(t)){showMask(true);return true;}if(/oculta.*mascara/.test(t)){showMask(false);return true;}if(/limpia.*mascara|borra.*mascara/.test(t)){clearMask();return true;}if(/cancela.*segment|deten.*segment/.test(t)){cancelCurrent();return true;}return false;}
@@ -1191,7 +1236,7 @@ function resumeAfterWardrobe(){
 document.addEventListener('photoia:wardrobe-engine-enter',suspendForWardrobe);
 document.addEventListener('photoia:wardrobe-engine-leave',resumeAfterWardrobe);
 
-window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,showWorkerDiagnostics,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get diagnostics(){return {...state.workerDiag}},get mask(){return state.mask},get maskKind(){return state.maskKind},isSkinMask,adjustSkinTone,previewSkinTone,cancelSkinTonePreview};
+window.PhotoSegmentation={version:VERSION,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,showWorkerDiagnostics,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get diagnostics(){return {...state.workerDiag}},get mask(){return state.mask},get maskKind(){return state.maskKind},isSkinMask,adjustSkinTone,previewSkinTone,cancelSkinTonePreview,beginSkinToneSession};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();
 })();
