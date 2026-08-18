@@ -1,7 +1,7 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.16-classic-worker';
+const WORKER_VERSION='15.17.1-id-landmark-authority';
 const MP_VERSION='1.0.1';
 const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -91,7 +91,6 @@ function adaptiveSkin(imageData,person,face){
   for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(person&&person[i]<100)continue;const dx=Math.abs(x-cx),faceZone=dx<face.w*.72&&y>face.y-face.h*.12&&y<faceBottom+face.h*.75,bodyZone=y>=faceBottom+face.h*.15&&y<Math.min(h,faceBottom+face.h*3.2)&&dx<face.w*1.8;if(!faceZone&&!bodyZone)continue;const j=i*4,c=ycbcr(data[j],data[j+1],data[j+2]),dcb=Math.abs(c.cb-cb)/Math.max(8,cbm*3.0),dcr=Math.abs(c.cr-cr)/Math.max(9,crm*3.0),d=Math.sqrt(dcb*dcb+dcr*dcr);if(c.y>28&&c.y<250&&d<1.08)out[i]=255}
   return out
 }
-function bustMask(person,face,w,h){const out=new Uint8Array(w*h),cx=face.x+face.w*.5,top=Math.max(0,face.y-face.h*.18),bottom=Math.min(h-1,face.y+face.h*2.45);for(let y=Math.floor(top);y<=bottom;y++){let half;if(y<=face.y+face.h*1.02){const t=(y-(face.y-face.h*.18))/(face.h*1.20);half=face.w*(.60+.10*Math.max(0,Math.min(1,t)))}else{const t=(y-(face.y+face.h*1.02))/Math.max(1,bottom-(face.y+face.h*1.02));half=face.w*(.72+1.05*Math.pow(Math.max(0,t),.72))}const l=Math.max(0,Math.floor(cx-half)),r=Math.min(w-1,Math.ceil(cx+half));for(let x=l;x<=r;x++){const i=y*w+x;if(!person||person[i]>70)out[i]=255}}return out}
 function faceMask(points,w,h){const b=bbox(points,w,h),out=new Uint8Array(w*h),cx=b.x+b.w*.5,cy=b.y+b.h*.52,rx=b.w*.58,ry=b.h*.62;for(let y=Math.max(0,Math.floor(cy-ry));y<Math.min(h,Math.ceil(cy+ry));y++)for(let x=Math.max(0,Math.floor(cx-rx));x<Math.min(w,Math.ceil(cx+rx));x++){const dx=(x-cx)/rx,dy=(y-cy)/ry;if(dx*dx+dy*dy<=1)out[y*w+x]=255}return out}
 async function runProfile(mode,imageData){
   const w=imageData.width,h=imageData.height;diag.lastTask=mode;diag.input=`${w}×${h}`;const total=now();let mask,pts,person,face;
@@ -100,11 +99,113 @@ async function runProfile(mode,imageData){
   if(mode==='person'){mask=await personMask(source)}
   else if(mode==='hair'||mode==='clothing'){mask=await multiclass(source,mode)}
   else if(mode==='face'){pts=await landmarks(source);mask=faceMask(pts,w,h)}
-  else if(mode==='bust'){person=await personMask(source);pts=await landmarks(source);face=bbox(pts,w,h);mask=bustMask(person,face,w,h)}
+  else if(mode==='bust'){person=await personMask(source);pts=await landmarks(source);mask=buildIdMaskFromFaceLandmarks(pts,w,h,person)}
   else if(mode==='skin'){person=await personMask(source);pts=await landmarks(source);face=bbox(pts,w,h);mask=adaptiveSkin(imageData,person,face)}
   else throw new Error(`Modo no soportado: ${mode}`);
   diag.lastMs=Math.round(now()-total);diag.lastPhase='done';diag.error='';return {mask,points:pts||null,diag:{...diag}}
 }
+
+function convexHull(points){
+  if(points.length<=3)return points.slice();
+  const pts=points.slice().sort((a,b)=>a.x===b.x?a.y-b.y:a.x-b.x);
+  const cross=(o,a,b)=>(a.x-o.x)*(b.y-o.y)-(a.y-o.y)*(b.x-o.x);
+  const lower=[];
+  for(const p of pts){
+    while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],p)<=0)lower.pop();
+    lower.push(p);
+  }
+  const upper=[];
+  for(let i=pts.length-1;i>=0;i--){
+    const p=pts[i];
+    while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],p)<=0)upper.pop();
+    upper.push(p);
+  }
+  upper.pop();lower.pop();
+  return lower.concat(upper);
+}
+function pointInPoly(x,y,poly){
+  let inside=false;
+  for(let i=0,j=poly.length-1;i<poly.length;j=i++){
+    const xi=poly[i].x, yi=poly[i].y, xj=poly[j].x, yj=poly[j].y;
+    const intersect=((yi>y)!=(yj>y))&&(x<(xj-xi)*(y-yi)/(yj-yi+1e-9)+xi);
+    if(intersect)inside=!inside;
+  }
+  return inside;
+}
+function featherRegion(mask,w,h,r=2){
+  if(r<=0)return mask;
+  let out=mask.slice();
+  for(let pass=0;pass<r;pass++){
+    const n=out.slice();
+    for(let y=1;y<h-1;y++)for(let x=1;x<w-1;x++){
+      let s=0,c=0;
+      for(let yy=-1;yy<=1;yy++)for(let xx=-1;xx<=1;xx++){s+=out[(y+yy)*w+x+xx];c++;}
+      n[y*w+x]=Math.round(s/c);
+    }
+    out=n;
+  }
+  return out;
+}
+
+function firstFaceLandmarks(result){
+  return result?.faceLandmarks?.[0]||result?.landmarks?.[0]||null;
+}
+
+function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){
+  if(!landmarks||landmarks.length<50)throw new Error('Face Landmarker did not return enough landmarks');
+  const pts=landmarks.map(p=>({x:(p.x<=1?p.x*w:p.x),y:(p.y<=1?p.y*h:p.y)}));
+
+  // Use robust face bounds from all landmarks, then construct head/neck/shoulders.
+  let minX=Infinity,minY=Infinity,maxX=-Infinity,maxY=-Infinity;
+  for(const p of pts){minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y);}
+  const fw=Math.max(12,maxX-minX), fh=Math.max(12,maxY-minY);
+  const cx=(minX+maxX)/2;
+  const faceTop=minY, faceBottom=maxY;
+
+  // Landmark-derived head ellipse, including ears/hairline margin.
+  const headTop=Math.max(0,faceTop-fh*.20);
+  const headBottom=Math.min(h-1,faceBottom+fh*.17);
+  const headRx=fw*.68;
+  const headCy=(headTop+headBottom)/2;
+  const headRy=(headBottom-headTop)/2;
+
+  // Neck and shoulders grow from jaw width rather than a generic oval.
+  const neckTop=faceBottom-fh*.03;
+  const neckBottom=Math.min(h-1,faceBottom+fh*.62);
+  const shoulderBottom=Math.min(h-1,faceBottom+fh*1.55);
+
+  const mask=new Uint8Array(w*h);
+  for(let y=Math.max(0,Math.floor(headTop));y<=shoulderBottom;y++){
+    let half=0;
+    if(y<=headBottom){
+      const dy=(y-headCy)/(headRy||1);
+      if(Math.abs(dy)<=1)half=headRx*Math.sqrt(Math.max(0,1-dy*dy));
+    }else if(y<=neckBottom){
+      const t=(y-headBottom)/Math.max(1,neckBottom-headBottom);
+      half=fw*(.34+.10*t);
+    }else{
+      const t=(y-neckBottom)/Math.max(1,shoulderBottom-neckBottom);
+      half=fw*(.44+1.18*Math.pow(t,.72));
+    }
+    const lx=Math.max(0,Math.floor(cx-half));
+    const rx=Math.min(w-1,Math.ceil(cx+half));
+    for(let x=lx;x<=rx;x++){
+      const edge=half?Math.abs(x-cx)/half:1;
+      let v=edge<.92?255:Math.round(255*Math.max(0,(1-edge)/.08));
+      if(personMask&&personMask.length===mask.length){
+        const pv=personMask[y*w+x];
+        // Face/head remains authoritative. Below the chin, use person segmentation as clipping aid only.
+        if(y>faceBottom+fh*.08){
+          if(pv<35)v=Math.round(v*.28);
+          else if(pv<90)v=Math.round(v*.65);
+        }
+      }
+      if(v>mask[y*w+x])mask[y*w+x]=v;
+    }
+  }
+  return featherRegion(mask,w,h,2);
+}
+
 self.onmessage=async e=>{
   const {id,type,mode,width,height,rgba}=e.data||{};
   if(type==='ping'){postMessage({type:'pong',id,diag:{...diag}});return}

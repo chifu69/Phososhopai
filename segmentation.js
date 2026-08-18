@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.16'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.17.1'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -666,7 +666,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.16`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.17.1`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -716,7 +716,7 @@ function showWorkerDiagnostics(){
   const lines=[
     'PHOTO IA · Motor de selección',
     `Worker: ${d.worker||'-'}`,
-    `Worker build: ${d.workerVersion||'15.16'}`,
+    `Worker build: ${d.workerVersion||'15.17.1'}`,
     `Worker type: ${d.workerKind||'classic'}`,
     `importScripts: ${d.importScriptsAvailable||'-'}`,
     `Módulo: ${d.module||'NOT_LOADED'} (${d.moduleSource||'-'})`,
