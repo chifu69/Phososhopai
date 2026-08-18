@@ -1,7 +1,7 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.23-smooth-neck-transition';
+const WORKER_VERSION='15.24-direct-person-bust-semantic-skin';
 const MP_VERSION='1.0.1';
 const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
@@ -212,8 +212,16 @@ async function runProfile(mode,imageData){
   if(mode==='person'){mask=await personMask(source)}
   else if(mode==='hair'||mode==='clothing'){mask=await multiclass(source,mode)}
   else if(mode==='face'){pts=await landmarks(source);mask=faceMask(pts,w,h)}
-  else if(mode==='bust'){person=await personMask(source);pts=await landmarks(source);mask=buildIdMaskFromFaceLandmarks(pts,w,h,person)}
-  else if(mode==='skin'){person=await personMask(source);pts=await landmarks(source);face=bbox(pts,w,h);mask=adaptiveSkin(imageData,person,face)}
+  else if(mode==='bust'){
+    person=await personMask(source);
+    pts=await landmarks(source);
+    mask=buildBustFromPersonMask(person,pts,w,h);
+  }
+  else if(mode==='skin'){
+    // Use the model's own semantic skin classes as authority.
+    // Hair/clothing already proved this multiclass model works well on this device.
+    mask=await multiclass(source,'skin');
+  }
   else throw new Error(`Modo no soportado: ${mode}`);
   diag.lastMs=Math.round(now()-total);diag.lastPhase='done';diag.error='';return {mask,points:pts||null,diag:{...diag}}
 }
@@ -262,6 +270,50 @@ function featherRegion(mask,w,h,r=2){
 
 function firstFaceLandmarks(result){
   return result?.faceLandmarks?.[0]||result?.landmarks?.[0]||null;
+}
+
+
+function buildBustFromPersonMask(personMask,landmarks,w,h){
+  if(!personMask||personMask.length!==w*h)throw new Error('No hay máscara de persona válida');
+  if(!landmarks||landmarks.length<50)throw new Error('Face Landmarker did not return enough landmarks');
+
+  const b=bbox(landmarks,w,h);
+  const faceBottom=b.y+b.h;
+
+  // Keep the real person silhouette from the top of the image down through upper chest.
+  // Face Landmarker only decides WHERE to cut vertically.
+  const bottom=Math.min(h-1,Math.round(faceBottom+b.h*2.10));
+  const fadeStart=Math.max(0,Math.round(bottom-b.h*.22));
+
+  const out=new Uint8Array(w*h);
+
+  for(let y=0;y<=bottom;y++){
+    const fade = y<=fadeStart ? 1 : Math.max(0,(bottom-y)/Math.max(1,bottom-fadeStart));
+    for(let x=0;x<w;x++){
+      const i=y*w+x;
+      const pv=personMask[i];
+      if(pv<35)continue;
+
+      let v=pv;
+      if(y>fadeStart)v=Math.round(v*fade);
+      if(v>out[i])out[i]=v;
+    }
+  }
+
+  // Remove tiny background leaks near the top by requiring stronger person confidence
+  // above the forehead while preserving hats/hair/glasses that are part of the person.
+  const topGuard=Math.max(0,Math.round(b.y-b.h*.65));
+  for(let y=0;y<topGuard;y++){
+    for(let x=0;x<w;x++){
+      const i=y*w+x;
+      if(out[i] && personMask[i]<80)out[i]=0;
+    }
+  }
+
+  let mask=featherRegion(out,w,h,1);
+  if(typeof closeMask==='function')mask=closeMask(mask,w,h,1);
+  if(typeof blurMask==='function')mask=blurMask(mask,w,h,1);
+  return mask;
 }
 
 function buildIdMaskFromFaceLandmarks(landmarks,w,h,personMask){

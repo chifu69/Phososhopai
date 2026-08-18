@@ -1,10 +1,16 @@
-# PHOTO IA 15.23 — Smooth Neck Transition + Stable Worker
+# PHOTO IA 15.24 — Direct Person Bust + Semantic Skin
 
-- Ropa y Cabello NO se modificaron.
-- Worker/MediaPipe/WASM/modelos permanecen como en 15.22.
+Cambios:
+- Persona completa NO se modifica.
+- Ropa NO se modifica.
+- Cabello NO se modifica.
 - Busto/ID:
-  - Cabeza/contorno superior de 15.22 se conserva.
-  - Hombros/pecho de 15.21/15.22 se conservan.
-  - Solo cambia la transición mandíbula → cuello → hombros.
-  - La unión ahora se ensancha gradualmente y mezcla landmarks con Selfie Segmentation.
-  - Se elimina el puente rectangular/horizontal y se aplica un blur local muy suave solo en esa banda.
+  - usa directamente la máscara real de Persona completa;
+  - Face Landmarker solo determina hasta dónde cortar verticalmente;
+  - conserva cabeza, cuello, hombros y pecho superior con la silueta real;
+  - elimina la geometría inventada de hombros.
+- Piel:
+  - usa directamente las clases semánticas de piel facial + piel corporal del modelo multiclase;
+  - YCbCr deja de ser la autoridad principal;
+  - ojos, cejas, cabello y ropa quedan fuera según las clases del modelo.
+- Worker/MediaPipe/WASM/modelos permanecen intactos.
