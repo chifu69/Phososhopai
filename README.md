@@ -1,15 +1,13 @@
-# PHOTO IA 15.14 — Worker Isolated AI
+# PHOTO IA 15.15 — Worker + Official MediaPipe Bundle
 
-Esta versión cambia la arquitectura de Selección IA para evitar congelamientos.
+Cambios principales:
+- Worker sigue aislando toda inferencia pesada del hilo principal.
+- MediaPipe Tasks Vision usa el bundle ESM oficial `vision_bundle.mjs`, versión 1.0.1.
+- WASM usa exactamente la misma versión 1.0.1.
+- Se eliminó el import `+esm` que produjo `Importing a module script failed`.
+- Diagnóstico ahora separa: módulo ESM, WASM, Selfie model, Face model y modelo multiclase.
+- La imagen de análisis sigue limitada a 256×256 aprox. en teléfono.
+- Selfie Segmentation y Face Landmarker siguen secuenciales, no paralelos.
 
-- MediaPipe para Persona, Busto/ID, Rostro, Piel, Cabello y Ropa corre dentro de `segmentation-worker.js`, fuera del hilo de interfaz.
-- En teléfonos la imagen de análisis se reduce a 256 px en el lado mayor.
-- Los modelos se ejecutan secuencialmente, nunca en paralelo.
-- Busto/ID: Selfie Segmentation → Face Landmarker → región de cabeza/cuello/hombros.
-- Piel: Selfie Segmentation → Face Landmarker → tono de piel aprendido de la cara.
-- Rostro: Face Landmarker.
-- Cabello/Ropa: segmentación multiclase.
-- Si el worker se atasca, se termina el worker; la UI no debe congelarse.
-- Primera inferencia: hasta 18 s para permitir carga del modelo. Inferencias siguientes: 6.5 s antes de reiniciar el worker.
-- Se añadió “Diagnóstico motor” a Selección IA para ver Worker, MediaPipe, resolución y tiempos.
-- En móvil, Objeto por toque usa temporalmente la selección local segura para evitar ejecutar Interactive Segmenter en el hilo principal.
+Nota:
+Los binarios de MediaPipe/modelos se cargan desde las URLs oficiales/pinneadas al iniciar el Worker. La interfaz permanece aislada y el Worker se puede terminar si una inferencia no responde.
