@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='3.6-adaptive-skin-id-geometry';
+const VERSION='3.7-landmarker-person-pipeline';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -11,6 +11,8 @@ const MEDIAPIPE_WASM_REMOTE='https://cdn.jsdelivr.net/npm/@mediapipe/tasks-visio
 const PERSON_MODEL='./assets/models/selfie_segmenter_landscape.tflite';
 const INTERACTIVE_MODEL='./assets/models/interactive_segmentation.task';
 const MULTICLASS_MODEL='./assets/models/selfie_multiclass_256x256.tflite';
+const FACE_LANDMARKER_MODEL='./assets/models/face_landmarker.task';
+const FACE_LANDMARKER_REMOTE='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task';
 const MODEL_REMOTE=new Map([
   [PERSON_MODEL,'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite'],
   [INTERACTIVE_MODEL,'https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/latest/interactive_segmentation.task'],
@@ -22,7 +24,7 @@ const LOAD_TIMEOUT=IS_IOS?9000:30000;
 const RUN_TIMEOUT=IS_IOS?8000:30000;
 const PROFILE_WATCHDOG=IS_IOS?7000:36000;
 const state={
-  module:null,fileset:null,imageSegmenter:null,multiclassSegmenter:null,interactiveSegmenter:null,
+  module:null,fileset:null,imageSegmenter:null,multiclassSegmenter:null,interactiveSegmenter:null,faceLandmarker:null,
   modulePromise:null,loading:false,mask:null,maskKind:'',maskOverlay:null,
   tapMode:false,workCanvas:null,operation:null,operationId:0,personModelBuffer:null,multiclassModelBuffer:null,interactiveModelBuffer:null,bodyPixNet:null,bodyPixPromise:null,semantic:{faceAnchor:null,faceMask:null,skinMask:null,hairMask:null,clothingMask:null,confidence:{}}
 };
@@ -695,6 +697,48 @@ async function createWithFallback(factory,operation,label){
     logDebug('CREATE FROM OPTIONS: CPU correcto');return created;
   }
 }
+
+async function ensureFaceLandmarker(operation){
+  await loadModule(operation);if(state.faceLandmarker)return state.faceLandmarker;
+  setStatus('Face Landmarker: cargando geometría facial…','loading');
+  let modelPath=FACE_LANDMARKER_MODEL;
+  try{const r=await fetch(modelPath,{cache:'force-cache'});if(!r.ok)throw new Error('local missing');}
+  catch(_){modelPath=FACE_LANDMARKER_REMOTE;}
+  state.faceLandmarker=await timeout(state.module.FaceLandmarker.createFromOptions(state.fileset,{
+    baseOptions:{modelAssetPath:modelPath},runningMode:'IMAGE',numFaces:1,
+    minFaceDetectionConfidence:.40,minFacePresenceConfidence:.40,minTrackingConfidence:.40,
+    outputFaceBlendshapes:false,outputFacialTransformationMatrixes:false
+  }),LOAD_TIMEOUT,'No se pudo iniciar Face Landmarker.',operation);
+  logDebug('FACE LANDMARKER: READY',{modelPath});return state.faceLandmarker;
+}
+async function faceLandmarks(canvas,operation){
+  const lm=await ensureFaceLandmarker(operation);setStatus('Face Landmarker: analizando rostro…','loading');
+  const result=await runTask(()=>lm.detect(canvas),operation);const pts=result?.faceLandmarks?.[0];
+  if(!pts||pts.length<100)throw makeError('Face Landmarker no encontró el rostro con suficiente confianza.','LANDMARKER_NO_FACE');
+  return pts;
+}
+function landmarkAnchor(points,w,h){
+  let minX=1,minY=1,maxX=0,maxY=0;for(const p of points){minX=Math.min(minX,p.x);maxX=Math.max(maxX,p.x);minY=Math.min(minY,p.y);maxY=Math.max(maxY,p.y);}
+  const x=minX*w,y=minY*h,bw=(maxX-minX)*w,bh=(maxY-minY)*h;
+  return {x,y,w:bw,h:bh,source:'FaceLandmarker'};
+}
+function ellipseMask(w,h,cx,cy,rx,ry){const out=new Uint8Array(w*h);for(let y=Math.max(0,Math.floor(cy-ry));y<Math.min(h,Math.ceil(cy+ry));y++)for(let x=Math.max(0,Math.floor(cx-rx));x<Math.min(w,Math.ceil(cx+rx));x++){const dx=(x-cx)/rx,dy=(y-cy)/ry;if(dx*dx+dy*dy<=1)out[y*w+x]=255;}return out;}
+function intersectMasks(a,b){const out=new Uint8Array(a.length);for(let i=0;i<a.length;i++)out[i]=(a[i]>70&&b[i]>70)?Math.min(a[i],b[i]):0;return out;}
+function landmarkerBustPrior(anchor,w,h){
+  const cx=anchor.x+anchor.w*.5,faceBottom=anchor.y+anchor.h;
+  const top=Math.max(0,anchor.y-anchor.h*.10),bottom=Math.min(h,faceBottom+anchor.h*1.55),out=new Uint8Array(w*h);
+  for(let y=Math.floor(top);y<Math.ceil(bottom);y++){
+    let half;if(y<=faceBottom)half=anchor.w*.62;else{const t=(y-faceBottom)/Math.max(1,bottom-faceBottom);half=anchor.w*(.70+1.10*t);}
+    for(let x=Math.max(0,Math.floor(cx-half));x<Math.min(w,Math.ceil(cx+half));x++)out[y*w+x]=255;
+  }
+  return blurMask(out,w,h,1);
+}
+async function landmarkerPersonPipeline(canvas,operation){
+  const points=await faceLandmarks(canvas,operation),anchor=landmarkAnchor(points,canvas.width,canvas.height);
+  setStatus('Selfie Segmentation: separando persona…','loading');
+  let person;try{person=await mediaPipePersonMask(canvas,operation);}catch(err){logDebug('PERSON segmentation fallback',err);person=offlinePortraitMask(canvas);}
+  return {points,anchor,person};
+}
 async function ensurePersonSegmenter(operation){
   logDebug('PERSON SEGMENTER: ensure inicio');
   await loadModule(operation);logDebug('PERSON SEGMENTER: módulo listo');if(state.imageSegmenter)return state.imageSegmenter;
@@ -840,24 +884,30 @@ async function segmentProfile(mode='person'){
     const work=await getWorkCanvas(operation);
     let mask=null,engine='MediaPipe';
 
-    if(mode==='bust'){
-      setStatus('Localizando rostro y construyendo área ID…','loading');
-      let person;
-      try{ person=offlinePortraitMask(work); }
-      catch(_){
-        person=new Uint8Array(work.width*work.height);
-        for(let i=0;i<person.length;i++)person[i]=255;
+    if(mode==='bust'||mode==='face'||mode==='skin'){
+      // 15.13: real mobile pipeline requested for ID/face/skin:
+      // Selfie Segmentation -> Face Landmarker -> semantic/color refinement.
+      const pipe=await timeout(landmarkerPersonPipeline(work,operation),PROFILE_WATCHDOG-800,'El pipeline facial tardó demasiado.',operation);
+      const {anchor,person}=pipe,w=work.width,h=work.height;
+      if(mode==='bust'){
+        const prior=landmarkerBustPrior(anchor,w,h);
+        mask=intersectMasks(person,prior);mask=blurMask(closeMask(mask,w,h,1),w,h,1);
+        engine='Selfie Segmentation + Face Landmarker';
+      }else{
+        const semantic=await timeout(semanticMasks(work,person),4200,'El refinamiento facial tardó demasiado.',operation);
+        if(mode==='face'){
+          const cx=anchor.x+anchor.w/2,cy=anchor.y+anchor.h*.52;
+          const geo=ellipseMask(w,h,cx,cy,anchor.w*.57,anchor.h*.60);
+          mask=intersectMasks(semantic.faceMask,geo);
+        }else{
+          // Keep the good 15.12 adaptive skin model, but constrain it with landmark geometry/person.
+          const cx=anchor.x+anchor.w/2,cy=anchor.y+anchor.h*.70;
+          const geo=ellipseMask(w,h,cx,cy,anchor.w*.72,anchor.h*1.05);
+          mask=intersectMasks(intersectMasks(semantic.skinMask,person),geo);
+        }
+        engine='Face Landmarker + modelo adaptativo de piel';
       }
-      const anchor=await timeout(
-        detectFaceAnchor(work,person),
-        2600,
-        'No pude localizar el rostro a tiempo.',
-        operation
-      );
-      if(!anchor)throw makeError('No pude localizar el rostro.','BUST_NO_FACE');
-      mask=buildStableIdRegion(anchor,work.width,work.height);
-      engine='Geometría facial local';
-    }else if(mode==='face'||mode==='skin'||mode==='hair'||mode==='clothing'){
+    }else if(mode==='hair'||mode==='clothing'){
       if(IS_IOS){
         // Safari/iPhone: do not enter MediaPipe inference on the main thread.
         // Use the local semantic engine directly to keep the UI responsive.
