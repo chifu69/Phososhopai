@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.15';
+const VERSION='15.16';
 const categoryMap={
  home:['.command-panel','.quick-actions'],smart:['.smart-core-panel','.vision-panel'],adjust:['.tools','.transform'],
  create:['.creative-panel','#object-inspector','.layers-panel'],ai:['#ai-studio'],export:['.export']

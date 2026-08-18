@@ -1,13 +1,10 @@
-# PHOTO IA 15.15 — Worker + Official MediaPipe Bundle
+# PHOTO IA 15.16 — Classic Worker MediaPipe Fix
 
-Cambios principales:
-- Worker sigue aislando toda inferencia pesada del hilo principal.
-- MediaPipe Tasks Vision usa el bundle ESM oficial `vision_bundle.mjs`, versión 1.0.1.
-- WASM usa exactamente la misma versión 1.0.1.
-- Se eliminó el import `+esm` que produjo `Importing a module script failed`.
-- Diagnóstico ahora separa: módulo ESM, WASM, Selfie model, Face model y modelo multiclase.
-- La imagen de análisis sigue limitada a 256×256 aprox. en teléfono.
-- Selfie Segmentation y Face Landmarker siguen secuenciales, no paralelos.
-
-Nota:
-Los binarios de MediaPipe/modelos se cargan desde las URLs oficiales/pinneadas al iniciar el Worker. La interfaz permanece aislada y el Worker se puede terminar si una inferencia no responde.
+- Cambia el worker de MediaPipe de `type: module` a Worker clásico.
+- Motivo: MediaPipe Tasks usa `importScripts()` internamente; los module workers no lo permiten.
+- El bundle ESM sigue cargándose con `import()` dentro del Worker clásico.
+- MediaPipe 1.0.1: bundle y WASM alineados.
+- Rutas locales virtuales se sirven mediante el service worker, con fallback CDN.
+- Cache totalmente nuevo `photo-ia-15-16-classic-worker-mediapipe`.
+- Los JS versionados usan network-first para evitar mezclar versiones anteriores.
+- Diagnóstico muestra worker build/type, importScripts, módulo, WASM y modelos por separado.

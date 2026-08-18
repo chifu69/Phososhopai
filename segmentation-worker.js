@@ -1,61 +1,83 @@
-/* PHOTO IA 15.14 — isolated ML worker
+/* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
+const WORKER_VERSION='15.16-classic-worker';
 const MP_VERSION='1.0.1';
+const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
+const WASM_LOCAL='./assets/mediapipe/wasm';
 const WASM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
-const PERSON_MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite';
-const MULTICLASS_MODEL='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
-const FACE_MODEL='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task';
+const PERSON_MODEL_LOCAL='./assets/models/selfie_segmenter_landscape.tflite';
+const PERSON_MODEL_REMOTE='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite';
+const MULTICLASS_MODEL_LOCAL='./assets/models/selfie_multiclass_256x256.tflite';
+const MULTICLASS_MODEL_REMOTE='https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite';
+const FACE_MODEL_LOCAL='./assets/models/face_landmarker.task';
+const FACE_MODEL_REMOTE='https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task';
+let PERSON_MODEL=PERSON_MODEL_LOCAL,MULTICLASS_MODEL=MULTICLASS_MODEL_LOCAL,FACE_MODEL=FACE_MODEL_LOCAL;
 let mp=null,fileset=null;
-let diag={worker:'READY',module:'NOT_LOADED',wasm:'NOT_LOADED',personModel:'NOT_LOADED',multiclassModel:'NOT_LOADED',faceModel:'NOT_LOADED',lastTask:'-',lastPhase:'idle',lastMs:0,input:'-',engine:'MediaPipe Worker',error:''};
+let diag={worker:'READY',workerVersion:WORKER_VERSION,workerKind:'classic',module:'NOT_LOADED',wasm:'NOT_LOADED',personModel:'NOT_LOADED',multiclassModel:'NOT_LOADED',faceModel:'NOT_LOADED',lastTask:'-',lastPhase:'idle',lastMs:0,input:'-',engine:'MediaPipe Worker',error:''};
 const now=()=>performance.now();
 function phase(name,extra={}){diag.lastPhase=name;Object.assign(diag,extra);postMessage({type:'phase',phase:name,diag:{...diag}})}
 function errText(e){return String(e?.message||e||'Error desconocido')}
 async function loadMP(){
   if(mp&&fileset)return;
   const t=now();
-  diag.module='LOADING';
-  diag.wasm='NOT_LOADED';
-  phase('Cargando MediaPipe ESM…',{module:'LOADING',wasm:'NOT_LOADED'});
+  diag.module='LOADING';diag.wasm='NOT_LOADED';
+  diag.importScriptsAvailable=typeof importScripts==='function'?'YES':'NO';
+  phase('Inicializando Worker clásico…',{module:'LOADING',wasm:'NOT_LOADED',workerKind:'classic',workerVersion:WORKER_VERSION,importScriptsAvailable:diag.importScriptsAvailable});
+  if(typeof importScripts!=='function')throw new Error('Worker incorrecto: MediaPipe necesita un Worker clásico con importScripts().');
+  let localErr=null;
   try{
-    mp=await import(ESM_REMOTE);
-    if(!mp?.FilesetResolver||!mp?.ImageSegmenter||!mp?.FaceLandmarker)
-      throw new Error('El bundle cargó pero faltan APIs de MediaPipe Tasks Vision');
-    diag.module='READY';
-    phase('MediaPipe módulo READY',{module:'READY'});
+    phase('Cargando MediaPipe ESM local…');
+    mp=await import(ESM_LOCAL);
+    diag.moduleSource='LOCAL';
   }catch(err){
-    diag.module='ERROR';
-    throw new Error(`MediaPipe module: ${errText(err)}`);
+    localErr=err;
+    phase('Bundle local no disponible; probando CDN…');
+    try{mp=await import(ESM_REMOTE);diag.moduleSource='CDN';}
+    catch(remoteErr){diag.module='ERROR';throw new Error(`MediaPipe module local: ${errText(localErr)} | CDN: ${errText(remoteErr)}`);}
   }
+  if(!mp?.FilesetResolver||!mp?.ImageSegmenter||!mp?.FaceLandmarker){diag.module='ERROR';throw new Error('El bundle MediaPipe cargó incompleto.');}
+  diag.module='READY';phase('MediaPipe módulo READY',{module:'READY'});
 
   try{
-    phase('Cargando MediaPipe WASM…',{wasm:'LOADING'});
-    fileset=await mp.FilesetResolver.forVisionTasks(WASM_REMOTE);
-    diag.wasm='READY';
-    diag.loadMs=Math.round(now()-t);
-    phase('MediaPipe WASM READY',{module:'READY',wasm:'READY'});
-  }catch(err){
-    diag.wasm='ERROR';
-    throw new Error(`MediaPipe WASM: ${errText(err)}`);
+    phase('Cargando MediaPipe WASM local…',{wasm:'LOADING'});
+    fileset=await mp.FilesetResolver.forVisionTasks(WASM_LOCAL);
+    diag.wasmSource='LOCAL';
+  }catch(localWasmErr){
+    phase('WASM local no disponible; probando CDN…',{wasm:'LOADING'});
+    try{fileset=await mp.FilesetResolver.forVisionTasks(WASM_REMOTE);diag.wasmSource='CDN';}
+    catch(remoteWasmErr){diag.wasm='ERROR';throw new Error(`MediaPipe WASM local: ${errText(localWasmErr)} | CDN: ${errText(remoteWasmErr)}`);}
   }
+  diag.wasm='READY';diag.loadMs=Math.round(now()-t);
+  phase('MediaPipe WASM READY',{module:'READY',wasm:'READY'});
+}
+
+async function createSegmenterWithFallback(localPath,remotePath,extra={}){
+  try{return await mp.ImageSegmenter.createFromOptions(fileset,{baseOptions:{modelAssetPath:localPath},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false,...extra});}
+  catch(localErr){phase('Modelo local no disponible; probando remoto…');return await mp.ImageSegmenter.createFromOptions(fileset,{baseOptions:{modelAssetPath:remotePath},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false,...extra});}
+}
+async function createFaceWithFallback(){
+  const opts=path=>({baseOptions:{modelAssetPath:path},runningMode:'IMAGE',numFaces:1,minFaceDetectionConfidence:.40,minFacePresenceConfidence:.40,minTrackingConfidence:.40,outputFaceBlendshapes:false,outputFacialTransformationMatrixes:false});
+  try{return await mp.FaceLandmarker.createFromOptions(fileset,opts(FACE_MODEL_LOCAL));}
+  catch(localErr){phase('Face model local no disponible; probando remoto…');return await mp.FaceLandmarker.createFromOptions(fileset,opts(FACE_MODEL_REMOTE));}
 }
 function closeResult(r){try{r?.categoryMask?.close?.()}catch(_){} try{r?.confidenceMasks?.forEach(m=>m.close?.())}catch(_){}}
 function maskBytes(m){if(!m)return null;try{const a=m.getAsUint8Array?.();if(a)return new Uint8Array(a)}catch(_){} try{const a=m.getAsFloat32Array?.();if(a)return Uint8Array.from(a,v=>Math.round(Math.max(0,Math.min(1,v))*255))}catch(_){} return null}
 function classMask(cat,ids){const set=new Set(ids),out=new Uint8Array(cat.length);for(let i=0;i<cat.length;i++)if(set.has(cat[i]))out[i]=255;return out}
 async function personMask(image){
   await loadMP();const t=now();phase('Selfie Segmentation…');
-  phase('Cargando modelo Selfie Segmentation…',{personModel:'LOADING'});const seg=await mp.ImageSegmenter.createFromOptions(fileset,{baseOptions:{modelAssetPath:PERSON_MODEL},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false});diag.personModel='READY';diag.personModel='READY';phase('Selfie Segmentation READY',{personModel:'READY'});
+  phase('Cargando modelo Selfie Segmentation…',{personModel:'LOADING'});const seg=await createSegmenterWithFallback(PERSON_MODEL_LOCAL,PERSON_MODEL_REMOTE);diag.personModel='READY';diag.personModel='READY';phase('Selfie Segmentation READY',{personModel:'READY'});
   let result;try{result=seg.segment(image);const cat=maskBytes(result?.categoryMask);if(!cat)throw new Error('Selfie Segmentation no devolvió máscara');const out=new Uint8Array(cat.length);for(let i=0;i<cat.length;i++)if(cat[i]===1)out[i]=255;diag.personMs=Math.round(now()-t);return out}finally{closeResult(result);try{seg.close?.()}catch(_){}}
 }
 async function multiclass(image,mode){
   await loadMP();const t=now();phase(`Segmentación multiclase: ${mode}…`);
-  phase('Cargando modelo multiclase…',{multiclassModel:'LOADING'});const seg=await mp.ImageSegmenter.createFromOptions(fileset,{baseOptions:{modelAssetPath:MULTICLASS_MODEL},runningMode:'IMAGE',outputCategoryMask:true,outputConfidenceMasks:false});diag.multiclassModel='READY';phase('Modelo multiclase READY',{multiclassModel:'READY'});
+  phase('Cargando modelo multiclase…',{multiclassModel:'LOADING'});const seg=await createSegmenterWithFallback(MULTICLASS_MODEL_LOCAL,MULTICLASS_MODEL_REMOTE);diag.multiclassModel='READY';phase('Modelo multiclase READY',{multiclassModel:'READY'});
   let result;try{result=seg.segment(image);const cat=maskBytes(result?.categoryMask);if(!cat)throw new Error('Multiclase no devolvió máscara');diag.multiclassMs=Math.round(now()-t);if(mode==='hair')return classMask(cat,[1]);if(mode==='clothing')return classMask(cat,[4]);if(mode==='skin')return classMask(cat,[2,3]);if(mode==='face')return classMask(cat,[3]);return classMask(cat,[1,2,3,4,5])}finally{closeResult(result);try{seg.close?.()}catch(_){}}
 }
 async function landmarks(image){
   await loadMP();const t=now();phase('Face Landmarker…');
-  phase('Cargando Face Landmarker…',{faceModel:'LOADING'});const lm=await mp.FaceLandmarker.createFromOptions(fileset,{baseOptions:{modelAssetPath:FACE_MODEL},runningMode:'IMAGE',numFaces:1,minFaceDetectionConfidence:.40,minFacePresenceConfidence:.40,minTrackingConfidence:.40,outputFaceBlendshapes:false,outputFacialTransformationMatrixes:false});diag.faceModel='READY';phase('Face Landmarker READY',{faceModel:'READY'});
+  phase('Cargando Face Landmarker…',{faceModel:'LOADING'});const lm=await createFaceWithFallback();diag.faceModel='READY';phase('Face Landmarker READY',{faceModel:'READY'});
   try{const r=lm.detect(image),pts=r?.faceLandmarks?.[0];if(!pts||pts.length<100)throw new Error('Face Landmarker no encontró el rostro');diag.faceMs=Math.round(now()-t);return pts.map(p=>({x:p.x,y:p.y,z:p.z||0}))}finally{try{lm.close?.()}catch(_){}}
 }
 function bbox(points,w,h){let minX=1,minY=1,maxX=0,maxY=0;for(const p of points){minX=Math.min(minX,p.x);minY=Math.min(minY,p.y);maxX=Math.max(maxX,p.x);maxY=Math.max(maxY,p.y)}return{x:minX*w,y:minY*h,w:(maxX-minX)*w,h:(maxY-minY)*h}}

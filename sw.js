@@ -1,26 +1,29 @@
-const CACHE='photo-ia-15-14-worker-isolated';
-const VERSION='15.15';
+const CACHE='photo-ia-15-16-classic-worker-mediapipe';
+const VERSION='15.16';
 const CORE=[
- './','./index.html','./styles.css?v=15.15-worker','./ui-layout.js?v=15.15-worker','./app.js?v=15.15-worker',
- './creative-tools.js?v=15.15-worker','./brain.js?v=15.15-worker',
- './opencv-engine.js?v=15.15-worker','./smart-core.js?v=15.15-worker','./wardrobe-engine.js?v=15.15-worker','./ai-studio.js?v=15.15-worker',
- './vision.js?v=15.15-worker','./onnx-engine.js?v=15.15-worker','./segmentation.js?v=15.15-worker','./segmentation-worker.js?v=15.15','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=15.16-worker','./ui-layout.js?v=15.16-worker','./app.js?v=15.16-worker',
+ './creative-tools.js?v=15.16-worker','./brain.js?v=15.16-worker',
+ './opencv-engine.js?v=15.16-worker','./smart-core.js?v=15.16-worker','./wardrobe-engine.js?v=15.16-worker','./ai-studio.js?v=15.16-worker',
+ './vision.js?v=15.16-worker','./onnx-engine.js?v=15.16-worker','./segmentation.js?v=15.16-worker','./segmentation-worker.js?v=15.16','./manifest.webmanifest'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=15.15-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=15.15-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=15.15-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=15.15-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=15.15-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=15.15-worker',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
- {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe opcional',required:false},
- {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
- {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
- {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.js',name:'WASM compatible',required:false},
- {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/wasm/vision_wasm_nosimd_internal.wasm',name:'Motor WASM compatible',required:false},
+ {local:'./assets/vendor/fabric.min.js?v=15.16-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=15.16-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=15.16-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=15.16-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=15.16-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=15.16-worker',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/mediapipe/vision_bundle.mjs?v=15.16',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
+ {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_nosimd_internal.js',name:'WASM compatible',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_nosimd_internal.wasm',name:'Motor WASM compatible',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_module_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_module_internal.js',name:'WASM module loader',required:false},
+ {local:'./assets/mediapipe/wasm/vision_wasm_module_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_module_internal.wasm',name:'WASM module runtime',required:false},
  {local:'./assets/models/selfie_segmenter_landscape.tflite',remote:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter_landscape/float16/latest/selfie_segmenter_landscape.tflite',name:'Modelo de persona opcional',required:false},
  {local:'./assets/models/interactive_segmentation.task',remote:'https://storage.googleapis.com/mediapipe-models/interactive_segmenter_v2/magic_touch/int8/latest/interactive_segmentation.task',name:'Modelo interactivo MediaPipe',required:false},
  {local:'./assets/models/selfie_multiclass_256x256.tflite',remote:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',name:'MediaPipe multiclase: cabello, piel, rostro y ropa',required:false,timeout:60000},
+ {local:'./assets/models/face_landmarker.task',remote:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',name:'Face Landmarker',required:false,timeout:60000},
  {local:'./assets/vendor/ort.min.js?v=15.15',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort.min.js',name:'ONNX Runtime Web',required:false,timeout:30000},
  {local:'./assets/onnx/ort-wasm-simd-threaded.mjs',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort-wasm-simd-threaded.mjs',name:'ONNX WASM loader',required:false,timeout:30000},
  {local:'./assets/onnx/ort-wasm-simd-threaded.wasm',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort-wasm-simd-threaded.wasm',name:'ONNX WASM runtime',required:false,timeout:30000}
@@ -75,6 +78,10 @@ self.addEventListener('fetch',e=>{
   if(e.request.mode==='navigate'){
    try{const fresh=await fetch(e.request,{cache:'no-store'});if(fresh.ok){cache.put('./index.html',fresh.clone());return fresh;}}catch(_){ }
    return (await cache.match('./index.html'))||new Response('Offline',{status:503});
+  }
+  const isVersionedCore=/\.(?:js|mjs|css)$/.test(url.pathname)&&url.searchParams.has('v');
+  if(isVersionedCore){
+   try{const fresh=await fetch(e.request,{cache:'no-store'});if(fresh.ok){cache.put(e.request,fresh.clone());return fresh;}}catch(_){ }
   }
   const cached=await cache.match(e.request,{ignoreSearch:false}) || await cache.match(url.href);
   if(cached) return cached;
