@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.26';
+const VERSION='15.27';
 const categoryMap={
  home:['.command-panel','.quick-actions'],smart:['.smart-core-panel','.vision-panel'],adjust:['.tools','.transform'],
  create:['.creative-panel','#object-inspector','.layers-panel'],ai:['#ai-studio'],export:['.export']
@@ -58,10 +58,10 @@ function openSkinTonePanel(){
  const existing=document.getElementById('photoia-skin-tone-panel');
  if(existing)existing.remove();
 
- if(!window.PhotoSegmentation?.mask||window.PhotoSegmentation?.maskKind!=='skin'){
+ if(!window.PhotoSegmentation?.mask||!window.PhotoSegmentation?.isSkinMask?.()){
    window.PhotoIA?.toast?.('Seleccionando piel primero…');
    window.PhotoSegmentation?.segmentSkin?.().then(()=>{
-     if(window.PhotoSegmentation?.maskKind==='skin')openSkinTonePanel();
+     if(window.PhotoSegmentation?.isSkinMask?.())openSkinTonePanel();
    });
    return;
  }
@@ -73,7 +73,7 @@ function openSkinTonePanel(){
  panel.className='pro-sheet skin-tone-sheet';
  panel.dataset.snap='compact';
  panel.innerHTML=`<div class="sheet-grabber"></div>
- <div class="sheet-head"><div><small>PHOTO IA 15.26</small><h2>Retoque de piel</h2></div><button type="button" class="sheet-close" aria-label="Cancelar">×</button></div>
+ <div class="sheet-head"><div><small>PHOTO IA 15.27</small><h2>Retoque de piel</h2></div><button type="button" class="sheet-close" aria-label="Cancelar">×</button></div>
  <div style="padding:8px 18px 24px">
    <p class="module-intro">Aclara u oscurece únicamente la piel seleccionada. La textura, sombras y color natural se conservan.</p>
    <label style="font-weight:800;display:flex;justify-content:space-between;align-items:center">
