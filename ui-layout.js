@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.30.2';
+const VERSION='15.31';
 const categoryMap={
  home:['.command-panel','.quick-actions'],smart:['.smart-core-panel','.vision-panel'],adjust:['.tools','.transform'],
  create:['.creative-panel','#object-inspector','.layers-panel'],ai:['#ai-studio'],export:['.export']
@@ -82,7 +82,7 @@ function openSkinTonePanel(){
        <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
          <div>
-           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.30.2</div>
+           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31</div>
            <div style="font-size:1.45rem;font-weight:900;color:#111827;margin-top:3px;">Retoque de piel</div>
          </div>
          <button id="skin-tone-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800;">×</button>
@@ -181,7 +181,7 @@ async function openGarmentColorPanel(part){
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;box-shadow:0 -12px 50px rgba(0,0,0,.28);padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
   <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.30.2</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
+   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
    <button id="garment-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800">×</button>
   </div>
   <p style="color:#64748b;line-height:1.35">Cambia solo esta prenda conservando sombras, pliegues, textura y logos visibles.</p>
@@ -212,7 +212,7 @@ function openClothingColorChooser(){
  wrap.style.cssText='position:fixed;inset:0;z-index:2147483645;background:rgba(3,10,24,.50);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
  wrap.innerHTML=`
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box">
-  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.30.2</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.31</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
   <p style="color:#64748b">PHOTO IA usa Pose Landmarker + la máscara de Ropa para separar cada prenda.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
    <button data-part="upper" class="secondary" style="padding:15px;border-radius:15px;font-weight:900">👕 Camisa / Top</button>
@@ -232,8 +232,48 @@ function openClothingColorChooser(){
  };
 }
 
+
+async function openHairColorPanel(){
+  if(!window.PhotoSegmentation?.mask || !/cabello|hair/i.test(String(window.PhotoSegmentation?.maskKind||''))){
+    window.PhotoIA?.toast?.('Seleccionando cabello…');
+    await window.PhotoSegmentation?.segmentHair?.();
+  }
+  if(!window.PhotoSegmentation?.mask){window.PhotoIA?.toast?.('No pude preparar la selección de cabello.');return;}
+  window.PhotoSegmentation?.showMask?.(false);
+  try{await window.PhotoSegmentation?.beginHairColorSession?.();}catch(e){console.error(e)}
+  const old=document.getElementById('photoia-hair-color-modal');if(old)old.remove();
+  const wrap=document.createElement('div');
+  wrap.id='photoia-hair-color-modal';
+  wrap.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(3,10,24,.56);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
+  wrap.innerHTML=`
+  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;box-shadow:0 -12px 50px rgba(0,0,0,.28);padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
+    <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
+    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
+      <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31</div><div style="font-size:1.4rem;font-weight:900;color:#111827">💇 Color de cabello</div></div>
+      <button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800">×</button>
+    </div>
+    <p style="color:#64748b;line-height:1.35">Cambia solo el cabello conservando luces, sombras y textura.</p>
+    <label style="display:flex;justify-content:space-between;align-items:center;font-weight:900;color:#111827"><span>Color</span><input id="hair-color" type="color" value="#7c2d12" style="width:64px;height:42px;border:0;background:none"></label>
+    <label style="display:flex;justify-content:space-between;align-items:center;font-weight:900;color:#111827;margin-top:10px"><span>Intensidad</span><strong id="hair-int-value">75</strong></label>
+    <input id="hair-intensity" type="range" min="0" max="100" value="75" step="1" style="display:block;width:100%;height:34px;accent-color:#f59e0b">
+    <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px;margin-top:18px">
+      <button id="hair-cancel" type="button" style="padding:15px;border-radius:15px;border:1px solid #cbd5e1;background:#fff;font-weight:900">Cancelar</button>
+      <button id="hair-apply" type="button" style="padding:15px;border-radius:15px;border:0;background:#f59e0b;font-weight:900">Aplicar</button>
+    </div>
+  </div>`;
+  document.body.appendChild(wrap);
+  const color=wrap.querySelector('#hair-color'),range=wrap.querySelector('#hair-intensity'),value=wrap.querySelector('#hair-int-value');
+  let timer=0,closed=false;
+  const preview=()=>{clearTimeout(timer);timer=setTimeout(()=>window.PhotoSegmentation?.previewHairColor?.(color.value,Number(range.value)),80)};
+  color.oninput=preview;range.oninput=()=>{value.textContent=range.value;preview()};
+  const cancel=async()=>{if(closed)return;closed=true;clearTimeout(timer);await window.PhotoSegmentation?.cancelHairColorPreview?.();wrap.remove()};
+  const apply=async()=>{if(closed)return;closed=true;clearTimeout(timer);await window.PhotoSegmentation?.applyHairColor?.(color.value,Number(range.value));wrap.remove()};
+  wrap.querySelector('#hair-x').onclick=cancel;wrap.querySelector('#hair-cancel').onclick=cancel;wrap.querySelector('#hair-apply').onclick=apply;
+  preview();
+}
+
 function buildSelection(){const n=document.createElement('section');n.className='module-grid-wrap';n.innerHTML='<p class="module-intro">Selecciona la parte exacta que quieres editar. La imagen completa puede volver a mostrarse sin perder los cambios.</p><div class="module-grid"></div>';const g=n.querySelector('.module-grid');
-  g.append(createCard('🧍','Persona completa','Conserva todo el cuerpo visible',()=>window.PhotoSegmentation?.segmentPerson?.()),createCard('🪪','Busto / identificación','Silueta Persona + recorte por rostro',()=>window.PhotoSegmentation?.segmentBust?.()),createCard('🙂','Rostro preciso','Cara separada de cabello, piel y ropa',()=>window.PhotoSegmentation?.segmentFace?.()),createCard('✨','Piel','Piel facial + corporal por IA',()=>window.PhotoSegmentation?.segmentSkin?.()),createCard('☀️','Aclarar / oscurecer piel','Ajusta solo la piel seleccionada',()=>openSkinTonePanel()),createCard('💇','Cabello','Protección independiente del cabello',()=>window.PhotoSegmentation?.segmentHair?.()),createCard('👕','Ropa','Selecciona vestuario sin cara ni piel',()=>window.PhotoSegmentation?.segmentClothing?.()),createCard('🎨','Color de ropa','Camisa, pantalón o zapatos por separado',()=>openClothingColorChooser()),createCard('☝️','Objeto por toque','Toca el objeto en la foto',()=>window.PhotoSegmentation?.beginTapMode?.()),createCard('✂️','Refinar máscara','Recupera bordes y suaviza halos',()=>window.PhotoSegmentation?.refineCurrentMask?.()),createCard('👁','Mostrar máscara','Visualiza la selección',()=>window.PhotoSegmentation?.showMask?.(true)),createCard('🌄','Regresar fondo','Muestra la imagen completa y conserva cambios',()=>window.PhotoSegmentation?.restoreBackground?.()),createCard('🧹','Limpiar máscara','Elimina la selección actual',()=>window.PhotoSegmentation?.clearMask?.()),createCard('🩺','Diagnóstico motor','Worker, modelo, resolución y tiempos',()=>window.PhotoSegmentation?.showWorkerDiagnostics?.()));return n}
+  g.append(createCard('🧍','Persona completa','Conserva todo el cuerpo visible',()=>window.PhotoSegmentation?.segmentPerson?.()),createCard('🪪','Busto / identificación','Silueta Persona + recorte por rostro',()=>window.PhotoSegmentation?.segmentBust?.()),createCard('🙂','Rostro preciso','Cara separada de cabello, piel y ropa',()=>window.PhotoSegmentation?.segmentFace?.()),createCard('✨','Piel','Piel facial + corporal por IA',()=>window.PhotoSegmentation?.segmentSkin?.()),createCard('☀️','Aclarar / oscurecer piel','Ajusta solo la piel seleccionada',()=>openSkinTonePanel()),createCard('💇','Cabello','Protección independiente del cabello',()=>window.PhotoSegmentation?.segmentHair?.()),createCard('🎨','Color de cabello','Cambia el tono sin perder textura',()=>openHairColorPanel()),createCard('👕','Ropa','Selecciona vestuario sin cara ni piel',()=>window.PhotoSegmentation?.segmentClothing?.()),createCard('🎨','Color de ropa','Camisa, pantalón o zapatos por separado',()=>openClothingColorChooser()),createCard('☝️','Objeto por toque','Toca el objeto en la foto',()=>window.PhotoSegmentation?.beginTapMode?.()),createCard('✂️','Refinar máscara','Recupera bordes y suaviza halos',()=>window.PhotoSegmentation?.refineCurrentMask?.()),createCard('👁','Mostrar máscara','Visualiza la selección',()=>window.PhotoSegmentation?.showMask?.(true)),createCard('🌄','Regresar fondo','Muestra la imagen completa y conserva cambios',()=>window.PhotoSegmentation?.restoreBackground?.()),createCard('🧹','Limpiar máscara','Elimina la selección actual',()=>window.PhotoSegmentation?.clearMask?.()),createCard('🩺','Diagnóstico motor','Worker, modelo, resolución y tiempos',()=>window.PhotoSegmentation?.showWorkerDiagnostics?.()));return n}
  function buildHistory(){const n=document.createElement('section');n.className='history-module';const h=window.PhotoIA?.state?.history||[];n.innerHTML=`<p class="module-intro">${h.length} estado${h.length===1?'':'s'} guardado${h.length===1?'':'s'}. Toca uno para regresar.</p><div class="history-timeline"></div>`;const list=n.querySelector('.history-timeline');h.forEach((json,i)=>{const b=document.createElement('button');b.type='button';b.innerHTML=`<span>${i===0?'📷':'✦'}</span><div><strong>${i===0?'Original / inicio':`Edición ${i}`}</strong><small>${i===h.length-1?'Estado actual':'Toca para restaurar'}</small></div>`;b.onclick=()=>{window.PhotoIA?.restoreJSON?.(json);window.PhotoIA?.toast(`Restaurado al paso ${i}`)};list.appendChild(b)});if(!h.length)list.innerHTML='<p>Aún no hay historial.</p>';return n}
  function buildInspector(){const n=document.createElement('section');n.className='inspector-module';n.innerHTML='<p class="module-intro">Diagnóstico local y crítica fotográfica antes de editar.</p><div id="adaptive-inspector-results" class="inspector-results"><p>Pulsa analizar para medir la imagen.</p></div><button class="primary inspector-run">🔍 Analizar ahora</button><button class="secondary critic-run">🧠 Crítica fotográfica</button>';n.querySelector('.critic-run').onclick=async()=>{try{const a=await window.PhotoSmartCore?.analyze?.();window.PhotoIA?.toast(a?.critic?.summary||'Crítica lista')}catch(e){window.PhotoIA?.toast(e.message)}};n.querySelector('.inspector-run').onclick=async()=>{const r=n.querySelector('#adaptive-inspector-results');r.innerHTML='<p>Analizando…</p>';try{const c=window.PhotoIA?.getPhotoAnalysisCanvas?.(720);if(!c)throw Error('Abre una foto primero.');const ctx=c.getContext('2d'),d=ctx.getImageData(0,0,c.width,c.height).data;let lum=0,lum2=0,sat=0,dark=0,bright=0;for(let i=0;i<d.length;i+=4){const mx=Math.max(d[i],d[i+1],d[i+2]),mn=Math.min(d[i],d[i+1],d[i+2]),l=.2126*d[i]+.7152*d[i+1]+.0722*d[i+2];lum+=l;lum2+=l*l;sat+=mx?((mx-mn)/mx):0;if(l<25)dark++;if(l>235)bright++}const px=d.length/4,mean=lum/px,std=Math.sqrt(Math.max(0,lum2/px-mean*mean));r.innerHTML=`<div class="metric-grid"><div><strong>${c.width}×${c.height}</strong><small>Análisis</small></div><div><strong>${Math.round(mean)}</strong><small>Luz media</small></div><div><strong>${Math.round(std)}</strong><small>Contraste</small></div><div><strong>${Math.round(sat/px*100)}%</strong><small>Saturación</small></div><div><strong>${(dark/px*100).toFixed(1)}%</strong><small>Sombras cerradas</small></div><div><strong>${(bright/px*100).toFixed(1)}%</strong><small>Luces altas</small></div></div>`}catch(e){r.innerHTML=`<p>${e.message}</p>`}};return n}
  function buildShare(){const n=document.createElement('section');n.className='module-grid-wrap';n.innerHTML='<p class="module-intro">Guarda, comparte o elige el formato desde el módulo de exportación.</p><div class="module-grid"></div>';const g=n.querySelector('.module-grid');g.append(createCard('💾','Guardar imagen','Descargar con la calidad elegida',()=>window.PhotoIA?.download?.()),createCard('📤','Compartir','Abrir hoja de compartir del teléfono',async()=>{try{const url=window.PhotoIA?.exportDataUrl?.();const blob=await(await fetch(url)).blob();const f=new File([blob],'PHOTO-IA.jpg',{type:blob.type});if(navigator.share&&navigator.canShare?.({files:[f]}))await navigator.share({files:[f],title:'PHOTO IA'});else window.PhotoIA?.download?.()}catch(e){window.PhotoIA?.download?.()}}),createCard('⚙️','Formato y calidad','Abrir opciones avanzadas',()=>openCategory('export')));return n}
