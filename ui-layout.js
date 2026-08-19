@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.31.1';
+const VERSION='15.31.2';
 const categoryMap={
  home:['.command-panel','.quick-actions'],smart:['.smart-core-panel','.vision-panel'],adjust:['.tools','.transform'],
  create:['.creative-panel','#object-inspector','.layers-panel'],ai:['#ai-studio'],export:['.export']
@@ -82,7 +82,7 @@ function openSkinTonePanel(){
        <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
          <div>
-           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31.1</div>
+           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31.2</div>
            <div style="font-size:1.45rem;font-weight:900;color:#111827;margin-top:3px;">Retoque de piel</div>
          </div>
          <button id="skin-tone-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800;">×</button>
@@ -181,7 +181,7 @@ async function openGarmentColorPanel(part){
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;box-shadow:0 -12px 50px rgba(0,0,0,.28);padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
   <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31.1</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
+   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31.2</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
    <button id="garment-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800">×</button>
   </div>
   <p style="color:#64748b;line-height:1.35">Cambia solo esta prenda conservando sombras, pliegues, textura y logos visibles.</p>
@@ -212,7 +212,7 @@ function openClothingColorChooser(){
  wrap.style.cssText='position:fixed;inset:0;z-index:2147483645;background:rgba(3,10,24,.50);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
  wrap.innerHTML=`
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box">
-  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.31.1</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.31.2</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
   <p style="color:#64748b">PHOTO IA usa Pose Landmarker + la máscara de Ropa para separar cada prenda.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
    <button data-part="upper" class="secondary" style="padding:15px;border-radius:15px;font-weight:900">👕 Camisa / Top</button>
@@ -233,6 +233,7 @@ function openClothingColorChooser(){
 }
 
 
+
 async function openHairColorPanel(){
   if(!window.PhotoSegmentation?.mask || !/cabello|hair/i.test(String(window.PhotoSegmentation?.maskKind||''))){
     window.PhotoIA?.toast?.('Seleccionando cabello…');
@@ -241,33 +242,38 @@ async function openHairColorPanel(){
   if(!window.PhotoSegmentation?.mask){window.PhotoIA?.toast?.('No pude preparar la selección de cabello.');return;}
   window.PhotoSegmentation?.showMask?.(false);
   try{await window.PhotoSegmentation?.beginHairColorSession?.();}catch(e){console.error(e)}
+
   const old=document.getElementById('photoia-hair-color-modal');if(old)old.remove();
+  const colors=[['#15110f','Negro'],['#2b1b14','Castaño oscuro'],['#4a2f22','Castaño medio'],['#76513a','Castaño claro'],['#7a3e2b','Auburn / rojizo natural'],['#8b6a47','Rubio oscuro'],['#c3a36a','Rubio'],['#6b6b68','Gris'],['#a8a8a4','Plateado'],['#dedbd2','Blanco']];
   const wrap=document.createElement('div');
   wrap.id='photoia-hair-color-modal';
   wrap.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(3,10,24,.56);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
-  wrap.innerHTML=`
-  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;box-shadow:0 -12px 50px rgba(0,0,0,.28);padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
-    <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
-    <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-      <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31.1</div><div style="font-size:1.4rem;font-weight:900;color:#111827">💇 Color de cabello</div></div>
-      <button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800">×</button>
-    </div>
-    <p style="color:#64748b;line-height:1.35">Cambia solo el cabello conservando luces, sombras y textura.</p>
-    <label style="display:flex;justify-content:space-between;align-items:center;font-weight:900;color:#111827"><span>Color</span><input id="hair-color" type="color" value="#7c2d12" style="width:64px;height:42px;border:0;background:none"></label>
-    <label style="display:flex;justify-content:space-between;align-items:center;font-weight:900;color:#111827;margin-top:10px"><span>Intensidad</span><strong id="hair-int-value">75</strong></label>
+  const swatches=colors.map(([hex,name],i)=>`<button type="button" class="hair-swatch" data-hair-color="${hex}" data-hair-name="${name}" aria-label="${name}" style="height:52px;border-radius:14px;border:${i===0?'3px solid #f59e0b':'2px solid #cbd5e1'};background:${hex};"></button>`).join('');
+  wrap.innerHTML=`<div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.31.2</div><div style="font-size:1.4rem;font-weight:900">💇 Color de cabello</div></div><button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px">×</button></div>
+    <p style="color:#64748b">Elige un tono natural. No se usa el selector de colores del iPhone.</p>
+    <div style="font-weight:900;margin-bottom:10px">Tono natural</div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px">${swatches}</div>
+    <div id="hair-color-name" style="color:#64748b;font-weight:800;margin-bottom:14px">Negro</div>
+    <label style="display:flex;justify-content:space-between;font-weight:900"><span>Intensidad</span><strong id="hair-int-value">75</strong></label>
     <input id="hair-intensity" type="range" min="0" max="100" value="75" step="1" style="display:block;width:100%;height:34px;accent-color:#f59e0b">
-    <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px;margin-top:18px">
-      <button id="hair-cancel" type="button" style="padding:15px;border-radius:15px;border:1px solid #cbd5e1;background:#fff;font-weight:900">Cancelar</button>
-      <button id="hair-apply" type="button" style="padding:15px;border-radius:15px;border:0;background:#f59e0b;font-weight:900">Aplicar</button>
-    </div>
+    <div style="display:grid;grid-template-columns:1fr 1.2fr;gap:10px;margin-top:18px"><button id="hair-cancel" type="button" style="padding:15px;border-radius:15px;border:1px solid #cbd5e1;background:#fff;font-weight:900">Cancelar</button><button id="hair-apply" type="button" style="padding:15px;border-radius:15px;border:0;background:#f59e0b;font-weight:900">Aplicar</button></div>
   </div>`;
   document.body.appendChild(wrap);
-  const color=wrap.querySelector('#hair-color'),range=wrap.querySelector('#hair-intensity'),value=wrap.querySelector('#hair-int-value');
-  let timer=0,closed=false;
-  const preview=()=>{clearTimeout(timer);timer=setTimeout(()=>window.PhotoSegmentation?.previewHairColor?.(color.value,Number(range.value)),80)};
-  color.oninput=preview;range.oninput=()=>{value.textContent=range.value;preview()};
+
+  const range=wrap.querySelector('#hair-intensity'),value=wrap.querySelector('#hair-int-value'),nameEl=wrap.querySelector('#hair-color-name');
+  let timer=0,closed=false,selectedColor='#15110f';
+  const preview=()=>{clearTimeout(timer);timer=setTimeout(()=>window.PhotoSegmentation?.previewHairColor?.(selectedColor,Number(range.value)),80)};
+  wrap.querySelectorAll('.hair-swatch').forEach(btn=>btn.onclick=()=>{
+    selectedColor=btn.dataset.hairColor;
+    wrap.querySelectorAll('.hair-swatch').forEach(b=>b.style.border='2px solid #cbd5e1');
+    btn.style.border='3px solid #f59e0b';
+    nameEl.textContent=btn.dataset.hairName;
+    preview();
+  });
+  range.oninput=()=>{value.textContent=range.value;preview()};
   const cancel=async()=>{if(closed)return;closed=true;clearTimeout(timer);await window.PhotoSegmentation?.cancelHairColorPreview?.();wrap.remove()};
-  const apply=async()=>{if(closed)return;closed=true;clearTimeout(timer);await window.PhotoSegmentation?.applyHairColor?.(color.value,Number(range.value));wrap.remove()};
+  const apply=async()=>{if(closed)return;closed=true;clearTimeout(timer);await window.PhotoSegmentation?.applyHairColor?.(selectedColor,Number(range.value));wrap.remove()};
   wrap.querySelector('#hair-x').onclick=cancel;wrap.querySelector('#hair-cancel').onclick=cancel;wrap.querySelector('#hair-apply').onclick=apply;
   preview();
 }
