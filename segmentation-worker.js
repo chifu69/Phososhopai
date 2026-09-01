@@ -1,9 +1,9 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.34-selection-stability-body-retouch';
+const WORKER_VERSION='15.35-hair-crown-contour';
 const MP_VERSION='1.0.1';
-const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.34';
+const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.35';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
 const WASM_LOCAL='./assets/mediapipe/wasm';
 const WASM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
@@ -196,6 +196,31 @@ function garmentRegionFromPose(clothing,pts,w,h,part){
 function closeResult(r){try{r?.categoryMask?.close?.()}catch(_){} try{r?.confidenceMasks?.forEach(m=>m.close?.())}catch(_){}}
 function maskBytes(m){if(!m)return null;try{const a=m.getAsUint8Array?.();if(a)return new Uint8Array(a)}catch(_){} try{const a=m.getAsFloat32Array?.();if(a)return Uint8Array.from(a,v=>Math.round(Math.max(0,Math.min(1,v))*255))}catch(_){} return null}
 function classMask(cat,ids){const set=new Set(ids),out=new Uint8Array(cat.length);for(let i=0;i<cat.length;i++)if(set.has(cat[i]))out[i]=255;return out}
+function refineHairCrownMask(hair,cat,w,h){
+  // Preserve the multiclass hair as authority, but repair tiny crown/side gaps
+  // caused by the 256px semantic model. Expansion is allowed ONLY into pixels
+  // MediaPipe already considers part of the person (skin/face/clothing/accessory),
+  // so this never grows freely into the background.
+  if(!hair||hair.length!==w*h||!cat||cat.length!==w*h)return hair;
+  let minX=w,minY=h,maxX=-1,maxY=-1,n=0;
+  for(let y=0;y<h;y++)for(let x=0;x<w;x++){const i=y*w+x;if(hair[i]>70){n++;minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);}}
+  if(n<w*h*.001||maxX<0)return hair;
+  const bw=maxX-minX+1,bh=maxY-minY+1,padX=Math.max(2,Math.round(bw*.055)),padTop=Math.max(2,Math.round(bh*.085));
+  let src=new Uint8Array(hair);
+  for(let pass=0;pass<2;pass++){
+    const out=new Uint8Array(src);
+    for(let y=Math.max(0,minY-padTop);y<=Math.min(h-1,maxY+2);y++)for(let x=Math.max(0,minX-padX);x<=Math.min(w-1,maxX+padX);x++){
+      const i=y*w+x;if(src[i]>70||cat[i]===0)continue;
+      let near=0;for(let dy=-1;dy<=1&&!near;dy++)for(let dx=-1;dx<=1;dx++){if(!dx&&!dy)continue;const xx=x+dx,yy=y+dy;if(xx>=0&&yy>=0&&xx<w&&yy<h&&src[yy*w+xx]>70){near=1;break;}}
+      if(near)out[i]=220;
+    }
+    src=out;
+  }
+  // Close pinholes and feather only one pixel; avoid erosion/opening that can shave
+  // off wispy hair at the top of the head.
+  if(typeof closeMask==='function')src=closeMask(src,w,h,1);
+  return typeof blurMask==='function'?blurMask(src,w,h,1):featherRegion(src,w,h,1);
+}
 
 function floatMask(m){
   if(!m)return null;
@@ -291,7 +316,7 @@ async function ensureMulticlassSegmenter(){
 }
 async function multiclass(image,mode){
   const t=now();phase(`Segmentación multiclase: ${mode}…`);const seg=await ensureMulticlassSegmenter();let result;
-  try{result=seg.segment(image);const cat=maskBytes(result?.categoryMask);if(!cat)throw new Error('Multiclase no devolvió máscara');diag.multiclassMs=Math.round(now()-t);if(mode==='hair')return classMask(cat,[1]);if(mode==='clothing')return classMask(cat,[4]);if(mode==='skin')return classMask(cat,[2,3]);if(mode==='face')return classMask(cat,[3]);return classMask(cat,[1,2,3,4,5]);}
+  try{result=seg.segment(image);const cat=maskBytes(result?.categoryMask);if(!cat)throw new Error('Multiclase no devolvió máscara');diag.multiclassMs=Math.round(now()-t);if(mode==='hair')return refineHairCrownMask(classMask(cat,[1]),cat,source.width,source.height);if(mode==='clothing')return classMask(cat,[4]);if(mode==='skin')return classMask(cat,[2,3]);if(mode==='face')return classMask(cat,[3]);return classMask(cat,[1,2,3,4,5]);}
   finally{closeResult(result);}
 }
 async function ensureFaceLandmarker(){
