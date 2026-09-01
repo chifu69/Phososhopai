@@ -1,10 +1,10 @@
 (() => {
 'use strict';
-const VERSION='15.31.2';
+const VERSION='15.32';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
-const state={canvas:null,photo:null,originalDataUrl:'',history:[],future:[],cropper:null,compare:false,loading:false,cvReady:false,layerSeq:0,processingScrollY:0};
+const state={canvas:null,photo:null,originalDataUrl:'',originalMime:'image/jpeg',originalName:'',history:[],future:[],cropper:null,compare:false,compareOverlay:null,compareVisibility:null,loading:false,cvReady:false,layerSeq:0,processingScrollY:0,resizing:false};
 
 function toast(message){const el=$('toast');el.textContent=message;el.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>el.classList.remove('show'),2200)}
 function processing(on,label='Procesando…'){
@@ -48,10 +48,26 @@ function fitCanvas(){
  }else{
    h=Math.max(360,Math.min(window.innerHeight*.52,620));
  }
+ const oldW=state.canvas?.width||w,oldH=state.canvas?.height||h;
+ const oldPhotoScale=state.photo?.scaleX||1;
+ const extras=state.photo?state.canvas.getObjects().filter(o=>o!==state.photo&&o.photoRole!=='preview-overlay'):[];
+ state.resizing=true;
  state.canvas.setDimensions({width:w,height:h});
- if(state.photo)fitPhoto();
+ if(state.photo){
+   fitPhoto();
+   // Keep editable layers registered to the photograph when the phone rotates or the viewport changes.
+   const ratio=(state.photo.scaleX||1)/Math.max(.0001,oldPhotoScale);
+   if(Number.isFinite(ratio)&&oldW>0&&oldH>0&&(Math.abs(w-oldW)>.5||Math.abs(h-oldH)>.5)){
+     extras.forEach(o=>{
+       const ox=(Number(o.left)||0)-oldW/2,oy=(Number(o.top)||0)-oldH/2;
+       o.set({left:w/2+ox*ratio,top:h/2+oy*ratio,scaleX:(o.scaleX||1)*ratio,scaleY:(o.scaleY||1)*ratio});
+       o.setCoords();
+     });
+   }
+ }
  state.canvas.calcOffset();
  state.canvas.requestRenderAll();
+ state.resizing=false;
 }
 function fitPhoto(){
  const p=state.photo;if(!p)return;
@@ -65,11 +81,24 @@ function fitPhoto(){
  p.set({left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center'});
  p.setCoords();
 }
-function snapshot(){if(!state.photo)return;state.history.push(state.canvas.toJSON(['photoRole','layerId','layerName','layerType']));if(state.history.length>30)state.history.shift();state.future=[];updateHistoryButtons();renderLayers()}
+function snapshot(){if(!state.photo||state.resizing||state.compare)return;const json=state.canvas.toJSON(['photoRole','layerId','layerName','layerType','userLocked','shapeSettings','photoAdjustments']);const prev=state.history[state.history.length-1];if(prev&&JSON.stringify(prev)===JSON.stringify(json)){updateHistoryButtons();renderLayers();return}state.history.push(json);if(state.history.length>40)state.history.shift();state.future=[];updateHistoryButtons();renderLayers()}
 function updateHistoryButtons(){$('undo-btn').disabled=state.history.length<2;$('redo-btn').disabled=!state.future.length}
-function restoreJSON(json){state.canvas.loadFromJSON(json,()=>{state.photo=state.canvas.getObjects().find(o=>o.photoRole==='main')||null;state.canvas.requestRenderAll();updateHistoryButtons();renderLayers()})}
+function rehydratePhotoAdjustments(){
+ if(!state.photo)return;
+ const byType={Brightness:'brightness',Contrast:'contrast',Saturation:'saturation',BlendColor:'temperature',Blur:'blur',Convolute:'sharpness'};
+ (state.photo.filters||[]).forEach(f=>{if(!f.__key&&byType[f.type])f.__key=byType[f.type]});
+ resetSliderUI();
+ const a=state.photo.photoAdjustments||{};
+ sliders.forEach(id=>{if(!(id in a))return;const v=Number(a[id])||0;const el=$(id),out=$(`${id}-out`);if(el)el.value=String(v);if(out)out.textContent=String(v)});
+}
+function restoreJSON(json){state.canvas.loadFromJSON(json,()=>{state.photo=state.canvas.getObjects().find(o=>o.photoRole==='main')||null;rehydratePhotoAdjustments();state.canvas.requestRenderAll();updateHistoryButtons();renderLayers()})}
 function undo(){if(state.history.length<2)return;state.future.push(state.history.pop());restoreJSON(state.history[state.history.length-1])}
 function redo(){if(!state.future.length)return;const next=state.future.pop();state.history.push(next);restoreJSON(next)}
+function restoreHistoryIndex(index){
+ const i=Math.max(0,Math.min(state.history.length-1,Number(index)||0));if(!state.history.length)return;
+ const selected=state.history[i],after=state.history.slice(i+1);
+ state.history=state.history.slice(0,i+1);state.future=after.reverse();restoreJSON(selected);updateHistoryButtons();
+}
 
 async function fileToImage(file){
  if(!file||!file.type.startsWith('image/'))throw new Error('Selecciona un archivo de imagen.');
@@ -84,10 +113,15 @@ async function loadFile(file){
  processing(true,'Abriendo fotografía…');
  try{
    const img=await fileToImage(file);
-   const max=1800;const ratio=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+   const max=2000;const ratio=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
    const off=document.createElement('canvas');off.width=Math.max(1,Math.round(img.naturalWidth*ratio));off.height=Math.max(1,Math.round(img.naturalHeight*ratio));
-   const ctx=off.getContext('2d',{alpha:false});ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,off.width,off.height);
-   const data=off.toDataURL('image/jpeg',.94);state.originalDataUrl=data;
+   const preserveAlpha=/png|webp/i.test(file.type||'');
+   const ctx=off.getContext('2d',{alpha:preserveAlpha});
+   if(!preserveAlpha){ctx.fillStyle='#fff';ctx.fillRect(0,0,off.width,off.height)}
+   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,off.width,off.height);
+   const mime=file.type==='image/png'?'image/png':file.type==='image/webp'?'image/webp':'image/jpeg';
+   const data=mime==='image/png'?off.toDataURL(mime):off.toDataURL(mime,.96);
+   state.originalDataUrl=data;state.originalMime=mime;state.originalName=file.name||'camera.jpg';
    await setMainImage(data,file.name||'camera.jpg');
    toast('Foto abierta correctamente');
  }catch(err){console.error(err);toast('No pude abrir la foto. Intenta otra vez.')}finally{processing(false)}
@@ -95,14 +129,14 @@ async function loadFile(file){
 function fabricImageFromURL(url){return new Promise((resolve,reject)=>fabric.Image.fromURL(url,img=>img?resolve(img):reject(new Error('Fabric no cargó la imagen')),{crossOrigin:'anonymous'}))}
 async function setMainImage(dataUrl,name='image.jpg'){
  const img=await fabricImageFromURL(dataUrl);
- state.canvas.clear();img.photoRole='main';img.layerId='layer-photo';img.layerName='Fotografía';img.layerType='photo';img.set({selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});img.globalCompositeOperation='source-over';state.photo=img;state.canvas.add(img);state.canvas.sendToBack(img);fitCanvas();
+ state.canvas.clear();img.photoRole='main';img.layerId='layer-photo';img.layerName='Fotografía';img.layerType='photo';img.photoAdjustments={};img.set({selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});img.globalCompositeOperation='source-over';state.photo=img;state.canvas.add(img);state.canvas.sendToBack(img);fitCanvas();
  $('empty-state').hidden=true;$('project-title').textContent=name;$('image-info').textContent=`${img.width} × ${img.height}px`;setEnabled(true);resetSliderUI();state.history=[];state.future=[];snapshot();normalizePhotoVisualState();document.dispatchEvent(new CustomEvent('photoia:image-loaded',{detail:{name,width:img.width,height:img.height}}));
 }
 
 
 function getPhotoAnalysisCanvas(max=900){
  if(!state.photo)throw new Error('Abre una foto primero.');
- const source=state.photo._originalElement||state.photo.getElement?.()||state.photo._element;
+ const source=state.photo._filteredEl||state.photo._element||state.photo.getElement?.()||state.photo._originalElement;
  if(!source)throw new Error('No pude leer la fotografía original.');
  const sw=source.naturalWidth||source.videoWidth||source.width||state.photo.width;
  const sh=source.naturalHeight||source.videoHeight||source.height||state.photo.height;
@@ -135,7 +169,7 @@ function normalizePhotoVisualState(){
 function clearCurrentPhoto(){
  if(!state.photo)return;
  if(!confirm('¿Borrar la foto actual y comenzar una nueva edición?'))return;
- state.canvas.clear();state.photo=null;state.originalDataUrl='';state.history=[];state.future=[];
+ state.canvas.clear();state.photo=null;state.originalDataUrl='';state.originalMime='image/jpeg';state.originalName='';state.history=[];state.future=[];
  resetSliderUI();setEnabled(false);$('empty-state').hidden=false;$('project-title').textContent='Nueva edición';$('image-info').textContent='Sin imagen';
  $('file-input').value='';$('camera-input').value='';
  document.dispatchEvent(new CustomEvent('photoia:image-cleared'));
@@ -144,7 +178,7 @@ function clearCurrentPhoto(){
 function resetSliderUI(){sliders.forEach(id=>{$(id).value=0;$(`${id}-out`).textContent='0'})}
 function getFilters(){return state.photo?.filters||[]}
 function replaceFilter(key,filter){const list=getFilters().filter(f=>f.__key!==key);if(filter){filter.__key=key;list.push(filter)}state.photo.filters=list;state.photo.applyFilters();state.canvas.requestRenderAll()}
-function applySlider(id,value,commit=false){if(!state.photo)return;const v=Number(value);$(`${id}-out`).textContent=v;const F=fabric.Image.filters;let filter=null;
+function applySlider(id,value,commit=false){if(!state.photo)return;const v=Number(value);$(`${id}-out`).textContent=v;state.photo.photoAdjustments={...(state.photo.photoAdjustments||{}),[id]:v};const F=fabric.Image.filters;let filter=null;
  if(id==='brightness')filter=new F.Brightness({brightness:v/100});
  if(id==='contrast')filter=new F.Contrast({contrast:v/100});
  if(id==='saturation')filter=new F.Saturation({saturation:v/100});
@@ -178,7 +212,7 @@ function applyAdaptiveAdjustments(values={}, commit=true){
  if(t&&F.BlendColor)add('temperature',new F.BlendColor({color:t>=0?'#ff9a48':'#63a6ff',mode:'tint',alpha:Math.abs(t/100)*.28}));
  if(bl&&F.Blur)add('blur',new F.Blur({blur:Math.min(.8,bl/20*.6)}));
  if(sh&&F.Convolute)add('sharpness',new F.Convolute({matrix:[0,-sh/200,0,-sh/200,1+sh/50,-sh/200,0,-sh/200,0]}));
- state.photo.filters=keep;state.photo.dirty=true;
+ state.photo.filters=keep;state.photo.photoAdjustments={...normalized};state.photo.dirty=true;
  state.photo.applyFilters();normalizePhotoVisualState();
  if(commit)snapshot();
  return normalized;
@@ -191,8 +225,8 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
   const img=await new Promise((resolve,reject)=>{const im=new Image();im.onload=()=>resolve(im);im.onerror=reject;im.src=state.originalDataUrl});
   const max=1800,ratio=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height));
   const w=Math.max(1,Math.round((img.naturalWidth||img.width)*ratio)),h=Math.max(1,Math.round((img.naturalHeight||img.height)*ratio));
-  const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{alpha:false,willReadFrequently:true});
-  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,w,h);
+  const c=document.createElement('canvas');c.width=w;c.height=h;const preserveAlpha=state.originalMime==='image/png';const ctx=c.getContext('2d',{alpha:preserveAlpha,willReadFrequently:true});
+  if(!preserveAlpha){ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h)}ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(img,0,0,w,h);
   const im=ctx.getImageData(0,0,w,h),d=im.data;
   const exposure=Math.pow(2,Number(recipe.exposure||0));
   const shadows=Number(recipe.shadows||0)/100,highlights=Number(recipe.highlights||0)/100;
@@ -233,7 +267,7 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
      const diff=Math.abs(sd[p+ch]-avg);
      od[p+ch]=diff<22?clamp8(sd[p+ch]*(1-mix)+avg*mix):sd[p+ch];
     }
-    od[p+3]=255;
+    od[p+3]=sd[p+3];
    }
    ctx.putImageData(out,0,0);
   }
@@ -248,14 +282,14 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
      const blur=(sd[p-4+ch]+sd[p+4+ch]+sd[p-w*4+ch]+sd[p+w*4+ch]+sd[p+ch]*4)/8;
      od[p+ch]=clamp8(sd[p+ch]+(sd[p+ch]-blur)*amount);
     }
-    od[p+3]=255;
+    od[p+3]=sd[p+3];
    }
    ctx.putImageData(out,0,0);
   }
-  const data=c.toDataURL('image/jpeg',.95);
+  const data=preserveAlpha?c.toDataURL('image/png'):c.toDataURL('image/jpeg',.97);
   const old=state.photo;
   const props={left:old.left,top:old.top,scaleX:old.scaleX,scaleY:old.scaleY,angle:old.angle,flipX:old.flipX,flipY:old.flipY,originX:old.originX,originY:old.originY};
-  const next=await fabricImageFromURL(data);next.photoRole='main';next.layerId='layer-photo';next.layerName='Fotografía';next.layerType='photo';next.set({...props,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
+  const next=await fabricImageFromURL(data);next.photoRole='main';next.layerId='layer-photo';next.layerName='Fotografía';next.layerType='photo';next.photoAdjustments={};next.set({...props,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
   state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();state.canvas.requestRenderAll();
   resetSliderUI();normalizePhotoVisualState();if(commit)snapshot();
   return recipe;
@@ -263,11 +297,25 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
 }
 
 
-async function applyProcessedImageDataUrl(dataUrl,commit=true){
+async function applyProcessedImageDataUrl(dataUrl,commit=true,guard=null,options={}){
  if(!state.photo)throw new Error('Abre una foto primero.');
- const old=state.photo;const props={left:old.left,top:old.top,scaleX:old.scaleX,scaleY:old.scaleY,angle:old.angle,flipX:old.flipX,flipY:old.flipY,originX:old.originX,originY:old.originY};
- const next=await fabricImageFromURL(dataUrl);next.photoRole='main';next.layerId='layer-photo';next.layerName='Fotografía';next.layerType='photo';next.set({...props,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
- state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();resetSliderUI();normalizePhotoVisualState();state.canvas.requestRenderAll();if(commit)snapshot();return true;
+ const old=state.photo;
+ const preserveFilters=!!options?.preserveFilters;
+ const keptFilters=preserveFilters?(old.filters||[]).slice():[];
+ const keptAdjustments=preserveFilters?{...(old.photoAdjustments||{})}:{};
+ const displayedW=Math.max(1,old.getScaledWidth?.()||old.width*(old.scaleX||1));
+ const displayedH=Math.max(1,old.getScaledHeight?.()||old.height*(old.scaleY||1));
+ const props={left:old.left,top:old.top,angle:old.angle,flipX:old.flipX,flipY:old.flipY,originX:old.originX,originY:old.originY};
+ const next=await fabricImageFromURL(dataUrl);
+ if(guard&&!guard())return false;
+ const nextScaleX=displayedW/Math.max(1,next.width),nextScaleY=displayedH/Math.max(1,next.height);
+ next.photoRole='main';next.layerId='layer-photo';next.layerName='Fotografía';next.layerType='photo';next.photoAdjustments=keptAdjustments;
+ next.filters=keptFilters;
+ next.set({...props,scaleX:nextScaleX,scaleY:nextScaleY,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
+ if(preserveFilters&&next.filters.length)next.applyFilters();
+ state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();
+ if(preserveFilters)rehydratePhotoAdjustments();else resetSliderUI();
+ normalizePhotoVisualState();state.canvas.requestRenderAll();if(commit)snapshot();return true;
 }
 
 async function applyPreset(name){
@@ -279,7 +327,7 @@ async function applyPreset(name){
   const previous=state.photo;
   const props={left:previous.left,top:previous.top,scaleX:previous.scaleX,scaleY:previous.scaleY,angle:previous.angle,flipX:previous.flipX,flipY:previous.flipY,originX:previous.originX,originY:previous.originY};
   const fresh=await fabricImageFromURL(state.originalDataUrl);
-  fresh.photoRole='main';fresh.layerId='layer-photo';fresh.layerName='Fotografía';fresh.layerType='photo';
+  fresh.photoRole='main';fresh.layerId='layer-photo';fresh.layerName='Fotografía';fresh.layerType='photo';fresh.photoAdjustments={brightness:0,contrast:0,saturation:0,temperature:0,sharpness:0,blur:0};
   fresh.set({...props,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
   fresh.filters=[];const F=fabric.Image.filters;
   const add=(key,f)=>{f.__key=key;fresh.filters.push(f)};
@@ -292,6 +340,9 @@ async function applyPreset(name){
     add('saturation',new F.Saturation({saturation:.09}));
     add('sharpness',new F.Convolute({matrix:[0,-.07,0,-.07,1.28,-.07,0,-.07,0]}));
   }
+  if(name==='vivid')fresh.photoAdjustments={brightness:4,contrast:10,saturation:24,temperature:0,sharpness:0,blur:0};
+  if(name==='portrait')fresh.photoAdjustments={brightness:4,contrast:3,saturation:4,temperature:0,sharpness:0,blur:1};
+  if(name==='auto'||name==='professional')fresh.photoAdjustments={brightness:3,contrast:8,saturation:9,temperature:0,sharpness:14,blur:0};
   fresh.applyFilters();
   state.canvas.remove(previous);state.photo=fresh;state.canvas.add(fresh);state.canvas.sendToBack(fresh);fresh.setCoords();
   resetSliderUI();normalizePhotoVisualState();state.canvas.requestRenderAll();snapshot();
@@ -395,24 +446,64 @@ function duplicateLayer(){const obj=selectedLayer();if(!obj||obj.photoRole==='ma
 function deleteLayer(){const obj=selectedLayer();if(!obj||obj.photoRole==='main')return;state.canvas.remove(obj);state.canvas.discardActiveObject();state.canvas.requestRenderAll();snapshot();toast('Capa eliminada')}
 function escapeHTML(value){return String(value).replace(/[&<>'"]/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]))}
 
-function rotate(deg){if(!state.photo)return;state.photo.rotate((state.photo.angle||0)+deg);fitCanvas();snapshot()}
+function rotate(deg){
+ if(!state.photo)return;
+ const cx=state.canvas.width/2,cy=state.canvas.height/2,rad=deg*Math.PI/180,cs=Math.cos(rad),sn=Math.sin(rad);
+ state.canvas.getObjects().filter(o=>o.photoRole!=='preview-overlay').forEach(o=>{
+   const x=(Number(o.left)||cx)-cx,y=(Number(o.top)||cy)-cy;
+   o.set({left:cx+x*cs-y*sn,top:cy+x*sn+y*cs,angle:(Number(o.angle)||0)+deg});o.setCoords();
+ });
+ fitCanvas();snapshot();
+}
 function flip(){if(!state.photo)return;state.photo.set('flipX',!state.photo.flipX);state.canvas.requestRenderAll();snapshot()}
 function addText(){const text=new fabric.IText('Tu texto',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:42,fontWeight:'bold',fill:'#ffffff',stroke:'#111111',strokeWidth:1});text.layerId=nextLayerId();text.layerName='Texto';text.layerType='text';state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
 function addSticker(){const text=new fabric.Text('⭐',{left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center',fontSize:72});text.layerId=nextLayerId();text.layerName='Sticker';text.layerType='sticker';state.canvas.add(text);state.canvas.setActiveObject(text);state.canvas.requestRenderAll();snapshot()}
-function exportDataUrl(){state.canvas.discardActiveObject();const vision=state.canvas.getObjects().filter(o=>o.layerType==='vision-detection'||o.layerType==='vision-mask'||o.excludeFromExport===true);const vis=vision.map(o=>o.visible);vision.forEach(o=>o.visible=false);state.canvas.requestRenderAll();const format=$('format').value;const quality=Number($('quality').value)/100;const out=state.canvas.toDataURL({format:format.split('/')[1],quality,multiplier:2});vision.forEach((o,i)=>o.visible=vis[i]);state.canvas.requestRenderAll();return out}
+function renderExportDataUrl({photoOnly=false,format=null,quality=null}={}){
+ if(!state.photo)return '';
+ state.canvas.discardActiveObject();
+ const objects=state.canvas.getObjects();
+ const hidden=objects.filter(o=>o!==state.photo&&(photoOnly||o.layerType==='vision-detection'||o.layerType==='vision-mask'||o.excludeFromExport===true));
+ const visibility=hidden.map(o=>o.visible);hidden.forEach(o=>o.visible=false);state.canvas.requestRenderAll();
+ try{
+   const rect=state.photo.getBoundingRect(true,true);
+   const angle=((state.photo.angle||0)%360+360)%360,swap=angle===90||angle===270;
+   const targetW=swap?state.photo.height:state.photo.width,targetH=swap?state.photo.width:state.photo.height;
+   const mx=Math.max(.25,Math.min(6,Math.min(targetW/Math.max(1,rect.width),targetH/Math.max(1,rect.height))));
+   const mime=format||$('format').value,q=quality??Number($('quality').value)/100;
+   return state.canvas.toDataURL({format:mime.split('/')[1],quality:q,multiplier:mx,left:rect.left,top:rect.top,width:rect.width,height:rect.height});
+ }finally{hidden.forEach((o,i)=>o.visible=visibility[i]);state.canvas.requestRenderAll()}
+}
+function exportDataUrl(){return renderExportDataUrl({photoOnly:false})}
+function exportPhotoDataUrl(){return renderExportDataUrl({photoOnly:true,format:'image/png',quality:1})}
 function download(){const url=exportDataUrl();const a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${$('format').value.split('/')[1].replace('jpeg','jpg')}`;a.click();toast('Imagen preparada para guardar')}
-function compare(showOriginal){if(!state.photo)return;if(showOriginal){state.photo.setSrc(state.originalDataUrl,()=>fitCanvas())}else restoreJSON(state.history[state.history.length-1])}
-function reset(){if(!state.originalDataUrl)return;processing(true,'Restableciendo…');setMainImage(state.originalDataUrl,$('project-title').textContent).finally(()=>{processing(false);toast('Foto restablecida')})}
+async function compare(showOriginal){
+ if(!state.photo)return;
+ if(showOriginal){
+   if(state.compare)return;state.compare=true;
+   state.compareVisibility=state.canvas.getObjects().filter(o=>o!==state.photo).map(o=>[o,o.visible]);
+   state.compareVisibility.forEach(([o])=>o.visible=false);
+   const base=await fabricImageFromURL(state.originalDataUrl);if(!state.compare)return;
+   base.photoRole='preview-overlay';base.layerType='preview';base.selectable=false;base.evented=false;base.objectCaching=false;
+   const p=state.photo,displayedW=p.getScaledWidth(),displayedH=p.getScaledHeight();
+   base.set({left:p.left,top:p.top,originX:p.originX,originY:p.originY,angle:p.angle,flipX:p.flipX,flipY:p.flipY,scaleX:displayedW/Math.max(1,base.width),scaleY:displayedH/Math.max(1,base.height)});
+   state.compareOverlay=base;state.canvas.add(base);state.canvas.bringToFront(base);state.canvas.requestRenderAll();
+ }else{
+   state.compare=false;if(state.compareOverlay){state.canvas.remove(state.compareOverlay);state.compareOverlay=null}
+   (state.compareVisibility||[]).forEach(([o,v])=>o.visible=v);state.compareVisibility=null;state.canvas.requestRenderAll();
+ }
+}
+function reset(){if(!state.originalDataUrl||!state.photo)return;processing(true,'Restableciendo…');applyProcessedImageDataUrl(state.originalDataUrl,true).finally(()=>{processing(false);toast('Fotografía restablecida; tus capas se conservaron')})}
 
-function openCrop(ratio=NaN){if(!state.photo)return;const modal=$('crop-modal');$('crop-image').src=exportDataUrl();modal.hidden=false;setTimeout(()=>{state.cropper?.destroy();state.cropper=new Cropper($('crop-image'),{viewMode:1,autoCropArea:1,responsive:true,background:false,aspectRatio:ratio})},50)}
+function openCrop(ratio=NaN){if(!state.photo)return;if(!window.Cropper){toast('La herramienta de recorte todavía no está disponible. Revisa la conexión y vuelve a intentar.');return}const editable=state.canvas.getObjects().filter(o=>o!==state.photo&&o.photoRole!=='preview-overlay'&&!o.excludeFromExport);if(editable.length){toast('Recorte protegido: elimina o exporta las capas antes de recortar para no aplanarlas.');return}const modal=$('crop-modal');$('crop-image').src=exportPhotoDataUrl();modal.hidden=false;setTimeout(()=>{state.cropper?.destroy();state.cropper=new Cropper($('crop-image'),{viewMode:1,autoCropArea:1,responsive:true,background:false,aspectRatio:ratio})},50)}
 function closeCrop(){state.cropper?.destroy();state.cropper=null;$('crop-modal').hidden=true}
-async function applyCrop(){if(!state.cropper)return;processing(true,'Aplicando recorte…');const c=state.cropper.getCroppedCanvas({maxWidth:1800,maxHeight:1800,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});const data=c.toDataURL('image/jpeg',.94);closeCrop();await setMainImage(data,$('project-title').textContent);state.originalDataUrl=data;processing(false);toast('Recorte aplicado')}
+async function applyCrop(){if(!state.cropper)return;processing(true,'Aplicando recorte…');try{const c=state.cropper.getCroppedCanvas({maxWidth:2000,maxHeight:2000,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});const data=state.originalMime==='image/png'?c.toDataURL('image/png'):c.toDataURL('image/jpeg',.96);closeCrop();state.originalDataUrl=data;await setMainImage(data,$('project-title').textContent);toast('Recorte aplicado')}finally{processing(false)}}
 
+let initAttempts=0;
 function init(){
  $('crop-modal').hidden=true;
  $('processing').hidden=true;
  document.body.classList.remove('modal-open');
- if(!window.fabric){toast('No se pudo cargar Fabric.js. Revisa la conexión.');return}
+ if(!window.fabric){if(initAttempts++<40){setTimeout(init,200);return}toast('No se pudo cargar el editor de capas. Conéctate una vez a Internet y vuelve a abrir PHOTO IA.');return}
  state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));state.canvas.on('selection:created',renderLayers);state.canvas.on('selection:updated',renderLayers);state.canvas.on('selection:cleared',renderLayers);state.canvas.on('object:modified',()=>snapshot());
  let lastCanvasTap=0;
  state.canvas.on('mouse:down',()=>{
@@ -432,13 +523,14 @@ function init(){
  $('theme-btn').onclick=()=>{document.documentElement.classList.toggle('dark');localStorage.setItem('photoIATheme',document.documentElement.classList.contains('dark')?'dark':'light')};if(localStorage.getItem('photoIATheme')==='dark')document.documentElement.classList.add('dark');
  document.addEventListener('dragover',e=>e.preventDefault());document.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files?.[0];if(f)loadFile(f)});
  if('serviceWorker' in navigator && window.isSecureContext){navigator.serviceWorker.register('./sw.js?v='+VERSION,{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn);}
+ window.dispatchEvent(new CustomEvent('photoia-ready'));
 }
 window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv&&cv.Mat){state.cvReady=true;$('engine-badge').textContent='Fabric + OpenCV listo';$('engine-badge').classList.add('ready')}else setTimeout(wait,250)};wait()});
 
 window.PhotoIA={
   get state(){return state},
-  snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,restoreJSON,undo,redo,reset,download,
-  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,getPhotoAnalysisCanvas,getOriginalAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
+  snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,restoreJSON,restoreHistoryIndex,undo,redo,reset,download,
+  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,exportPhotoDataUrl,getPhotoAnalysisCanvas,getOriginalAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
 };
-document.addEventListener('DOMContentLoaded',()=>{init();window.dispatchEvent(new CustomEvent('photoia-ready'))});
+document.addEventListener('DOMContentLoaded',init);
 })();

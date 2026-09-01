@@ -1,19 +1,20 @@
-const CACHE='photo-ia-15-27-skin-tone-flow-fix';
-const VERSION='15.31.2';
+const CACHE='photo-ia-15-32-core-stabilization';
+const VERSION='15.32';
 const CORE=[
- './','./index.html','./styles.css?v=15.31.2-worker','./ui-layout.js?v=15.31.2-worker','./app.js?v=15.31.2-worker',
- './creative-tools.js?v=15.31.2-worker','./brain.js?v=15.31.2-worker',
- './opencv-engine.js?v=15.31.2-worker','./smart-core.js?v=15.31.2-worker','./wardrobe-engine.js?v=15.31.2-worker','./ai-studio.js?v=15.31.2-worker',
- './vision.js?v=15.31.2-worker','./onnx-engine.js?v=15.31.2-worker','./segmentation.js?v=15.31.2-worker','./segmentation-worker.js?v=15.31.2','./manifest.webmanifest'
+ './','./index.html','./styles.css?v=15.32','./ui-layout.js?v=15.32','./app.js?v=15.32',
+ './creative-tools.js?v=15.32','./brain.js?v=15.32',
+ './opencv-engine.js?v=15.32','./smart-core.js?v=15.32','./wardrobe-engine.js?v=15.32','./ai-studio.js?v=15.32',
+ './vision.js?v=15.32','./onnx-engine.js?v=15.32','./segmentation.js?v=15.32','./segmentation-worker.js?v=15.32','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png'
 ];
 const ASSETS=[
- {local:'./assets/vendor/fabric.min.js?v=15.31.2-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=15.31.2-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=15.31.2-worker',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=15.31.2-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=15.31.2-worker',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=15.31.2-worker',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
- {local:'./assets/mediapipe/vision_bundle.mjs?v=15.31.2',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
+ {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe Tasks Vision 0.10.35',required:false,timeout:30000},
+ {local:'./assets/vendor/fabric.min.js?v=15.32',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=15.32',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=15.32',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=15.32',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=15.32',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=15.32',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/mediapipe/vision_bundle.mjs?v=15.32',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_nosimd_internal.js',name:'WASM compatible',required:false},
@@ -25,7 +26,7 @@ const ASSETS=[
  {local:'./assets/models/selfie_multiclass_256x256.tflite',remote:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',name:'MediaPipe multiclase: cabello, piel, rostro y ropa',required:false,timeout:60000},
  {local:'./assets/models/face_landmarker.task',remote:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',name:'Face Landmarker',required:false,timeout:60000},
  {local:'./assets/models/pose_landmarker_lite.task',remote:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',name:'Pose Landmarker Lite',required:false,timeout:60000},
- {local:'./assets/vendor/ort.min.js?v=15.15',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort.min.js',name:'ONNX Runtime Web',required:false,timeout:30000},
+ {local:'./assets/vendor/ort.min.js?v=15.32',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort.min.js',name:'ONNX Runtime Web',required:false,timeout:30000},
  {local:'./assets/onnx/ort-wasm-simd-threaded.mjs',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort-wasm-simd-threaded.mjs',name:'ONNX WASM loader',required:false,timeout:30000},
  {local:'./assets/onnx/ort-wasm-simd-threaded.wasm',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort-wasm-simd-threaded.wasm',name:'ONNX WASM runtime',required:false,timeout:30000}
 ];
@@ -65,7 +66,7 @@ async function installLocalCore(){
  await notify({type:'LOCAL_CORE_READY',version:VERSION,results,missingRequired,missingOptional,degraded:missingRequired.length>0});
 }
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>Promise.allSettled(CORE.map(x=>c.add(x)))).then(()=>self.skipWaiting())));
-self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
+self.addEventListener('activate',e=>e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('photo-ia-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener('message',e=>{
  if(e.data?.type==='INSTALL_LOCAL_CORE') e.waitUntil(installLocalCore().catch(async err=>notify({type:'LOCAL_CORE_FATAL',message:String(err)})));
  if(e.data?.type==='SKIP_LOCAL_INSTALL') e.waitUntil(notify({type:'LOCAL_CORE_READY',version:VERSION,results:[],missingRequired:[],missingOptional:[],degraded:true,skipped:true}));
@@ -91,9 +92,9 @@ self.addEventListener('fetch',e=>{
   const asset=ASSETS.find(a=>a.local===relative);
   if(asset){
    try{await cacheRemote(asset);return (await cache.match(localKey(relative)));}
-   catch(err){return new Response('',{status:204})}
+   catch(err){return new Response('Asset unavailable',{status:503,headers:{'Content-Type':'text/plain'}})}
   }
   try{const r=await fetch(e.request);if(r.ok) cache.put(e.request,r.clone());return r}
-  catch(err){return (await cache.match('./index.html'))||new Response('Offline',{status:503})}
+  catch(err){return new Response('Offline resource unavailable',{status:503,headers:{'Content-Type':'text/plain'}})}
  })());
 });

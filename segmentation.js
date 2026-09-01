@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.31.2'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.32'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -666,7 +666,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.31.2`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.32`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -695,7 +695,7 @@ function workerProfile(work,mode,operation){
   const ctx=work.getContext('2d',{willReadFrequently:true});
   const img=ctx.getImageData(0,0,work.width,work.height);
   const first=!state.workerWarm;
-  const timeoutMs=first?18000:6500;
+  const timeoutMs=first?(IS_IOS?60000:75000):(IS_IOS?12000:30000);
   state.workerDiag={...state.workerDiag,lastTask:mode,input:`${work.width}×${work.height}`,lastPhase:'queued',error:''};
   return new Promise((resolve,reject)=>{
     const timer=setTimeout(()=>{
@@ -1116,7 +1116,7 @@ async function beginSkinToneSession(){
   if(!w||!h)throw makeError('La fotografía no tiene resolución válida.');
   const c=document.createElement('canvas');c.width=w;c.height=h;
   c.getContext('2d',{alpha:false}).drawImage(el,0,0,w,h);
-  skinToneBaseDataUrl=c.toDataURL('image/jpeg',.97);
+  skinToneBaseDataUrl=c.toDataURL('image/png');
   skinToneBaseImage=await loadImage(skinToneBaseDataUrl);
   return true;
 }
@@ -1137,15 +1137,16 @@ function scaledMaskAlpha(mask,x,y,outW,outH){
   const a1=a01+(a11-a01)*fx;
   return (a0+(a1-a0)*fy)/255;
 }
-function skinToneDataUrl(amount){
+function skinToneDataUrl(amount,maxDim=0){
  if(!isSkinMask())throw makeError('Primero selecciona Piel.');
  if(!skinToneBaseImage)throw makeError('El retoque de piel no está preparado.');
 
  const ui=Math.max(-100,Math.min(100,Number(amount)||0));
  const mask=state.mask;
  const src=skinToneBaseImage;
- const width=src.naturalWidth||src.width;
- const height=src.naturalHeight||src.height;
+ const fullW=src.naturalWidth||src.width,fullH=src.naturalHeight||src.height;
+ const scale=maxDim>0?Math.min(1,maxDim/Math.max(fullW,fullH)):1;
+ const width=Math.max(1,Math.round(fullW*scale)),height=Math.max(1,Math.round(fullH*scale));
 
  const out=document.createElement('canvas');out.width=width;out.height=height;
  const ctx=out.getContext('2d',{willReadFrequently:true,alpha:false});
@@ -1186,7 +1187,7 @@ function skinToneDataUrl(amount){
  }
 
  ctx.putImageData(img,0,0);
- return out.toDataURL('image/jpeg',.97);
+ return out.toDataURL('image/png');
 }
 
 async function previewSkinTone(amount){
@@ -1195,9 +1196,9 @@ async function previewSkinTone(amount){
  try{
    showMask(false);
    if(!skinToneBaseImage)await beginSkinToneSession();
-   const url=skinToneDataUrl(amount);
+   const url=skinToneDataUrl(amount,900);
    if(seq!==skinPreviewSeq)return;
-   await api().applyProcessedImageDataUrl(url,false);
+   await api().applyProcessedImageDataUrl(url,false,()=>seq===skinPreviewSeq,{preserveFilters:true});
  }catch(err){
    console.error(err);
    api()?.toast(friendlyError(err));
@@ -1205,9 +1206,9 @@ async function previewSkinTone(amount){
 }
 
 async function cancelSkinTonePreview(){
- skinPreviewSeq++;
+ const seq=++skinPreviewSeq;
  try{
-   if(skinToneBaseDataUrl)await api().applyProcessedImageDataUrl(skinToneBaseDataUrl,false);
+   if(skinToneBaseDataUrl)await api().applyProcessedImageDataUrl(skinToneBaseDataUrl,false,()=>seq===skinPreviewSeq,{preserveFilters:true});
    if(state.mask)showMask(true);
  }catch(err){console.error(err);}
  finally{endSkinToneSession();}
@@ -1217,12 +1218,13 @@ async function adjustSkinTone(amount){
  if(!isSkinMask())return api()?.toast('Primero selecciona Piel.');
  const ui=Math.max(-100,Math.min(100,Number(amount)||0));
  if(!ui)return api()?.toast('Elige una intensidad.');
+ const seq=++skinPreviewSeq;
  try{
-   skinPreviewSeq++;
    showMask(false);
    if(!skinToneBaseImage)await beginSkinToneSession();
    const url=skinToneDataUrl(ui);
-   await api().applyProcessedImageDataUrl(url,true);
+   const applied=await api().applyProcessedImageDataUrl(url,true,()=>seq===skinPreviewSeq,{preserveFilters:true});
+   if(!applied)return;
    clearMask();
    api().toast(ui>0?'Piel aclarada':'Piel oscurecida');
  }catch(err){
@@ -1241,7 +1243,7 @@ async function beginGarmentColorSession(){
   const W=el.naturalWidth||el.width||photo.width||0,H=el.naturalHeight||el.height||photo.height||0;
   if(!W||!H)throw makeError('La fotografía no tiene resolución válida.');
   const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d',{alpha:false}).drawImage(el,0,0,W,H);
-  garmentColorBaseDataUrl=c.toDataURL('image/jpeg',.97);garmentColorBaseImage=await loadImage(garmentColorBaseDataUrl);
+  garmentColorBaseDataUrl=c.toDataURL('image/png');garmentColorBaseImage=await loadImage(garmentColorBaseDataUrl);
 }
 function endGarmentColorSession(){garmentColorBaseDataUrl='';garmentColorBaseImage=null;garmentColorSessionActive=false}
 function hexRgb(hex){const h=String(hex||'#000000').replace('#',''),n=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);return{r:(n>>16)&255,g:(n>>8)&255,b:n&255}}
@@ -1254,28 +1256,31 @@ function garmentMaskAlpha(x,y,W,H){
   const a0=d[y0*m.width+x0]+(d[y0*m.width+x1]-d[y0*m.width+x0])*fx,a1=d[y1*m.width+x0]+(d[y1*m.width+x1]-d[y1*m.width+x0])*fx;
   return(a0+(a1-a0)*fy)/255;
 }
-function garmentColorDataUrl(hex,intensity){
+function garmentColorDataUrl(hex,intensity,maxDim=0){
   if(!state.mask)throw makeError('Selecciona una prenda primero.');
   if(!garmentColorBaseImage)throw makeError('El cambio de color no está preparado.');
   const trg=rgbToHsl2(...Object.values(hexRgb(hex))),amt=Math.max(0,Math.min(100,Number(intensity)||0))/100;
-  const src=garmentColorBaseImage,W=src.naturalWidth||src.width,H=src.naturalHeight||src.height,c=document.createElement('canvas');c.width=W;c.height=H;
+  const src=garmentColorBaseImage,fullW=src.naturalWidth||src.width,fullH=src.naturalHeight||src.height,scale=maxDim>0?Math.min(1,maxDim/Math.max(fullW,fullH)):1,W=Math.max(1,Math.round(fullW*scale)),H=Math.max(1,Math.round(fullH*scale)),c=document.createElement('canvas');c.width=W;c.height=H;
   const ctx=c.getContext('2d',{willReadFrequently:true,alpha:false});ctx.drawImage(src,0,0,W,H);const im=ctx.getImageData(0,0,W,H),p=im.data;
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){const a=garmentMaskAlpha(x,y,W,H);if(a<.015)continue;const j=(y*W+x)*4,o=rgbToHsl2(p[j],p[j+1],p[j+2]);
-    const targetSat=Math.max(.12,trg.s),sat=o.s*(1-amt)+targetSat*amt,rgb=hslToRgb2(trg.h,sat,o.l),aa=Math.pow(a,.82)*amt;
+    const targetSat=Math.max(.08,trg.s),sat=o.s*(1-amt)+targetSat*amt;
+    const texture=(o.l-.5)*.45,targetL=Math.max(.025,Math.min(.975,trg.l+texture));
+    const lum=o.l*(1-amt)+targetL*amt,rgb=hslToRgb2(trg.h,sat,lum),aa=Math.pow(a,.82)*amt;
     p[j]+= (rgb.r-p[j])*aa;p[j+1]+=(rgb.g-p[j+1])*aa;p[j+2]+=(rgb.b-p[j+2])*aa;
   }
-  ctx.putImageData(im,0,0);return c.toDataURL('image/jpeg',.97);
+  ctx.putImageData(im,0,0);return c.toDataURL('image/png');
 }
-async function previewGarmentColor(hex,intensity){const seq=++garmentPreviewSeq;try{showMask(false);if(!garmentColorBaseImage)await beginGarmentColorSession();const url=garmentColorDataUrl(hex,intensity);if(seq!==garmentPreviewSeq)return;await api().applyProcessedImageDataUrl(url,false)}catch(e){console.error(e);api()?.toast(friendlyError(e))}}
-async function cancelGarmentColorPreview(){garmentPreviewSeq++;try{if(garmentColorBaseDataUrl)await api().applyProcessedImageDataUrl(garmentColorBaseDataUrl,false);if(state.mask)showMask(true)}finally{endGarmentColorSession()}}
+async function previewGarmentColor(hex,intensity){const seq=++garmentPreviewSeq;try{showMask(false);if(!garmentColorBaseImage)await beginGarmentColorSession();const url=garmentColorDataUrl(hex,intensity,900);if(seq!==garmentPreviewSeq)return;await api().applyProcessedImageDataUrl(url,false,()=>seq===garmentPreviewSeq,{preserveFilters:true})}catch(e){console.error(e);api()?.toast(friendlyError(e))}}
+async function cancelGarmentColorPreview(){const seq=++garmentPreviewSeq;try{if(garmentColorBaseDataUrl)await api().applyProcessedImageDataUrl(garmentColorBaseDataUrl,false,()=>seq===garmentPreviewSeq,{preserveFilters:true});if(state.mask)showMask(true)}finally{endGarmentColorSession()}}
 async function applyGarmentColor(hex,intensity){
-  garmentPreviewSeq++;
+  const seq=++garmentPreviewSeq;
   try{
     if(!state.mask)return api()?.toast('Selecciona una prenda primero.');
     showMask(false);
     if(!garmentColorBaseImage)await beginGarmentColorSession();
     const url=garmentColorDataUrl(hex,intensity);
-    await api().applyProcessedImageDataUrl(url,true);
+    const applied=await api().applyProcessedImageDataUrl(url,true,()=>seq===garmentPreviewSeq,{preserveFilters:true});
+    if(!applied)return;
     clearMask();
     api().toast('Color de prenda aplicado');
   }catch(e){console.error(e);api()?.toast(friendlyError(e))}
@@ -1292,7 +1297,7 @@ async function beginHairColorSession(){
   if(!W||!H)throw makeError('La fotografía no tiene resolución válida.');
   const c=document.createElement('canvas');c.width=W;c.height=H;
   c.getContext('2d',{alpha:false}).drawImage(el,0,0,W,H);
-  hairColorBaseDataUrl=c.toDataURL('image/jpeg',.97);
+  hairColorBaseDataUrl=c.toDataURL('image/png');
   hairColorBaseImage=await loadImage(hairColorBaseDataUrl);
 }
 function endHairColorSession(){hairColorBaseDataUrl='';hairColorBaseImage=null}
@@ -1304,34 +1309,37 @@ function hairMaskAlpha(x,y,W,H){
   const a1=d[y1*m.width+x0]+(d[y1*m.width+x1]-d[y1*m.width+x0])*fx;
   return(a0+(a1-a0)*fy)/255;
 }
-function hairColorDataUrl(hex,intensity){
+function hairColorDataUrl(hex,intensity,maxDim=0){
   if(!state.mask||!/cabello|hair/i.test(String(state.maskKind||'')))throw makeError('Primero selecciona Cabello.');
   if(!hairColorBaseImage)throw makeError('El cambio de color de cabello no está preparado.');
   const trg=rgbToHsl2(...Object.values(hexRgb(hex))),amt=Math.max(0,Math.min(100,Number(intensity)||0))/100;
-  const src=hairColorBaseImage,W=src.naturalWidth||src.width,H=src.naturalHeight||src.height,c=document.createElement('canvas');c.width=W;c.height=H;
+  const src=hairColorBaseImage,fullW=src.naturalWidth||src.width,fullH=src.naturalHeight||src.height,scale=maxDim>0?Math.min(1,maxDim/Math.max(fullW,fullH)):1,W=Math.max(1,Math.round(fullW*scale)),H=Math.max(1,Math.round(fullH*scale)),c=document.createElement('canvas');c.width=W;c.height=H;
   const ctx=c.getContext('2d',{willReadFrequently:true,alpha:false});ctx.drawImage(src,0,0,W,H);
   const im=ctx.getImageData(0,0,W,H),p=im.data;
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const a=hairMaskAlpha(x,y,W,H);if(a<.015)continue;
     const j=(y*W+x)*4,o=rgbToHsl2(p[j],p[j+1],p[j+2]);
     const darkBoost=1+(1-o.l)*.30,eff=Math.min(1,amt*darkBoost),targetSat=Math.max(.14,trg.s);
-    const sat=o.s*(1-eff)+targetSat*eff,rgb=hslToRgb2(trg.h,sat,o.l),aa=Math.pow(a,.80)*eff;
+    const sat=o.s*(1-eff)+targetSat*eff;
+    // Move luminance toward the chosen hair color, but preserve strand/shadow texture.
+    const texture=(o.l-.5)*.35,targetL=Math.max(.018,Math.min(.982,trg.l+texture));
+    const lum=o.l*(1-eff)+targetL*eff,rgb=hslToRgb2(trg.h,sat,lum),aa=Math.pow(a,.80)*eff;
     p[j]+=(rgb.r-p[j])*aa;p[j+1]+=(rgb.g-p[j+1])*aa;p[j+2]+=(rgb.b-p[j+2])*aa;
   }
-  ctx.putImageData(im,0,0);return c.toDataURL('image/jpeg',.97);
+  ctx.putImageData(im,0,0);return c.toDataURL('image/png');
 }
 async function previewHairColor(hex,intensity){
-  const seq=++hairPreviewSeq;try{showMask(false);if(!hairColorBaseImage)await beginHairColorSession();const url=hairColorDataUrl(hex,intensity);if(seq!==hairPreviewSeq)return;await api().applyProcessedImageDataUrl(url,false)}catch(e){console.error(e);api()?.toast(friendlyError(e))}
+  const seq=++hairPreviewSeq;try{showMask(false);if(!hairColorBaseImage)await beginHairColorSession();const url=hairColorDataUrl(hex,intensity,900);if(seq!==hairPreviewSeq)return;await api().applyProcessedImageDataUrl(url,false,()=>seq===hairPreviewSeq,{preserveFilters:true})}catch(e){console.error(e);api()?.toast(friendlyError(e))}
 }
 async function cancelHairColorPreview(){
-  hairPreviewSeq++;try{if(hairColorBaseDataUrl)await api().applyProcessedImageDataUrl(hairColorBaseDataUrl,false);if(state.mask)showMask(true)}finally{endHairColorSession()}
+  const seq=++hairPreviewSeq;try{if(hairColorBaseDataUrl)await api().applyProcessedImageDataUrl(hairColorBaseDataUrl,false,()=>seq===hairPreviewSeq,{preserveFilters:true});if(state.mask)showMask(true)}finally{endHairColorSession()}
 }
 async function applyHairColor(hex,intensity){
-  hairPreviewSeq++;
+  const seq=++hairPreviewSeq;
   try{
     if(!state.mask||!/cabello|hair/i.test(String(state.maskKind||'')))return api()?.toast('Primero selecciona Cabello.');
     showMask(false);if(!hairColorBaseImage)await beginHairColorSession();
-    const url=hairColorDataUrl(hex,intensity);await api().applyProcessedImageDataUrl(url,true);
+    const url=hairColorDataUrl(hex,intensity);const applied=await api().applyProcessedImageDataUrl(url,true,()=>seq===hairPreviewSeq,{preserveFilters:true});if(!applied)return;
     clearMask();api().toast('Color de cabello aplicado');
   }catch(e){console.error(e);api()?.toast(friendlyError(e))}
   finally{endHairColorSession()}

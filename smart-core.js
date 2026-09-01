@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='13.1-photo-critic-engine';
+const VERSION='15.32-photo-critic-engine';
 const $=id=>document.getElementById(id),api=()=>window.PhotoIA,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 let lastAnalysis=null,lastAppliedSignature='';
 function status(t,c='ready'){const b=$('smart-core-badge');if(b){b.textContent=t;b.className=`smart-core-badge ${c}`}}
@@ -30,7 +30,24 @@ async function understand(raw){const t=String(raw||'').toLowerCase().normalize('
  if(/piel/.test(t)&&/(suav|manchas|arrugas|natural)/.test(t))return regionalEdit('skin',{exposure:.04,shadows:5,warmth:1,smooth:true,detail:0,strength:.64},'la piel');
  if(/identificacion|credencial|pasaporte|id photo/.test(t)){window.PhotoAIStudio?.enterPortraitIdMode?.();api().toast('Modo identificación preparado con la foto completa, sin máscara de busto.');return true}
  return false}
+
+const MODE_RECIPES={
+ natural:{exposure:.02,shadows:4,highlights:2,contrast:4,vibrance:5,warmth:1,clarity:2,blackPoint:0,whitePoint:255,gamma:1,denoise:1,label:'Natural'},
+ portrait:{exposure:.04,shadows:6,highlights:3,contrast:2,vibrance:3,warmth:2,clarity:0,blackPoint:0,whitePoint:255,gamma:1,denoise:2,label:'Retrato'},
+ night:{exposure:.18,shadows:18,highlights:8,contrast:6,vibrance:4,warmth:3,clarity:2,blackPoint:0,whitePoint:255,gamma:1,denoise:8,label:'Noche'},
+ document:{exposure:.07,shadows:8,highlights:10,contrast:22,vibrance:-30,warmth:0,clarity:12,blackPoint:3,whitePoint:250,gamma:1,denoise:2,label:'Documento'},
+ vivid:{exposure:.03,shadows:4,highlights:3,contrast:10,vibrance:28,warmth:1,clarity:6,blackPoint:0,whitePoint:255,gamma:1,denoise:1,label:'Vibrante'}
+};
+async function applySmartMode(mode){
+ ensure();const r=MODE_RECIPES[mode];if(!r)return false;
+ document.querySelectorAll('[data-smart-mode]').forEach(b=>b.classList.toggle('active',b.dataset.smartMode===mode));
+ const {label,...recipe}=r;
+ await api().applySmartPixelRecipe(recipe,true);
+ api().toast(`Modo ${label} aplicado desde la foto base`);
+ const hint=$('smart-route-hint');if(hint)hint.textContent=`${label}: edición local aplicada sin acumular ajustes anteriores.`;
+ return true;
+}
 async function runRetouch(btn,label,work,success){ensure();if(!window.PhotoOpenCV?.ready)throw new Error('OpenCV no está listo.');btn.disabled=true;const old=btn.textContent;btn.textContent=label;status('Aplicando retoque localizado…','working');try{const data=await work();await api().applyProcessedImageDataUrl(data,true);api().toast(success);status('Retoque localizado aplicado','ready')}finally{btn.textContent=old;btn.disabled=false}}
-function boot(){const a=$('smart-analyze'),b=$('smart-apply'),smooth=$('smart-smooth-skin'),blem=$('smart-remove-blemishes'),moles=$('smart-remove-moles'),slider=$('portrait-strength'),value=$('portrait-strength-value');const updateStrength=()=>{if(value&&slider)value.textContent=`${slider.value}%`};if(slider){slider.oninput=updateStrength;updateStrength()}if(a)a.onclick=()=>analyze().catch(e=>{console.error(e);status('Error de análisis','error');api()?.toast(e.message)});if(b)b.onclick=()=>apply(b).catch(e=>{console.error(e);status('Error al aplicar','error');api()?.toast(e.message)});if(smooth)smooth.onclick=()=>runRetouch(smooth,'Suavizando…',()=>window.PhotoOpenCV.smoothPortraitSkin(Number(slider?.value||35)/100),'Piel suavizada de forma natural').catch(e=>api()?.toast(e.message));if(blem)blem.onclick=()=>runRetouch(blem,'Limpiando…',()=>window.PhotoOpenCV.removeSkinSpots('blemish'),'Granitos y manchas pequeñas reducidos').catch(e=>api()?.toast(e.message));if(moles)moles.onclick=()=>runRetouch(moles,'Retirando…',()=>window.PhotoOpenCV.removeSkinSpots('mole'),'Lunares pequeños retirados').catch(e=>api()?.toast(e.message));const setRetouchDisabled=v=>[smooth,blem,moles].forEach(x=>{if(x)x.disabled=v});document.addEventListener('photoia:image-loaded',()=>{lastAnalysis=null;lastAppliedSignature='';if(b)b.disabled=true;setRetouchDisabled(false);status('Lista para análisis profesional','ready')});document.addEventListener('photoia:image-cleared',()=>{lastAnalysis=null;lastAppliedSignature='';if(b)b.disabled=true;setRetouchDisabled(true);status('Esperando foto…','ready')});window.PhotoSmartCore={version:VERSION,analyze,applyRecommendations:()=>apply(b),understand,regionalEdit};status('Photo Critic Engine listo','ready')}
+function boot(){const a=$('smart-analyze'),b=$('smart-apply'),smooth=$('smart-smooth-skin'),blem=$('smart-remove-blemishes'),moles=$('smart-remove-moles'),slider=$('portrait-strength'),value=$('portrait-strength-value');document.querySelectorAll('[data-smart-mode]').forEach(btn=>btn.onclick=()=>applySmartMode(btn.dataset.smartMode).catch(e=>api()?.toast(e.message)));if($('smart-queue-clear'))$('smart-queue-clear').onclick=()=>{const list=$('smart-queue-list');if(list)list.innerHTML='';if($('smart-queue-count'))$('smart-queue-count').textContent='0';api()?.toast('Lista local vacía')};const updateStrength=()=>{if(value&&slider)value.textContent=`${slider.value}%`};if(slider){slider.oninput=updateStrength;updateStrength()}if(a)a.onclick=()=>analyze().catch(e=>{console.error(e);status('Error de análisis','error');api()?.toast(e.message)});if(b)b.onclick=()=>apply(b).catch(e=>{console.error(e);status('Error al aplicar','error');api()?.toast(e.message)});if(smooth)smooth.onclick=()=>runRetouch(smooth,'Suavizando…',()=>window.PhotoOpenCV.smoothPortraitSkin(Number(slider?.value||35)/100),'Piel suavizada de forma natural').catch(e=>api()?.toast(e.message));if(blem)blem.onclick=()=>runRetouch(blem,'Limpiando…',()=>window.PhotoOpenCV.removeSkinSpots('blemish'),'Granitos y manchas pequeñas reducidos').catch(e=>api()?.toast(e.message));if(moles)moles.onclick=()=>runRetouch(moles,'Retirando…',()=>window.PhotoOpenCV.removeSkinSpots('mole'),'Lunares pequeños retirados').catch(e=>api()?.toast(e.message));const setRetouchDisabled=v=>[smooth,blem,moles].forEach(x=>{if(x)x.disabled=v});document.addEventListener('photoia:image-loaded',()=>{lastAnalysis=null;lastAppliedSignature='';if(b)b.disabled=true;setRetouchDisabled(false);status('Lista para análisis profesional','ready')});document.addEventListener('photoia:image-cleared',()=>{lastAnalysis=null;lastAppliedSignature='';if(b)b.disabled=true;setRetouchDisabled(true);status('Esperando foto…','ready')});window.PhotoSmartCore={version:VERSION,analyze,applyRecommendations:()=>apply(b),understand,regionalEdit,applySmartMode};status('Photo Critic Engine listo','ready')}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',boot,{once:true});else boot();
 })();

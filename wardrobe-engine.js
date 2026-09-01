@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const VERSION='15.3';
+const VERSION='15.32';
 
 function normalize(value){
   return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -73,7 +73,7 @@ function leave(){
 }
 async function run({url,token,source,prompt,reference,signal,onProgress}){
   const router=window.PhotoConnectionRouter;
-  if(!router)throw new Error('Connection Router 15.3 no está cargado.');
+  if(!router)throw new Error('Connection Router no está cargado.');
   enter();
   onProgress?.(5,'Buscando Alienware','Probando red local y Tailscale…');
   const route=await router.resolve({

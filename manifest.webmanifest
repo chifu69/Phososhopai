@@ -1,13 +1,26 @@
 {
-  "name": "PHOTO IA 15.31.2 Skin Tone Local Retouch AI",
+  "name": "PHOTO IA 15.32 Core Stabilization",
   "short_name": "PHOTO IA",
-  "description": "Editor fotográfico privado con edición por capas, Multi-Pass Selection, Identity Guard y Alienware opcional.",
-  "start_url": "./?v=15.31.2-worker",
+  "description": "Editor fotográfico privado por capas con selección local, previews seguros y Alienware opcional.",
+  "start_url": "./?v=15.32",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
   "orientation": "any",
-  "icons": [],
+  "icons": [
+    {
+      "src": "./assets/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "./assets/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
   "scope": "./",
-  "id": "photo-ia-13-9-layered-identity"
+  "id": "photo-ia-15-32-core-stabilization"
 }

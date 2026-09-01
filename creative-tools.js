@@ -107,7 +107,8 @@ const onReady=()=>{
   function commitSelected(){const obj=selected();if(!obj||obj.photoRole==='main')return;safeSnapshot()}
 
   canvas.on('selection:created',updateSelection);canvas.on('selection:updated',updateSelection);canvas.on('selection:cleared',updateSelection);
-  canvas.on('object:modified',()=>{safeSnapshot();updateSelection()});
+  // app.js owns object:modified history snapshots; keep only inspector synchronization here.
+  canvas.on('object:modified',()=>{updateSelection()});
 
   $('create-text').onclick=()=>{
     const text=decorate(new fabric.IText($('text-value').value||'Tu texto',{

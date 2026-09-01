@@ -1,9 +1,9 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.30-pose-garment-color';
+const WORKER_VERSION='15.32-core-stabilization';
 const MP_VERSION='1.0.1';
-const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.16';
+const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.32';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
 const WASM_LOCAL='./assets/mediapipe/wasm';
 const WASM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
@@ -278,8 +278,12 @@ async function personMask(image){
       confidenceIndex=-1;
     }
 
-    const side=Math.round(Math.sqrt(out.length));
-    const stats=maskStats(out,side,Math.max(1,Math.round(out.length/side)));
+    let mw=Number(result?.confidenceMasks?.[personIdx]?.width||result?.categoryMask?.width||0),mh=Number(result?.confidenceMasks?.[personIdx]?.height||result?.categoryMask?.height||0);
+    if(!mw||!mh||mw*mh!==out.length){
+      // Selfie landscape is normally 256x144; use exact factor pairs when metadata is unavailable.
+      if(out.length%256===0){mw=256;mh=out.length/256}else if(out.length%144===0){mh=144;mw=out.length/144}else{mw=Math.round(Math.sqrt(out.length));mh=Math.max(1,Math.round(out.length/mw))}
+    }
+    const stats=maskStats(out,mw,mh);
     diag.personMaskSource=source;
     diag.personConfidenceIndex=confidenceIndex;
     diag.personLabels=labels.join('|')||'-';

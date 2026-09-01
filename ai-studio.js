@@ -2,10 +2,10 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const STORE='photoia-ai-studio-v4';
-const ENGINE_VERSION='15.30.1';
+const ENGINE_VERSION='15.32';
 const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(location.protocol==='http:'&&location.port==='8189'))?location.origin:'';
 const TAILSCALE_URL='https://100.79.114.52:8443';
-const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},activeUrl:'',online:false,activeUrl:'',activeRouteKind:'',mode:'image_edit'};
+const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},activeUrl:'',online:false,activeRouteKind:'',mode:'image_edit'};
 function app(){return window.PhotoIA}
 function toast(m){app()?.toast?.(m)}
 function read(){
@@ -39,10 +39,10 @@ function setBadge(mode,text){const el=$('ai-server-badge');el.className=`ai-serv
 function setStatus(mode,title,detail,pct=0){const box=$('ai-job-status');box.className=`ai-job-status ${mode}`;box.querySelector('strong').textContent=title;box.querySelector('small').textContent=detail;$('ai-progress-text').textContent=`${Math.round(pct)}%`;$('ai-progress-bar').style.width=`${Math.max(0,Math.min(100,pct))}%`}
 function dataUrlToBlob(data){const [head,b64]=data.split(',');const mime=(head.match(/:(.*?);/)||[])[1]||'image/jpeg';const bin=atob(b64);const arr=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)arr[i]=bin.charCodeAt(i);return new Blob([arr],{type:mime})}
 function preview(id,source,emptyIcon,emptyText){const box=$(id);box.innerHTML='';if(source){const img=document.createElement('img');img.src=source instanceof File?URL.createObjectURL(source):source;box.appendChild(img)}else box.innerHTML=`<b>${emptyIcon}</b><small>${emptyText}</small>`}
-function canvasImage(){try{return app()?.exportDataUrl?.()||''}catch{return ''}}
+function canvasImage(){try{return app()?.exportPhotoDataUrl?.()||app()?.exportDataUrl?.()||''}catch{return ''}}
 function useCanvas(silent=false){const d=canvasImage();if(!d){if(!silent)toast('Abre una foto primero.');return false;}state.main=d;if(!silent)toast('Foto del lienzo preparada');return true}
 function chooseFile(input,key,previewId){const f=input.files?.[0];if(!f)return;state[key]=f;preview(previewId,f,key==='main'?'📷':'＋',key==='main'?'Foto principal':'Referencia');if(key==='reference')$('ai-clear-reference').disabled=false}
-function renderHistory(){const wrap=$('ai-history');wrap.innerHTML='';if(!state.history.length){wrap.innerHTML='<p class="layers-empty">Todavía no hay resultados del Estudio IA.</p>';return}state.history.forEach((item,i)=>{const d=document.createElement('div');d.className='ai-history-item';d.innerHTML=`<img alt="Resultado IA ${i+1}" src="${item.image}"><button type="button">Usar resultado</button>`;d.querySelector('button').onclick=async()=>{await app()?.setMainImage?.(item.image,'Resultado Estudio IA');toast('Resultado colocado en el lienzo')};wrap.appendChild(d)})}
+function renderHistory(){const wrap=$('ai-history');wrap.innerHTML='';if(!state.history.length){wrap.innerHTML='<p class="layers-empty">Todavía no hay resultados del Estudio IA.</p>';return}state.history.forEach((item,i)=>{const d=document.createElement('div');d.className='ai-history-item';d.innerHTML=`<img alt="Resultado IA ${i+1}" src="${item.image}"><button type="button">Usar resultado</button>`;d.querySelector('button').onclick=async()=>{await app()?.applyProcessedImageDataUrl?.(item.image,true);toast('Resultado colocado sin borrar tus capas')};wrap.appendChild(d)})}
 function connectionCandidates(){
  const primary=$('ai-server-url')?.value?.trim().replace(/\/$/,'')||state.settings.url||'';
  const list=[primary,TAILSCALE_URL].filter(Boolean);
@@ -61,8 +61,9 @@ async function testConnection(){
  const router=window.PhotoConnectionRouter;
  if(!router){toast('Connection Router no está cargado.');return false}
  saveSettings();
- const btn=$('ai-test');
+ const btn=$('ai-test-server');
  if(btn)btn.disabled=true;
+ setBadge('testing','Conectando…');
  setStatus('processing','Buscando Alienware','Probando red local…',6);
  try{
   const route=await router.resolve({
@@ -73,17 +74,24 @@ async function testConnection(){
    }
   });
   if(!route.ok){
-   state.online=false;
+   state.online=false;setBadge('offline','PC desconectada');
    setStatus('error','Alienware no disponible','No respondió por red local ni por Tailscale.',0);
    toast('No se pudo conectar');
    return false;
   }
-  state.online=true;
+  state.online=true;setBadge('online','PC conectada');
   state.activeUrl=route.url;
   state.activeRouteKind=route.kind;
   setStatus('done','Conectado',`Conectado por ${route.label}.`,100);
   toast(`Conectado por ${route.label}`);
   return true;
+ }catch(err){
+  console.error(err);
+  state.online=false;setBadge('offline','PC desconectada');
+  const msg=err?.name==='AbortError'?'La prueba de conexión tardó demasiado.':(err?.message||'No se pudo comprobar el servidor.');
+  setStatus('error','Alienware no disponible',msg,0);
+  toast(msg);
+  return false;
  }finally{
   if(btn)btn.disabled=false;
  }
@@ -312,7 +320,7 @@ async function generateWardrobe(prompt){
   state.history.unshift({image:out.image,prompt,date:Date.now(),task:'wardrobe_only'});
   state.history=state.history.slice(0,8);
   save();renderHistory();
-  await app()?.setMainImage?.(out.image,'Resultado Estudio IA');
+  await app()?.applyProcessedImageDataUrl?.(out.image,true);
   toast('Cambio de ropa recibido del Alienware');
  }catch(e){
   if(progressTimer){clearInterval(progressTimer);progressTimer=null}
@@ -332,10 +340,11 @@ async function generateWardrobe(prompt){
 async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
  if(window.PhotoWardrobeEngine?.matches?.(state.mode,prompt)){await generateWardrobe(prompt);return}
  state.controller=new AbortController();$('ai-generate').disabled=true;$('ai-cancel-job').hidden=false;setStatus('processing','Enviando fotografías','Preparando la tarea para FLUX.2 Klein…',12);
+ let progress=null;
  try{const task=await prepareTask(prompt);const form=new FormData();form.append('prompt',task.prompt);form.append('mode',state.reference&&state.mode==='image_edit'?'multi_reference_edit':state.mode||'image_edit');form.append('profile','smart_edit');form.append('task',task.task==='portrait_id'?'general_edit':task.task);form.append('edit_intent',task.editIntent||task.task);form.append('preserve_identity','true');form.append('preserve_face','true');form.append('preserve_hair','true');form.append('preserve_pose','true');form.append('preserve_body',String(task.task==='portrait_id'));form.append('preserve_clothing',String(task.task==='portrait_id'));form.append('preserve_background',String(task.task==='portrait_id'));form.append('focus_region',task.task==='portrait_id'?'face_head_neck_shoulders':'');form.append('edit_strength',task.task==='portrait_id'?'low':'auto');form.append('server_semantic_parser',String(task.task==='wardrobe_only'));form.append('client_masks_authoritative',String(task.task!=='wardrobe_only'&&task.task!=='portrait_id'));form.append('allow_wardrobe_change',String(task.task==='wardrobe_only'||task.task==='scene_and_wardrobe'));form.append('adapt_face_lighting','true');form.append('image',await sourceBlob(task.source),'main.png');if(task.personMask)form.append('mask',await sourceBlob(task.personMask),'person-mask.png');if(task.identityMask)form.append('identity_mask',await sourceBlob(task.identityMask),'identity-mask.png');if(state.reference)form.append('reference',await sourceBlob(state.reference),'reference.jpg');
- const progress=setInterval(()=>{const current=parseInt($('ai-progress-text').textContent)||12;if(current<88)setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando la edición…',current+Math.random()*5)},1200);
+ progress=setInterval(()=>{const current=parseInt($('ai-progress-text').textContent)||12;if(current<88)setStatus('processing','Procesando en Alienware','FLUX.2 Klein está creando la edición…',current+Math.random()*5)},1200);
  const targetUrl=state.activeUrl||state.settings.url;
- const r=await fetch(`${targetUrl}/api/v1/edit`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},body:form,signal:state.controller.signal});clearInterval(progress);if(!r.ok){let msg='';try{msg=(await r.json()).error||''}catch{}throw new Error(msg||`Error ${r.status}`)}
+ const r=await fetch(`${targetUrl}/api/v1/edit`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{},body:form,signal:state.controller.signal});if(progress){clearInterval(progress);progress=null}if(!r.ok){let msg='';try{msg=(await r.json()).error||''}catch{}throw new Error(msg||`Error ${r.status}`)}
  const type=r.headers.get('content-type')||'';let result;if(type.includes('application/json')){const j=await r.json();result=j.image||j.dataUrl||j.result;if(result&&!result.startsWith('data:')&&!result.startsWith('http'))result=`data:image/png;base64,${result}`}else{const blob=await r.blob();result=await new Promise((ok,no)=>{const fr=new FileReader();fr.onload=()=>ok(fr.result);fr.onerror=no;fr.readAsDataURL(blob)})}
  if(!result)throw new Error('El servidor no devolvió una imagen.');
  if(task.task==='background_only'&&task.personMask){
@@ -347,8 +356,8 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
   result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.28});
  }
  const doneDetail=task.task==='portrait_id'?'Retrato/ID mejorado usando la fotografía completa; identidad, ropa y fondo protegidos.':task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Cambio de ropa procesado en el Alienware sobre la fotografía original.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
- setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.setMainImage?.(result,'Resultado Estudio IA');toast('Edición recibida del Alienware')
- }catch(e){if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
+ setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.applyProcessedImageDataUrl?.(result,true);toast('Edición recibida del Alienware sin borrar tus capas')
+ }catch(e){if(progress){clearInterval(progress);progress=null}if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{if(progress){clearInterval(progress);progress=null}$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
 function enterPortraitIdMode(){
  useCanvas(true);
  if(!state.main){toast('Abre una foto primero.');return false}
@@ -364,7 +373,7 @@ function enterPortraitIdMode(){
  return true;
 }
 window.PhotoAIStudio={version:ENGINE_VERSION,enterPortraitIdMode,get mode(){return state.mode}};
-function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();
+function init(){read();$('ai-server-url').value=state.settings.url;$('ai-server-token').value=state.settings.token;renderHistory();setBadge('offline','PC desconectada');
  $('ai-choose-reference').onclick=()=>$('ai-reference-file').click();$('ai-reference-file').onchange=e=>chooseFile(e.target,'reference','ai-reference-preview');$('ai-clear-reference').onclick=()=>{state.reference=null;$('ai-reference-file').value='';preview('ai-reference-preview',null,'＋','Persona, ropa o estilo');$('ai-clear-reference').disabled=true};
  document.querySelectorAll('[data-ai-action]').forEach(b=>b.onclick=()=>{document.querySelectorAll('[data-ai-action]').forEach(x=>x.classList.remove('active'));b.classList.add('active');state.mode=b.dataset.aiMode||'image_edit';if(state.mode==='change_clothes'){try{window.PhotoWardrobeEngine?.enter?.()}catch(_){}}$('ai-prompt').value=b.dataset.aiAction;$('ai-prompt').focus();toast(`Modo inteligente: ${b.textContent.trim()}`)});
  $('ai-save-settings').onclick=saveSettings;$('ai-test-server').onclick=async()=>{saveSettings();await testConnection()};$('ai-generate').onclick=generate;$('ai-cancel-job').onclick=async()=>{state.controller?.abort();try{if(state.activeUrl||state.settings.url)await fetch(`${state.activeUrl||state.settings.url}/api/v1/interrupt`,{method:'POST',headers:state.settings.token?{'X-PhotoIA-Token':state.settings.token}:{}})}catch{}};$('ai-clear-history').onclick=()=>{state.history=[];save();renderHistory();toast('Historial del Estudio IA limpiado')};

@@ -1,0 +1,28 @@
+PHOTO IA 15.32 — STATIC / PACKAGE VALIDATION
+
+PASS: JavaScript syntax check (node --check) for every *.js file.
+PASS: manifest.webmanifest JSON parse.
+PASS: CSS brace balance.
+PASS: no duplicate static HTML IDs.
+PASS: primary build/version references aligned to 15.32.
+PASS: Test Connection uses the real ai-test-server control.
+PASS: localized preview debounce = 140 ms for skin/clothing/hair.
+PASS: localized preview/apply/cancel calls use sequence guards.
+PASS: localized retouch requests preserve existing Fabric photo filters.
+PASS: service worker only purges PHOTO IA caches.
+PASS: missing JS/CSS fallback returns HTTP error instead of index HTML.
+PASS: package-local app/core references exist; optional vendor/model URLs are virtual cache targets with CDN fallback.
+PASS: generated 192x192 and 512x512 PWA icons exist.
+PASS: mathematical hair luminance sanity check demonstrates light/dark palette range.
+
+NOT RUN: Full browser/device runtime automation. A Chromium runtime is not installed in this build environment. This build therefore does not claim an automated Safari/iPhone end-to-end test.
+
+Recommended manual smoke test after installation:
+1. Open photo; Brightness +20; select Hair; preview/cancel/apply color; verify Brightness remains +20.
+2. Change dark hair to Blonde/White and verify visible lightening while texture remains.
+3. Add text/sticker; run Alienware edit; verify creative layers remain.
+4. Undo/Redo and History jump; verify one step per action and slider synchronization.
+5. Hold Before/After; verify true original view without creative layers, then release.
+6. Export; verify dimensions are close to working photo resolution, not phone viewport size.
+7. Rotate phone/window; verify layers remain registered to photo.
+8. Test connection with Alienware offline/online; verify badge and error state.
