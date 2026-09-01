@@ -1,0 +1,15 @@
+PHOTO IA 15.35.1 — Hair Selection Hotfix
+
+Validation completed:
+- JavaScript syntax check passed for every top-level .js file.
+- manifest.webmanifest JSON validation passed.
+- Hair multiclass regression test passed with a 256 x 256 MediaPipe-style category mask.
+- Hair result returned a non-empty Uint8Array with 65,536 pixels.
+- No active reference remains to source.width/source.height in the hair path.
+- Worker URL, app resources and PWA cache are versioned as 15.35.1.
+
+Scope:
+- Cabello restored.
+- Color de cabello restored through the same mask path.
+- Crown contour repair retained using the category mask's real dimensions.
+- Skin, clothing, clothing color, Smart and body-retouch logic unchanged.

@@ -1,9 +1,9 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.35-hair-crown-contour';
+const WORKER_VERSION='15.35.1-hair-selection-hotfix';
 const MP_VERSION='1.0.1';
-const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.35';
+const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.35.1';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
 const WASM_LOCAL='./assets/mediapipe/wasm';
 const WASM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
@@ -316,7 +316,25 @@ async function ensureMulticlassSegmenter(){
 }
 async function multiclass(image,mode){
   const t=now();phase(`Segmentación multiclase: ${mode}…`);const seg=await ensureMulticlassSegmenter();let result;
-  try{result=seg.segment(image);const cat=maskBytes(result?.categoryMask);if(!cat)throw new Error('Multiclase no devolvió máscara');diag.multiclassMs=Math.round(now()-t);if(mode==='hair')return refineHairCrownMask(classMask(cat,[1]),cat,source.width,source.height);if(mode==='clothing')return classMask(cat,[4]);if(mode==='skin')return classMask(cat,[2,3]);if(mode==='face')return classMask(cat,[3]);return classMask(cat,[1,2,3,4,5]);}
+  try{
+    result=seg.segment(image);
+    const categoryMask=result?.categoryMask;
+    const cat=maskBytes(categoryMask);
+    if(!cat)throw new Error('Multiclase no devolvió máscara');
+    diag.multiclassMs=Math.round(now()-t);
+    if(mode==='hair'){
+      let w=Number(categoryMask?.width||0),h=Number(categoryMask?.height||0);
+      if(!w||!h||w*h!==cat.length){
+        if(cat.length%256===0){w=256;h=cat.length/256;}
+        else{w=Math.round(Math.sqrt(cat.length));h=Math.max(1,Math.round(cat.length/w));}
+      }
+      return refineHairCrownMask(classMask(cat,[1]),cat,w,h);
+    }
+    if(mode==='clothing')return classMask(cat,[4]);
+    if(mode==='skin')return classMask(cat,[2,3]);
+    if(mode==='face')return classMask(cat,[3]);
+    return classMask(cat,[1,2,3,4,5]);
+  }
   finally{closeResult(result);}
 }
 async function ensureFaceLandmarker(){

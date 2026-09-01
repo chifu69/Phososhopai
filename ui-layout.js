@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.35';
+const VERSION='15.35.1';
 const categoryMap={
  home:['.command-panel','.quick-actions'],smart:['.smart-core-panel','.vision-panel'],adjust:['.tools','.transform'],
  create:['.creative-panel','#object-inspector','.layers-panel'],ai:['#ai-studio'],export:['.export']
@@ -82,7 +82,7 @@ function openSkinTonePanel(){
        <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
          <div>
-           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.35</div>
+           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.35.1</div>
            <div style="font-size:1.45rem;font-weight:900;color:#111827;margin-top:3px;">Retoque de piel</div>
          </div>
          <button id="skin-tone-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800;">×</button>
@@ -182,7 +182,7 @@ async function openGarmentColorPanel(part){
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;box-shadow:0 -12px 50px rgba(0,0,0,.28);padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
   <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.35</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
+   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.35.1</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
    <button id="garment-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800">×</button>
   </div>
   <p style="color:#64748b;line-height:1.35">Cambia solo esta prenda conservando sombras, pliegues, textura y logos visibles.</p>
@@ -213,7 +213,7 @@ function openClothingColorChooser(){
  wrap.style.cssText='position:fixed;inset:0;z-index:2147483645;background:rgba(3,10,24,.50);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
  wrap.innerHTML=`
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box">
-  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.35</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.35.1</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
   <p style="color:#64748b">PHOTO IA usa Pose Landmarker + la máscara de Ropa para separar cada prenda. Si la ropa es de una sola pieza, usa Vestido 👗.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
    <button data-part="upper" class="secondary" style="padding:15px;border-radius:15px;font-weight:900">👕 Camisa / Top</button>
@@ -252,7 +252,7 @@ async function openHairColorPanel(){
   wrap.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(3,10,24,.56);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
   const swatches=colors.map(([hex,name],i)=>`<button type="button" class="hair-swatch" data-hair-color="${hex}" data-hair-name="${name}" aria-label="${name}" style="height:52px;border-radius:14px;border:${i===0?'3px solid #f59e0b':'2px solid #cbd5e1'};background:${hex};"></button>`).join('');
   wrap.innerHTML=`<div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.35</div><div style="font-size:1.4rem;font-weight:900">💇 Color de cabello</div></div><button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px">×</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.35.1</div><div style="font-size:1.4rem;font-weight:900">💇 Color de cabello</div></div><button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px">×</button></div>
     <p style="color:#64748b">Elige un tono natural. No se usa el selector de colores del iPhone.</p>
     <div style="font-weight:900;margin-bottom:10px">Tono natural</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px">${swatches}</div>

@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 15.35 Dress + Natural Skin",
+  "name": "PHOTO IA 15.35.1 Dress + Natural Skin",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado por capas con selección local, previews seguros y Alienware opcional.",
-  "start_url": "./?v=15.35",
+  "start_url": "./?v=15.35.1",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
