@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 15.32 Core Stabilization",
+  "name": "PHOTO IA 15.33 Selection Stability + Body Retouch",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado por capas con selección local, previews seguros y Alienware opcional.",
-  "start_url": "./?v=15.32",
+  "start_url": "./?v=15.33",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
@@ -22,5 +22,5 @@
     }
   ],
   "scope": "./",
-  "id": "photo-ia-15-32-core-stabilization"
+  "id": "photo-ia-15-33-selection-stability-body-retouch"
 }

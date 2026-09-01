@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const VERSION='15.32';
+const VERSION='15.33';
 
 function normalize(value){
   return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');

@@ -1,0 +1,30 @@
+PHOTO IA 15.33 — Validation Report
+
+Base: PHOTO IA 15.32 Core Stabilization
+Build: Selection Stability + Body Retouch
+
+STATIC VALIDATION
+PASS — All JavaScript files parse with node --check.
+PASS — manifest.webmanifest is valid JSON.
+PASS — No duplicate HTML IDs.
+PASS — All non-optional local index references exist.
+PASS — All Service Worker CORE resources exist.
+PASS — No active 15.32 build references remain.
+
+FEATURE ASSERTIONS
+PASS — Task-specific segmentation resolution is enabled.
+PASS — Face fallback path is present.
+PASS — Bust fallback path is present.
+PASS — Garment mask validation is present.
+PASS — Garment deterministic fallback is present.
+PASS — Person/Multiclass/Face/Pose MediaPipe instances are persistent in the worker.
+PASS — Pose landmarks are exported to body retouch.
+PASS — Smart Analysis has OpenCV readiness gating.
+PASS — Smart Analysis has Canvas fallback when OpenCV is unavailable.
+PASS — Hair color uses luminance-preserving tint instead of flat HSL replacement.
+PASS — Abdomen / Waist+Abdomen local body-retouch module is present.
+PASS — Body retouch includes Preview / Apply / Cancel and conservative maximum effect.
+
+NOTES
+- Full browser inference cannot be reproduced in this container because the optional MediaPipe/OpenCV runtime files are not bundled and the container has no outbound DNS. The build therefore includes redundant in-app fallbacks specifically for device-side failures.
+- The user should test the same problem photo first: Camisa/Top repeatedly (3-5 times), Rostro preciso, Busto/ID, Smart Analyze, Hair color, then Abdomen preview at 15%.

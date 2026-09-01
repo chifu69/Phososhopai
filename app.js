@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.32';
+const VERSION='15.33';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];

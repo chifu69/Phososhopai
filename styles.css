@@ -799,3 +799,10 @@ body.photoia-pro-ui{overflow-x:hidden}
 .photo-critic-list{display:grid;gap:8px;margin:10px 0 0;padding:0;list-style:none}
 .photo-critic-list li{display:grid;gap:2px;padding:9px 10px;border:1px solid color-mix(in srgb,var(--line) 78%,transparent);border-radius:12px;background:color-mix(in srgb,var(--surface) 90%,transparent)}
 .photo-critic-list strong{font-size:12px}.photo-critic-list span{font-size:11px;color:var(--muted);line-height:1.35}
+
+/* PHOTO IA 15.33 — subtle body retouch */
+.body-retouch-box{margin-top:16px;padding:18px;border:1px solid var(--line,#d8e0eb);border-radius:24px;background:linear-gradient(145deg,rgba(242,248,255,.96),rgba(250,246,255,.96))}
+.body-retouch-grid{display:grid;grid-template-columns:1fr 1.4fr;gap:12px;margin-top:14px}.body-retouch-grid label{font-weight:800;color:var(--muted,#667085)}.body-retouch-grid select{width:100%;margin-top:7px;min-height:46px;border:1px solid var(--line,#d8e0eb);border-radius:14px;background:var(--panel,#fff);padding:0 12px;font:inherit}.body-retouch-grid input{display:block;margin-top:10px}
+.body-retouch-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}.body-retouch-actions button{min-height:52px;font-weight:800}
+@media(max-width:680px){.body-retouch-box{padding:14px}.body-retouch-grid,.body-retouch-actions{grid-template-columns:1fr}}
+@media(prefers-color-scheme:dark){.body-retouch-box{background:linear-gradient(145deg,rgba(25,35,47,.96),rgba(34,28,43,.96))}}

@@ -1,7 +1,8 @@
 (() => {
 'use strict';
-const VERSION='5.0-photo-critic-regional-engine';
+const VERSION='5.1-ready-gate-fallback';
 let ready=false;
+let readyWaiters=[];
 const api=()=>window.PhotoIA;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 async function getSourceCanvas(max=1600,source='current'){const c=source==='original'?await api()?.getOriginalAnalysisCanvas?.(max):api()?.getPhotoAnalysisCanvas?.(max);if(!c)throw new Error('Abre una foto primero.');return c;}
@@ -164,7 +165,23 @@ async function adjustRegion(region='face',options={}){
  }finally{if(mask&&![masks?.face,masks?.skin,masks?.sky,masks?.green,masks?.dark].includes(mask))safeDelete(mask);deleteMasks(masks);safeDelete(src,target)}
 }
 function render(r){const el=document.getElementById('opencv-diagnostics');if(!el)return;el.hidden=false;const regs=r.detectedRegions?.length?r.detectedRegions.join(' · '):'General';el.innerHTML=`<strong>OpenCV Portrait Beauty activo</strong><span>Regiones: ${regs}</span><span>Enfoque: ${r.blurRisk==='low'?'Bueno':r.blurRisk==='medium'?'Medio':'Bajo'}</span><span>Ruido: ${r.noiseEstimate}</span><span>Horizonte: ${Math.abs(r.horizon.angle).toFixed(1)}°</span>`;}
-function markReady(){ready=!!window.cv?.Mat;const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Portrait Beauty activo';badge.classList.add('ready')}}
-window.addEventListener('opencv-script-loaded',()=>{const wait=()=>window.cv?.Mat?markReady():setTimeout(wait,200);wait()});
-window.PhotoOpenCV={version:VERSION,get ready(){return ready},analyzeCurrent,enhanceCurrent,removeSkinSpots,smoothPortraitSkin,critiquePhoto,adjustRegion};
+function markReady(){
+ ready=!!window.cv?.Mat;
+ const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Portrait Beauty activo';badge.classList.add('ready')}
+ if(ready&&readyWaiters.length){const list=readyWaiters.splice(0);list.forEach(x=>x(true));}
+ return ready;
+}
+function whenReady(timeoutMs=15000){
+ if(ready||window.cv?.Mat){markReady();return Promise.resolve(true)}
+ return new Promise(resolve=>{
+  let done=false;const finish=v=>{if(done)return;done=true;clearTimeout(timer);clearInterval(poll);resolve(v)};
+  const poll=setInterval(()=>{if(window.cv?.Mat){markReady();finish(true)}},180);
+  const timer=setTimeout(()=>finish(!!window.cv?.Mat),Math.max(500,timeoutMs));
+  readyWaiters.push(v=>finish(v));
+ });
+}
+window.addEventListener('opencv-script-loaded',()=>{whenReady(20000)});
+// If the script loaded before this module registered the event, still detect it.
+if(window.cv?.Mat)markReady();else setTimeout(()=>whenReady(12000),0);
+window.PhotoOpenCV={version:VERSION,get ready(){return ready},whenReady,analyzeCurrent,enhanceCurrent,removeSkinSpots,smoothPortraitSkin,critiquePhoto,adjustRegion};
 })();

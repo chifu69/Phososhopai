@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 
-const VERSION='15.32';
+const VERSION='15.33';
 const TAILSCALE_URL='https://desktop-i33j4gg.tail079508.ts.net';
 
 function normalizeUrl(value){
