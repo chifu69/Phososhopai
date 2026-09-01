@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 15.33 Selection Stability + Body Retouch",
+  "name": "PHOTO IA 15.34 Dress + Natural Skin",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado por capas con selección local, previews seguros y Alienware opcional.",
-  "start_url": "./?v=15.33",
+  "start_url": "./?v=15.34",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",
@@ -22,5 +22,5 @@
     }
   ],
   "scope": "./",
-  "id": "photo-ia-15-33-selection-stability-body-retouch"
+  "id": "photo-ia-15-34-dress-natural-skin"
 }

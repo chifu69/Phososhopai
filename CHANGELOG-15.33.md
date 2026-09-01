@@ -1,4 +1,4 @@
-# CHANGELOG — PHOTO IA 15.33
+# CHANGELOG — PHOTO IA 15.34
 
 ## Selection Stability
 - Task-specific segmentation resolution: Face/Bust/Pose 640 px on mobile, Garment 512 px, semantic masks 320 px.

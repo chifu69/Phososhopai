@@ -1,0 +1,15 @@
+PHOTO IA 15.34 — Static Validation
+
+PASS — All JavaScript files pass node --check.
+PASS — manifest.webmanifest parses as valid JSON.
+PASS — Dress appears once in clothing chooser.
+PASS — Dress mode is exported by PhotoSegmentation.
+PASS — Dress bypasses shirt/pants split and uses full clothing mask.
+PASS — Skin tone slider is limited to -50..50.
+PASS — Skin tone algorithm preserves local texture and protects shadows/highlights.
+PASS — Root local references in index.html exist; optional vendor assets retain CDN/cache fallback behavior.
+
+Device test recommended:
+1. Same dress photo -> Color de ropa -> Vestido -> preview/apply.
+2. Aclarar piel at +10, +20, +30; compare Before/After.
+3. Cancel preview and Undo after Apply.

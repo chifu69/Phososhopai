@@ -1,9 +1,9 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.33-selection-stability-body-retouch';
+const WORKER_VERSION='15.34-selection-stability-body-retouch';
 const MP_VERSION='1.0.1';
-const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.33';
+const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.34';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
 const WASM_LOCAL='./assets/mediapipe/wasm';
 const WASM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
@@ -132,6 +132,12 @@ function morphGarment(mask,w,h){
   if(typeof blurMask==='function')a=blurMask(a,w,h,1);
   else a=featherRegion(a,w,h,1);
   return a;
+}
+function garmentWholeFromClothing(clothing,w,h){
+  const out=morphGarment(clothing,w,h);
+  const n=out.reduce((acc,v)=>acc+(v>70),0);
+  if(n<w*h*.004)throw new Error('No pude aislar el vestido en esta foto');
+  return out;
 }
 function garmentRegionFromPose(clothing,pts,w,h,part){
   const conf=i=>Math.min(pts[i]?.visibility??1,pts[i]?.presence??1);
@@ -316,11 +322,15 @@ async function runProfile(mode,imageData){
   if(mode==='pose'){pts=await poseLandmarks(source);mask=new Uint8Array(0)}
   else if(mode==='person'){mask=await personMask(source)}
   else if(mode==='hair'||mode==='clothing'){mask=await multiclass(source,mode)}
-  else if(mode==='garment-upper'||mode==='garment-lower'||mode==='garment-shoes'){
+  else if(mode==='garment-upper'||mode==='garment-lower'||mode==='garment-dress'||mode==='garment-shoes'){
     const clothing=await multiclass(source,'clothing');
-    pts=await poseLandmarks(source);
-    const part=mode==='garment-upper'?'upper':mode==='garment-lower'?'lower':'shoes';
-    mask=garmentRegionFromPose(clothing,pts,w,h,part);
+    if(mode==='garment-dress'){
+      mask=garmentWholeFromClothing(clothing,w,h);
+    }else{
+      pts=await poseLandmarks(source);
+      const part=mode==='garment-upper'?'upper':mode==='garment-lower'?'lower':'shoes';
+      mask=garmentRegionFromPose(clothing,pts,w,h,part);
+    }
   }
   else if(mode==='face'){pts=await landmarks(source);mask=faceMask(pts,w,h)}
   else if(mode==='bust'){

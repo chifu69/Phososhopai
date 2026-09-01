@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='5.1-ready-gate-fallback';
+const VERSION='5.2-prewarm';
 let ready=false;
 let readyWaiters=[];
 const api=()=>window.PhotoIA;
@@ -168,6 +168,7 @@ function render(r){const el=document.getElementById('opencv-diagnostics');if(!el
 function markReady(){
  ready=!!window.cv?.Mat;
  const badge=document.getElementById('engine-badge');if(ready&&badge){badge.textContent='Fabric + OpenCV Portrait Beauty activo';badge.classList.add('ready')}
+ if(ready){try{window.dispatchEvent(new CustomEvent('photoia:opencv-ready'));}catch(_){}}
  if(ready&&readyWaiters.length){const list=readyWaiters.splice(0);list.forEach(x=>x(true));}
  return ready;
 }
@@ -180,8 +181,11 @@ function whenReady(timeoutMs=15000){
   readyWaiters.push(v=>finish(v));
  });
 }
-window.addEventListener('opencv-script-loaded',()=>{whenReady(20000)});
-// If the script loaded before this module registered the event, still detect it.
-if(window.cv?.Mat)markReady();else setTimeout(()=>whenReady(12000),0);
+window.addEventListener('opencv-script-loaded',()=>{whenReady(24000)});
+// OpenCV.js sometimes exposes cv first and Mat slightly later. Poll once at startup and also honor the async callback when present.
+if(!window.Module)window.Module={};
+const prevReady=window.Module.onRuntimeInitialized;
+window.Module.onRuntimeInitialized=()=>{try{prevReady?.();}catch(_){ }markReady();};
+if(window.cv?.Mat)markReady();else setTimeout(()=>whenReady(18000),0);
 window.PhotoOpenCV={version:VERSION,get ready(){return ready},whenReady,analyzeCurrent,enhanceCurrent,removeSkinSpots,smoothPortraitSkin,critiquePhoto,adjustRegion};
 })();
