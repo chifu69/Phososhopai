@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.35.1'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.35.2'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -672,7 +672,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.35.1`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.35.2`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -954,6 +954,34 @@ function closeResult(result){
 function maskArea(mask,t=80){let n=0;for(const v of mask||[])if(v>t)n++;return n;}
 function maskCentroidY(mask,w,h,t=80){let n=0,sum=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++){if(mask[y*w+x]>t){n++;sum+=y;}}return n?sum/n:null;}
 
+function medianRow(values){if(!values.length)return 0;const a=[...values].sort((x,y)=>x-y),m=(a.length-1)/2;return Number.isInteger(m)?a[m]:(a[Math.floor(m)]+a[Math.ceil(m)])/2;}
+function adaptiveUpperFallbackBottom(clothing,rows,b,w,h,baseBottom){
+  const last=b.y+b.h-1,edgeMargin=Math.max(3,Math.round(h*.045));
+  if(last<h-1-edgeMargin)return baseBottom;
+  const cx=b.x+b.w/2,half=Math.max(2,b.w*.13),c0=Math.max(0,Math.floor(cx-half)),c1=Math.min(w-1,Math.ceil(cx+half));
+  const centerRows=new Int32Array(h);
+  for(let y=b.y;y<=last;y++)for(let x=c0;x<=c1;x++)if(clothing[y*w+x]>55)centerRows[y]++;
+  const coreStart=Math.max(b.y,Math.round(b.y+b.h*.12)),coreEnd=Math.max(coreStart,Math.min(baseBottom,Math.round(b.y+b.h*.58)));
+  const core=[],centerCore=[];
+  for(let y=coreStart;y<=coreEnd;y++){if(rows[y]>0)core.push(rows[y]);if(centerRows[y]>0)centerCore.push(centerRows[y]);}
+  const base=medianRow(core),centerBase=medianRow(centerCore);
+  if(base<Math.max(3,b.w*.10)||centerBase<1)return baseBottom;
+  const maxBad=Math.max(3,Math.round(h*.018));let good=0,total=0,badRun=0,lastGood=baseBottom;
+  for(let y=baseBottom+1;y<=last;y++){
+    total++;
+    const broad=rows[y]>=base*.52,centered=centerRows[y]>=Math.max(1,centerBase*.34);
+    if(broad&&centered){good++;badRun=0;lastGood=y;}
+    else if(++badRun>=maxBad)break;
+  }
+  return lastGood>=last-edgeMargin&&good/Math.max(1,total)>=.70?last:baseBottom;
+}
+function lowerBodyVisibleFromPose(points,h){
+  if(!Array.isArray(points)||points.length<29)return false;
+  const conf=i=>Math.min(points[i]?.visibility??1,points[i]?.presence??1),yy=i=>(points[i]?.y??2)*h;
+  const hip=(yy(23)+yy(24))/2;
+  return [25,26].some(i=>conf(i)>=.34&&yy(i)>hip+h*.055&&yy(i)<h*.97)||[27,28].some(i=>conf(i)>=.30&&yy(i)>hip+h*.12&&yy(i)<h*.985);
+}
+
 function garmentFallbackFromClothing(clothing,w,h,part){
   if(!clothing||clothing.length!==w*h)throw makeError('La máscara de ropa no es válida.','GARMENT_BASE_INVALID');
   const b=maskBounds(clothing,w,h,70);if(!b)throw makeError('No pude detectar la ropa completa.','GARMENT_BASE_EMPTY');
@@ -973,7 +1001,8 @@ function garmentFallbackFromClothing(clothing,w,h,part){
   const q38=quantile(.38),q56=quantile(.56),q84=quantile(.84);
   let y0=b.y,y1=b.y+b.h-1;
   if(part==='upper'){
-    y1=Math.min(y1,Math.max(b.y+8,q56));
+    const baseUpperBottom=Math.min(y1,Math.max(b.y+8,q56));
+    y1=adaptiveUpperFallbackBottom(clothing,rows,b,w,h,baseUpperBottom);
   }else if(part==='lower'){
     y0=Math.max(b.y,Math.min(y1-5,q38));
     y1=Math.max(y0+5,Math.min(y1,q84+Math.round(b.h*.10)));
@@ -992,12 +1021,14 @@ function garmentFallbackFromClothing(clothing,w,h,part){
 }
 
 
-function garmentMaskLooksWrong(mask,clothing,w,h,part){
+function garmentMaskLooksWrong(mask,clothing,w,h,part,points=null){
   const garmentArea=maskArea(mask),clothingArea=maskArea(clothing);if(!garmentArea||!clothingArea)return true;
   const rel=garmentArea/clothingArea,b=maskBounds(clothing,w,h,70),g=maskBounds(mask,w,h,70);if(!b||!g)return true;
   const cy=maskCentroidY(mask,w,h,70),norm=(cy-b.y)/Math.max(1,b.h);
   const topNorm=(g.y-b.y)/Math.max(1,b.h),bottomNorm=(g.y+g.h-b.y)/Math.max(1,b.h);
-  if(part==='upper'&&(rel<.12||rel>.78||norm>.62||topNorm>.28||bottomNorm<.16))return true;
+  const edgeMargin=Math.max(3,Math.round(h*.045));
+  const croppedUpper=part==='upper'&&!lowerBodyVisibleFromPose(points,h)&&(b.y+b.h-1>=h-1-edgeMargin)&&(g.y+g.h-1>=h-1-edgeMargin);
+  if(part==='upper'&&(rel<.12||(!croppedUpper&&rel>.82)||norm>(croppedUpper ? .76 : .62)||topNorm>.28||bottomNorm<.16))return true;
   if(part==='lower'&&(rel<.10||rel>.88||norm<.36||topNorm<.18||bottomNorm<.48))return true;
   if(part==='dress'&&(rel<.28||rel>.98||topNorm>.12||bottomNorm<.62))return true;
   if(part==='shoes'&&(rel<.015||rel>.34||norm<.70))return true;
@@ -1030,8 +1061,8 @@ async function segmentProfile(mode='person'){
   setStatus('Preparando imagen para el motor aislado…','loading');
   try{
     const work=await getWorkCanvas(operation,mode);if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
-    let mask=null,engine='Web Worker',workerErr=null;
-    try{if(mode==='garment-dress')throw makeError('Vestido usa la máscara completa de ropa.','DRESS_USE_CLOTHING');const result=await workerProfile(work,mode,operation);mask=new Uint8Array(result.mask);state.workerDiag={...state.workerDiag,...(result.diag||{}),worker:'READY'};engine=result?.diag?.engine||'MediaPipe Web Worker';}
+    let mask=null,engine='Web Worker',workerErr=null,workerPoints=null;
+    try{if(mode==='garment-dress')throw makeError('Vestido usa la máscara completa de ropa.','DRESS_USE_CLOTHING');const result=await workerProfile(work,mode,operation);mask=new Uint8Array(result.mask);workerPoints=result?.points||null;state.workerDiag={...state.workerDiag,...(result.diag||{}),worker:'READY'};engine=result?.diag?.engine||'MediaPipe Web Worker';}
     catch(err){workerErr=err;logDebug('WORKER PROFILE ERROR',{mode,error:String(err?.message||err)});}
 
     if((!mask||mask.length!==work.width*work.height||!maskArea(mask))&&mode==='person'){mask=offlinePortraitMask(work);engine='Fallback local de persona';}
@@ -1043,7 +1074,7 @@ async function segmentProfile(mode='person'){
       let clothing=null;
       try{const c=await workerProfile(work,'clothing',operation);clothing=new Uint8Array(c.mask);}catch(err){logDebug('GARMENT clothing validation failed',err)}
       if(clothing?.length===work.width*work.height){
-        if(part==='dress'||!mask||mask.length!==work.width*work.height||garmentMaskLooksWrong(mask,clothing,work.width,work.height,part)){
+        if(part==='dress'||!mask||mask.length!==work.width*work.height||garmentMaskLooksWrong(mask,clothing,work.width,work.height,part,workerPoints)){
           logDebug('GARMENT unstable mask -> deterministic clothing fallback',{mode});
           mask=garmentFallbackFromClothing(clothing,work.width,work.height,part);engine='Ropa + región anatómica estable';
         }

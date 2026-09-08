@@ -1,24 +1,19 @@
-# PHOTO IA 15.35.1 — Hair Selection Hotfix
+# PHOTO IA 15.35.2 — Clothing Mask Crop Fix
 
-Esta versión parte de PHOTO IA 15.33 y corrige específicamente dos problemas vistos en pruebas reales en iPhone.
+Esta versión parte de PHOTO IA 15.35.1 y corrige el corte horizontal de **Camisa / Top** visto en selfies y fotos recortadas.
 
-## Vestido 👗
-Cuando la persona lleva una prenda de una sola pieza, usa **Vestido**. PHOTO IA toma la prenda completa de la máscara de ropa y no la fuerza a dividirse en Top/Pantalón. La opción aparece en Selección IA y en Color de ropa.
+## Color de ropa / Camisa
+- Si la misma máscara de ropa continúa de forma ancha y centrada hasta el borde inferior de la foto, PHOTO IA ahora conserva esa continuación en lugar de cortar siempre cerca de la cadera o en el 56% de la máscara.
+- Si las rodillas/tobillos sí son visibles, se mantiene el límite anatómico para no convertir el pantalón en parte de la camisa.
+- El fallback local también detecta cuándo la prenda se estrecha o se separa como piernas y evita extender la camisa hasta abajo.
 
-## Tono de piel natural
-El control Aclarar/Oscurecer ahora es deliberadamente más sutil (±50). Conserva sombras, altas luces y textura, y evita empujar la piel hacia blanco/gris.
+## Conservado de 15.35.1
+- Hotfix de selección y color de cabello.
+- Vestido de una sola pieza.
+- Tono de piel natural.
+- Smart, retoque corporal y herramientas creativas sin cambios funcionales intencionales.
 
-## Conservado de 15.33
-Face/Busto redundante, OpenCV fallback, estabilidad de Camisa/Pantalón/Zapatos, cabello con textura y Retoque corporal sutil.
+## Caché PWA
+La versión y la caché suben a 15.35.2 para que Safari/iPhone cargue el nuevo Worker y no reutilice 15.35.1.
 
-
-## Hair Crown Contour Fix
-- Hair selection now repairs small gaps at the crown and upper sides without expanding freely into the background.
-- Removed erosive cleanup from the hair-specific path so fine top-of-head strands are less likely to be shaved off.
-- The semantic hair class remains the authority; repair is constrained to pixels already classified as part of the person.
-
-## Hotfix 15.35.1
-- Corrige el error `Can't find variable: source` al seleccionar Cabello.
-- Restaura Color de cabello, que depende de la misma máscara.
-- Renueva la versión del Worker y la caché PWA para impedir que Safari reutilice el código defectuoso de 15.35.
-- No cambia piel, ropa, color de ropa, Smart ni retoque corporal.
+Consulta `CHANGELOG-15.35.2.md` para el detalle técnico.

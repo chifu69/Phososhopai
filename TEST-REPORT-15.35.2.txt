@@ -1,0 +1,13 @@
+PHOTO IA 15.35.2 — Clothing Mask Crop Fix
+
+Validation completed:
+- JavaScript syntax check passed for every top-level .js file.
+- manifest.webmanifest JSON validation passed.
+- Synthetic worker regression: a cropped shirt mask that stays broad/centered to the bottom edge now extends Camisa / Top to the crop edge (test bounds 23..98 on 100px height).
+- Synthetic full-body regression: when knees/ankles are visible, Camisa / Top keeps the anatomical cutoff and does not extend through pants (test bounds 23..61 on 100px height).
+- Worker URL, app resources and PWA cache are versioned as 15.35.2.
+
+Scope:
+- Fixed clothing upper-mask crop behavior.
+- Preserved hair hotfix from 15.35.1.
+- No intentional changes to skin tone, Smart, body retouch, Alienware routing, or creative layers.

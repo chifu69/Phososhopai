@@ -1,9 +1,9 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.35.1-hair-selection-hotfix';
+const WORKER_VERSION='15.35.2-clothing-mask-fix';
 const MP_VERSION='1.0.1';
-const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.35.1';
+const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.35.2';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
 const WASM_LOCAL='./assets/mediapipe/wasm';
 const WASM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;
@@ -139,6 +139,56 @@ function garmentWholeFromClothing(clothing,w,h){
   if(n<w*h*.004)throw new Error('No pude aislar el vestido en esta foto');
   return out;
 }
+
+function medianCount(values){
+  if(!values.length)return 0;
+  const a=[...values].sort((x,y)=>x-y),m=(a.length-1)/2;
+  return Number.isInteger(m)?a[m]:(a[Math.floor(m)]+a[Math.ceil(m)])/2;
+}
+function posePointVisible(pts,i,min=.34){
+  const p=pts?.[i];if(!p)return false;
+  const c=Math.min(p.visibility??1,p.presence??1);
+  return c>=min;
+}
+function adaptiveUpperCropBottom(clothing,pts,w,h,shoulderY,hipY,baseBottom,x0,x1){
+  // Camisa/Top used to stop at an anatomical hip cutoff even when a selfie was
+  // cropped through the same shirt. Extend only when the clothing itself stays
+  // continuous to the lower image edge and the lower body is not reliably visible.
+  x0=Math.max(0,Math.floor(x0));x1=Math.min(w-1,Math.ceil(x1));
+  const rows=new Int32Array(h),centerRows=new Int32Array(h);
+  const cx=(x0+x1)/2,half=Math.max(2,(x1-x0+1)*.13),c0=Math.max(x0,Math.floor(cx-half)),c1=Math.min(x1,Math.ceil(cx+half));
+  let last=-1;
+  for(let y=0;y<h;y++)for(let x=x0;x<=x1;x++)if(clothing[y*w+x]>55){rows[y]++;if(x>=c0&&x<=c1)centerRows[y]++;last=y;}
+  if(last<0)return baseBottom;
+  const edgeMargin=Math.max(3,Math.round(h*.045));
+  if(last<h-1-edgeMargin)return baseBottom;
+
+  const kneeYs=[25,26].filter(i=>posePointVisible(pts,i,.34)).map(i=>clamp01(pts[i].y)*h);
+  const ankleYs=[27,28].filter(i=>posePointVisible(pts,i,.30)).map(i=>clamp01(pts[i].y)*h);
+  const kneeVisible=kneeYs.some(y=>y>hipY+h*.055&&y<h*.97);
+  const ankleVisible=ankleYs.some(y=>y>hipY+h*.12&&y<h*.985);
+  if(kneeVisible||ankleVisible)return baseBottom;
+
+  const coreStart=Math.max(0,Math.round(shoulderY+(hipY-shoulderY)*.20));
+  const coreEnd=Math.max(coreStart,Math.min(Math.round(hipY),Math.round(baseBottom)));
+  const core=[],centerCore=[];
+  for(let y=coreStart;y<=coreEnd;y++){if(rows[y]>0)core.push(rows[y]);if(centerRows[y]>0)centerCore.push(centerRows[y]);}
+  const base=medianCount(core),centerBase=medianCount(centerCore);
+  if(base<Math.max(3,(x1-x0+1)*.10)||centerBase<1)return baseBottom;
+
+  const start=Math.max(0,Math.round(baseBottom)+1),maxBad=Math.max(3,Math.round(h*.018));
+  let good=0,total=0,badRun=0,lastGood=baseBottom;
+  for(let y=start;y<=last;y++){
+    total++;
+    const broad=rows[y]>=base*.52;
+    const centered=centerRows[y]>=Math.max(1,centerBase*.34);
+    if(broad&&centered){good++;badRun=0;lastGood=y;}
+    else if(++badRun>=maxBad)break;
+  }
+  const reachedEdge=lastGood>=last-edgeMargin;
+  const goodRatio=good/Math.max(1,total);
+  return reachedEdge&&goodRatio>=.70?last:baseBottom;
+}
 function garmentRegionFromPose(clothing,pts,w,h,part){
   const conf=i=>Math.min(pts[i]?.visibility??1,pts[i]?.presence??1);
   if([11,12,23,24].some(i=>!pts[i]||conf(i)<.20))throw new Error('Pose Landmarker no tiene suficiente confianza en hombros/cadera');
@@ -152,12 +202,14 @@ function garmentRegionFromPose(clothing,pts,w,h,part){
   if(part==='upper'){
     const padX=bodyW*.38;
     const top=Math.max(0,shoulderY-bodyW*.34);
-    const bottom=Math.min(h-1,hipY+Math.max(6,(hipY-shoulderY)*.18));
+    const left=Math.min(ls.x,lh.x)-padX,right=Math.max(rs.x,rh.x)+padX;
+    const anatomicalBottom=Math.min(h-1,hipY+Math.max(6,(hipY-shoulderY)*.18));
+    const bottom=adaptiveUpperCropBottom(clothing,pts,w,h,shoulderY,hipY,anatomicalBottom,left,right);
     const poly=[
-      {x:Math.min(ls.x,lh.x)-padX,y:top},
-      {x:Math.max(rs.x,rh.x)+padX,y:top},
-      {x:Math.max(rs.x,rh.x)+padX,y:bottom},
-      {x:Math.min(ls.x,lh.x)-padX,y:bottom}
+      {x:left,y:top},
+      {x:right,y:top},
+      {x:right,y:bottom},
+      {x:left,y:bottom}
     ];
     region=polyMask(poly,w,h);
   }else if(part==='lower'){
