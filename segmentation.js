@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='3.9-stable-selection-pipeline';
+const VERSION='15.35.3-natural-garment';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.35.2'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.35.3'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -672,7 +672,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.35.2`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.35.3`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -1335,8 +1335,9 @@ async function adjustSkinTone(amount){
  }
 }
 
-let garmentColorBaseDataUrl='',garmentColorBaseImage=null,garmentPreviewSeq=0,garmentColorSessionActive=false;
+let garmentColorBaseDataUrl='',garmentColorBaseImage=null,garmentPreviewSeq=0,garmentColorSessionActive=false,garmentColorAnalysis=null;
 async function beginGarmentColorSession(){
+  garmentColorAnalysis=null;
   garmentColorSessionActive=true;
   const photo=api()?.state?.photo,el=photo?.getElement?.()||photo?._element;
   if(!el)throw makeError('No pude leer la fotografía actual.');
@@ -1345,7 +1346,7 @@ async function beginGarmentColorSession(){
   const c=document.createElement('canvas');c.width=W;c.height=H;c.getContext('2d',{alpha:false}).drawImage(el,0,0,W,H);
   garmentColorBaseDataUrl=c.toDataURL('image/png');garmentColorBaseImage=await loadImage(garmentColorBaseDataUrl);
 }
-function endGarmentColorSession(){garmentColorBaseDataUrl='';garmentColorBaseImage=null;garmentColorSessionActive=false}
+function endGarmentColorSession(){garmentColorBaseDataUrl='';garmentColorBaseImage=null;garmentColorAnalysis=null;garmentColorSessionActive=false}
 function hexRgb(hex){const h=String(hex||'#000000').replace('#',''),n=parseInt(h.length===3?h.split('').map(c=>c+c).join(''):h,16);return{r:(n>>16)&255,g:(n>>8)&255,b:n&255}}
 function rgbToHsl2(r,g,b){r/=255;g/=255;b/=255;const mx=Math.max(r,g,b),mn=Math.min(r,g,b);let h=0,s=0,l=(mx+mn)/2;if(mx!==mn){const d=mx-mn;s=l>.5?d/(2-mx-mn):d/(mx+mn);switch(mx){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;default:h=(r-g)/d+4}h/=6}return{h,s,l}}
 function hslToRgb2(h,s,l){let r,g,b;if(!s)r=g=b=l;else{const f=(p,q,t)=>{if(t<0)t+=1;if(t>1)t-=1;if(t<1/6)return p+(q-p)*6*t;if(t<1/2)return q;if(t<2/3)return p+(q-p)*(2/3-t)*6;return p};const q=l<.5?l*(1+s):l+s-l*s,p=2*l-q;r=f(p,q,h+1/3);g=f(p,q,h);b=f(p,q,h-1/3)}return{r:r*255,g:g*255,b:b*255}}
@@ -1356,17 +1357,84 @@ function garmentMaskAlpha(x,y,W,H){
   const a0=d[y0*m.width+x0]+(d[y0*m.width+x1]-d[y0*m.width+x0])*fx,a1=d[y1*m.width+x0]+(d[y1*m.width+x1]-d[y1*m.width+x0])*fx;
   return(a0+(a1-a0)*fy)/255;
 }
+// Garment-only analysis: do not alter the semantic mask or shared hair/skin helpers.
+const garmentLinear=Array.from({length:256},(_,v)=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)});
+function garmentEncode(v){return 255*(v<=.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-.055)}
+function garmentLuminance(p,j){return .2126*garmentLinear[p[j]]+.7152*garmentLinear[p[j+1]]+.0722*garmentLinear[p[j+2]]}
+function analyzeGarmentPixels(p,W,H,mask){
+  const n=W*H,protection=new Float32Array(n),labels=new Int32Array(n),queue=new Int32Array(n);
+  const delta=(i,k)=>Math.max(Math.abs(p[i*4]-p[k*4]),Math.abs(p[i*4+1]-p[k*4+1]),Math.abs(p[i*4+2]-p[k*4+2]))/255;
+  let area=0;for(let i=0;i<n;i++)if(mask[i]>.5)area++;
+  // Smooth fabric gradients stay connected. Hard boundaries isolate pocket objects,
+  // including their interiors, rather than merely leaving a thin unchanged outline.
+  let label=0;
+  for(let start=0;start<n;start++){
+    if(labels[start]||mask[start]<=.5)continue;
+    let head=0,tail=1,boundary=0,hard=0,touches=false;queue[0]=start;labels[start]=++label;
+    while(head<tail){
+      const i=queue[head++],x=i%W,y=Math.floor(i/W);
+      for(const k of [x?i-1:-1,x<W-1?i+1:-1,y?i-W:-1,y<H-1?i+W:-1]){
+        if(k<0||mask[k]<=.5){touches=true;continue;}
+        const d=delta(i,k);
+        if(d>.11){boundary++;if(d>.18)hard++;continue;}
+        if(!labels[k]){labels[k]=label;queue[tail++]=k;}
+      }
+    }
+    if(!touches&&tail<=area*.12&&boundary>=4&&hard/boundary>.35){
+      for(let q=0;q<tail;q++)protection[queue[q]]=1;
+    }
+  }
+  // Protect abrupt/reflective detail even when it connects to a larger region.
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const i=y*W+x;if(mask[i]<=.5)continue;
+    let edge=0;
+    for(const k of [x?i-1:i,x<W-1?i+1:i,y?i-W:i,y<H-1?i+W:i])if(mask[k]>.5)edge=Math.max(edge,delta(i,k));
+    protection[i]=Math.max(protection[i],Math.min(.95,Math.max(0,(edge-.14)/.22)));
+  }
+  // A one-pixel feather protects antialiased object rims without eroding shirt coverage.
+  const soft=protection.slice();
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const i=y*W+x;
+    for(const k of [x?i-1:i,x<W-1?i+1:i,y?i-W:i,y<H-1?i+W:i])soft[i]=Math.max(soft[i],protection[k]*.65);
+  }
+  const hist=new Float64Array(256);let weight=0;
+  for(let i=0;i<n;i++)if(mask[i]>.5){const w=mask[i]*(1-soft[i]);hist[Math.round(garmentLuminance(p,i*4)*255)]+=w;weight+=w;}
+  let sum=0,median=128;
+  for(let v=0;v<256;v++){sum+=hist[v];if(sum>=weight*.5){median=v;break;}}
+  return {width:W,height:H,protection:soft,reference:Math.max(.008,median/255)};
+}
+function getGarmentColorAnalysis(){
+  if(garmentColorAnalysis?.mask===state.mask)return garmentColorAnalysis;
+  const src=garmentColorBaseImage,scale=Math.min(1,600/Math.max(src.width,src.height));
+  const c=document.createElement('canvas');c.width=Math.max(1,Math.round(src.width*scale));c.height=Math.max(1,Math.round(src.height*scale));
+  const ctx=c.getContext('2d',{willReadFrequently:true});ctx.drawImage(src,0,0,c.width,c.height);
+  const mask=new Float32Array(c.width*c.height);
+  for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++)mask[y*c.width+x]=garmentMaskAlpha(x,y,c.width,c.height);
+  garmentColorAnalysis={...analyzeGarmentPixels(ctx.getImageData(0,0,c.width,c.height).data,c.width,c.height,mask),mask:state.mask};
+  return garmentColorAnalysis;
+}
+function garmentProtectionAt(a,x,y,W,H){
+  const sx=Math.max(0,Math.min(a.width-1,(x+.5)*a.width/W-.5)),sy=Math.max(0,Math.min(a.height-1,(y+.5)*a.height/H-.5));
+  const x0=Math.floor(sx),y0=Math.floor(sy),x1=Math.min(a.width-1,x0+1),y1=Math.min(a.height-1,y0+1),fx=sx-x0,fy=sy-y0,p=a.protection;
+  return (p[y0*a.width+x0]*(1-fx)+p[y0*a.width+x1]*fx)*(1-fy)+(p[y1*a.width+x0]*(1-fx)+p[y1*a.width+x1]*fx)*fy;
+}
+function garmentShadePixel(r,g,b,target,reference){
+  const luminance=.2126*garmentLinear[r]+.7152*garmentLinear[g]+.0722*garmentLinear[b];
+  const ratio=luminance/reference;
+  // Reflectance follows the original linear-light shading, including fine texture.
+  // The shoulder avoids clipped highlights; near-black/white dyes retain detail.
+  return target.map(t=>garmentEncode(t*ratio/(1+t*(ratio-1))));
+}
 function garmentColorDataUrl(hex,intensity,maxDim=0){
   if(!state.mask)throw makeError('Selecciona una prenda primero.');
   if(!garmentColorBaseImage)throw makeError('El cambio de color no está preparado.');
-  const trg=rgbToHsl2(...Object.values(hexRgb(hex))),amt=Math.max(0,Math.min(100,Number(intensity)||0))/100;
+  const target=Object.values(hexRgb(hex)).map(v=>.008+.92*garmentLinear[v]),amt=Math.max(0,Math.min(100,Number(intensity)||0))/100;
   const src=garmentColorBaseImage,fullW=src.naturalWidth||src.width,fullH=src.naturalHeight||src.height,scale=maxDim>0?Math.min(1,maxDim/Math.max(fullW,fullH)):1,W=Math.max(1,Math.round(fullW*scale)),H=Math.max(1,Math.round(fullH*scale)),c=document.createElement('canvas');c.width=W;c.height=H;
-  const ctx=c.getContext('2d',{willReadFrequently:true,alpha:false});ctx.drawImage(src,0,0,W,H);const im=ctx.getImageData(0,0,W,H),p=im.data;
-  for(let y=0;y<H;y++)for(let x=0;x<W;x++){const a=garmentMaskAlpha(x,y,W,H);if(a<.015)continue;const j=(y*W+x)*4,o=rgbToHsl2(p[j],p[j+1],p[j+2]);
-    const targetSat=Math.max(.08,trg.s),sat=o.s*(1-amt)+targetSat*amt;
-    const texture=(o.l-.5)*.45,targetL=Math.max(.025,Math.min(.975,trg.l+texture));
-    const lum=o.l*(1-amt)+targetL*amt,rgb=hslToRgb2(trg.h,sat,lum),aa=Math.pow(a,.82)*amt;
-    p[j]+= (rgb.r-p[j])*aa;p[j+1]+=(rgb.g-p[j+1])*aa;p[j+2]+=(rgb.b-p[j+2])*aa;
+  const ctx=c.getContext('2d',{willReadFrequently:true,alpha:false});ctx.drawImage(src,0,0,W,H);const im=ctx.getImageData(0,0,W,H),p=im.data,analysis=getGarmentColorAnalysis();
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+    const a=garmentMaskAlpha(x,y,W,H)*amt*(1-garmentProtectionAt(analysis,x,y,W,H));if(a<=0)continue;
+    const j=(y*W+x)*4,rgb=garmentShadePixel(p[j],p[j+1],p[j+2],target,analysis.reference);
+    for(let k=0;k<3;k++)p[j+k]+=(rgb[k]-p[j+k])*a;
   }
   ctx.putImageData(im,0,0);return c.toDataURL('image/png');
 }

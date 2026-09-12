@@ -1,9 +1,9 @@
 /* PHOTO IA 15.16 — classic isolated MediaPipe worker
  * All MediaPipe inference runs here, never on the UI thread.
  */
-const WORKER_VERSION='15.35.2-clothing-mask-fix';
+const WORKER_VERSION='15.35.3-natural-garment';
 const MP_VERSION='1.0.1';
-const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.35.2';
+const ESM_LOCAL='./assets/mediapipe/vision_bundle.mjs?v=15.35.3';
 const ESM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/vision_bundle.mjs`;
 const WASM_LOCAL='./assets/mediapipe/wasm';
 const WASM_REMOTE=`https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@${MP_VERSION}/wasm`;

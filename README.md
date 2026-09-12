@@ -1,4 +1,10 @@
-# PHOTO IA 15.35.2 — Clothing Mask Crop Fix
+# PHOTO IA 15.35.3 — Natural Garment Recolor
+
+Color de ropa conserva luces, sombras y textura, con protección local para objetos de bolsillo y detalles de alto contraste. Se mantiene la cobertura de selfies recortadas de 15.35.2.
+
+Consulta `CHANGELOG-15.35.3.md`. Pruebas locales: `node tests/garment-recolor.test.cjs`.
+
+## Antecedentes: 15.35.2 — Clothing Mask Crop Fix
 
 Esta versión parte de PHOTO IA 15.35.1 y corrige el corte horizontal de **Camisa / Top** visto en selfies y fotos recortadas.
 
@@ -14,6 +20,6 @@ Esta versión parte de PHOTO IA 15.35.1 y corrige el corte horizontal de **Camis
 - Smart, retoque corporal y herramientas creativas sin cambios funcionales intencionales.
 
 ## Caché PWA
-La versión y la caché suben a 15.35.2 para que Safari/iPhone cargue el nuevo Worker y no reutilice 15.35.1.
+La versión actual y la caché son 15.35.3 para que Safari/iPhone cargue los scripts actualizados.
 
 Consulta `CHANGELOG-15.35.2.md` para el detalle técnico.
