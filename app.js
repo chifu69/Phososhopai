@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.35.5';
+const VERSION='15.36.0';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -218,7 +218,7 @@ function applyAdaptiveAdjustments(values={}, commit=true){
  return normalized;
 }
 
-async function applySmartPixelRecipe(recipe={}, commit=true){
+async function applySmartPixelRecipe(recipe={}, commit=true,guard=null){
  if(!state.photo||!state.originalDataUrl)throw new Error('Abre una foto primero.');
  processing(true,'Aplicando mejora profesional…');
  try{
@@ -234,23 +234,27 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
   const warmth=Number(recipe.warmth||0)/100,clarity=Number(recipe.clarity||0)/100;
   const blackPoint=Number(recipe.blackPoint||0)/255,whitePoint=Number(recipe.whitePoint||255)/255,gamma=Math.max(.75,Math.min(1.3,Number(recipe.gamma||1))),denoise=Math.max(0,Number(recipe.denoise||0))/100;
   const clamp8=v=>v<0?0:v>255?255:v;
+  const magicLut=recipe.magic&&window.PhotoSmartCore?.magicTone?Float32Array.from({length:256},(_,v)=>window.PhotoSmartCore.magicTone(v,recipe)/255):null;
   for(let i=0;i<d.length;i+=4){
    let r=d[i]/255,g=d[i+1]/255,b=d[i+2]/255;
+   const skin=recipe.portraitProtection&&r>g*.94&&r>b*1.02&&r>.18;
    // Adaptive black/white normalization from the actual photo histogram.
    const span=Math.max(.18,whitePoint-blackPoint);
    r=Math.max(0,Math.min(1,(r-blackPoint)/span));
    g=Math.max(0,Math.min(1,(g-blackPoint)/span));
    b=Math.max(0,Math.min(1,(b-blackPoint)/span));
-   r=Math.pow(r,1/gamma)*exposure;g=Math.pow(g,1/gamma)*exposure;b=Math.pow(b,1/gamma)*exposure;
+   if(magicLut){
+    r=magicLut[Math.round(r*255)];g=magicLut[Math.round(g*255)];b=magicLut[Math.round(b*255)];
+   }else{r=Math.pow(r,1/gamma)*exposure;g=Math.pow(g,1/gamma)*exposure;b=Math.pow(b,1/gamma)*exposure;}
    let l=.2126*r+.7152*g+.0722*b;
    const sw=(1-Math.min(1,l))**2,hw=Math.min(1,l)**2;
-   const lift=shadows*.30*sw,rec=highlights*.26*hw;
+   const lift=magicLut?0:shadows*.30*sw,rec=magicLut?0:highlights*.26*hw;
    r=r+lift-rec;g=g+lift-rec;b=b+lift-rec;
    // Smooth S-curve contrast around perceptual mid gray.
-   const cf=1+contrast*.82;r=.5+(r-.5)*cf;g=.5+(g-.5)*cf;b=.5+(b-.5)*cf;
+   const cf=magicLut?1:1+contrast*.82;r=.5+(r-.5)*cf;g=.5+(g-.5)*cf;b=.5+(b-.5)*cf;
    l=.2126*r+.7152*g+.0722*b;
    const mx=Math.max(r,g,b),mn=Math.min(r,g,b),sat=mx>0?(mx-mn)/mx:0;
-   const vf=1+vibrance*(1-sat)*1.35;
+   const vf=1+vibrance*(1-sat)*1.35*(skin?.4:1);
    r=l+(r-l)*vf;g=l+(g-l)*vf;b=l+(b-l)*vf;
    r+=warmth*.055;g+=warmth*.012;b-=warmth*.055;
    d[i]=clamp8(r*255);d[i+1]=clamp8(g*255);d[i+2]=clamp8(b*255);
@@ -287,11 +291,8 @@ async function applySmartPixelRecipe(recipe={}, commit=true){
    ctx.putImageData(out,0,0);
   }
   const data=preserveAlpha?c.toDataURL('image/png'):c.toDataURL('image/jpeg',.97);
-  const old=state.photo;
-  const props={left:old.left,top:old.top,scaleX:old.scaleX,scaleY:old.scaleY,angle:old.angle,flipX:old.flipX,flipY:old.flipY,originX:old.originX,originY:old.originY};
-  const next=await fabricImageFromURL(data);next.photoRole='main';next.layerId='layer-photo';next.layerName='Fotografía';next.layerType='photo';next.photoAdjustments={};next.set({...props,selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});
-  state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();state.canvas.requestRenderAll();
-  resetSliderUI();normalizePhotoVisualState();if(commit)snapshot();
+  if(guard&&!guard())return false;
+  if(!await applyProcessedImageDataUrl(data,commit,guard))return false;
   return recipe;
  }finally{processing(false)}
 }

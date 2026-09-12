@@ -1,4 +1,10 @@
-# PHOTO IA 15.35.5 — Garment Detail Refinement
+# PHOTO IA 15.36.0 — Mejora automática
+
+Analiza la fotografía o aplica directamente la mejora automática de luz, sombras y color. Receta adaptativa con límites para retratos, modo compatible y protección al cambiar de foto durante el proceso.
+
+Consulta `CHANGELOG-15.36.0.md`. Pruebas: `node tests/smart-enhance.test.cjs` y `node tests/garment-recolor.test.cjs`.
+
+## Antecedentes: PHOTO IA 15.35.5 — Garment Detail Refinement
 
 Color de ropa tiñe también las costuras y sombras profundas, con una elevación controlada del negro. Conserva luces, sombras y textura, con protección local para objetos de bolsillo. Se mantiene la cobertura de selfies recortadas de 15.35.2.
 
@@ -20,6 +26,6 @@ Esta versión parte de PHOTO IA 15.35.1 y corrige el corte horizontal de **Camis
 - Smart, retoque corporal y herramientas creativas sin cambios funcionales intencionales.
 
 ## Caché PWA
-La versión actual y la caché son 15.35.5 para que Safari/iPhone cargue los scripts actualizados.
+La versión actual y la caché son 15.36.0 para que Safari/iPhone cargue los scripts actualizados.
 
 Consulta `CHANGELOG-15.35.2.md` para el detalle técnico.
