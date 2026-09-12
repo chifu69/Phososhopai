@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.35.3-natural-garment';
+const VERSION='15.35.4-natural-garment';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.35.3'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.35.4'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -672,7 +672,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.35.3`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.35.4`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -1361,6 +1361,12 @@ function garmentMaskAlpha(x,y,W,H){
 const garmentLinear=Array.from({length:256},(_,v)=>{v/=255;return v<=.04045?v/12.92:Math.pow((v+.055)/1.055,2.4)});
 function garmentEncode(v){return 255*(v<=.0031308?12.92*v:1.055*Math.pow(v,1/2.4)-.055)}
 function garmentLuminance(p,j){return .2126*garmentLinear[p[j]]+.7152*garmentLinear[p[j+1]]+.0722*garmentLinear[p[j+2]]}
+// Chromaticity changes little under textile shading. Ignore it near black, where
+// sensor noise/quantization dominates; shape must provide the object evidence there.
+function garmentChromaDistance(r,g,b,R,G,B){
+  const sum=Math.max(1,r+g+b),other=Math.max(1,R+G+B);
+  return Math.max(Math.abs(r/sum-R/other),Math.abs(g/sum-G/other),Math.abs(b/sum-B/other));
+}
 function analyzeGarmentPixels(p,W,H,mask){
   const n=W*H,protection=new Float32Array(n),labels=new Int32Array(n),queue=new Int32Array(n);
   const delta=(i,k)=>Math.max(Math.abs(p[i*4]-p[k*4]),Math.abs(p[i*4+1]-p[k*4+1]),Math.abs(p[i*4+2]-p[k*4+2]))/255;
@@ -1371,25 +1377,47 @@ function analyzeGarmentPixels(p,W,H,mask){
   for(let start=0;start<n;start++){
     if(labels[start]||mask[start]<=.5)continue;
     let head=0,tail=1,boundary=0,hard=0,touches=false;queue[0]=start;labels[start]=++label;
+    let minX=W,maxX=0,minY=H,maxY=0,r=0,g=0,b=0,R=0,G=0,B=0;
     while(head<tail){
       const i=queue[head++],x=i%W,y=Math.floor(i/W);
+      minX=Math.min(minX,x);maxX=Math.max(maxX,x);minY=Math.min(minY,y);maxY=Math.max(maxY,y);
+      r+=p[i*4];g+=p[i*4+1];b+=p[i*4+2];
       for(const k of [x?i-1:-1,x<W-1?i+1:-1,y?i-W:-1,y<H-1?i+W:-1]){
         if(k<0||mask[k]<=.5){touches=true;continue;}
         const d=delta(i,k);
-        if(d>.11){boundary++;if(d>.18)hard++;continue;}
+        if(d>.11){boundary++;R+=p[k*4];G+=p[k*4+1];B+=p[k*4+2];if(d>.18)hard++;continue;}
         if(!labels[k]){labels[k]=label;queue[tail++]=k;}
       }
     }
     if(!touches&&tail<=area*.12&&boundary>=4&&hard/boundary>.35){
-      for(let q=0;q<tail;q++)protection[queue[q]]=1;
+      const mean=(r+g+b)/(3*tail),surround=(R+G+B)/(3*boundary);
+      const bw=maxX-minX+1,bh=maxY-minY+1,fill=tail/(bw*bh),aspect=Math.max(bw,bh)/Math.min(bw,bh);
+      const chroma=garmentChromaDistance(r,g,b,R,G,B);
+      const dark=mean<surround*.65;
+      // Narrow/curved collar seams and same-color folds are textile evidence.
+      // Compact, solid silhouettes remain protected even on a neutral shirt;
+      // elongated objects need a measurable material/color difference (e.g. a pen).
+      const solidObject=fill>.82&&aspect<4&&Math.min(bw,bh)>=3;
+      const differentMaterial=mean>12&&chroma>.10;
+      const textileShadow=dark&&!solidObject&&(!differentMaterial||fill<.55);
+      if(!textileShadow)for(let q=0;q<tail;q++)protection[queue[q]]=1;
     }
   }
   // Protect abrupt/reflective detail even when it connects to a larger region.
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const i=y*W+x;if(mask[i]<=.5)continue;
     let edge=0;
-    for(const k of [x?i-1:i,x<W-1?i+1:i,y?i-W:i,y<H-1?i+W:i])if(mask[k]>.5)edge=Math.max(edge,delta(i,k));
-    protection[i]=Math.max(protection[i],Math.min(.95,Math.max(0,(edge-.14)/.22)));
+    for(const k of [x?i-1:i,x<W-1?i+1:i,y?i-W:i,y<H-1?i+W:i])if(mask[k]>.5){
+      const j=i*4,l=k*4,mean=(p[j]+p[j+1]+p[j+2])/3,other=(p[l]+p[l+1]+p[l+2])/3;
+      const dark=Math.min(mean,other),bright=Math.max(mean,other);
+      const chroma=garmentChromaDistance(p[j],p[j+1],p[j+2],p[l],p[l+1],p[l+2]);
+      const shadowEdge=dark<bright*.65&&(dark<16||chroma<.10);
+      const strength=Math.min(.95,Math.max(0,(delta(i,k)-.14)/.22));
+      // Contrast alone must not leave a black outline on the collar. Confirmed
+      // object components above still override this reduced shadow-edge protection.
+      edge=Math.max(edge,shadowEdge?strength*.08:strength);
+    }
+    protection[i]=Math.max(protection[i],edge);
   }
   // A one-pixel feather protects antialiased object rims without eroding shirt coverage.
   const soft=protection.slice();
@@ -1422,8 +1450,14 @@ function garmentShadePixel(r,g,b,target,reference){
   const luminance=.2126*garmentLinear[r]+.7152*garmentLinear[g]+.0722*garmentLinear[b];
   const ratio=luminance/reference;
   // Reflectance follows the original linear-light shading, including fine texture.
-  // The shoulder avoids clipped highlights; near-black/white dyes retain detail.
-  return target.map(t=>garmentEncode(t*ratio/(1+t*(ratio-1))));
+  // Lift only the deepest textile shadows. Apply the floor in output linear
+  // light, not to ratio: a ratio floor would over-brighten shadows for white dyes.
+  // It fades before midtones and keeps strict shadow ordering instead of clamping.
+  const shadowLift=.018*Math.exp(-ratio/.12);
+  return target.map(t=>{
+    const shaded=t*ratio/(1+t*(ratio-1));
+    return garmentEncode(shaded+t*shadowLift*(1-shaded));
+  });
 }
 function garmentColorDataUrl(hex,intensity,maxDim=0){
   if(!state.mask)throw makeError('Selecciona una prenda primero.');
