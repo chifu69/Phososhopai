@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.35.4-natural-garment';
+const VERSION='15.35.5-natural-garment';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.35.4'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.35.5'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -672,7 +672,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.35.4`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.35.5`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -1367,7 +1367,7 @@ function garmentChromaDistance(r,g,b,R,G,B){
   const sum=Math.max(1,r+g+b),other=Math.max(1,R+G+B);
   return Math.max(Math.abs(r/sum-R/other),Math.abs(g/sum-G/other),Math.abs(b/sum-B/other));
 }
-function analyzeGarmentPixels(p,W,H,mask){
+function analyzeGarmentPixels(p,W,H,mask,multiscale=true){
   const n=W*H,protection=new Float32Array(n),labels=new Int32Array(n),queue=new Int32Array(n);
   const delta=(i,k)=>Math.max(Math.abs(p[i*4]-p[k*4]),Math.abs(p[i*4+1]-p[k*4+1]),Math.abs(p[i*4+2]-p[k*4+2]))/255;
   let area=0;for(let i=0;i<n;i++)if(mask[i]>.5)area++;
@@ -1399,10 +1399,36 @@ function analyzeGarmentPixels(p,W,H,mask){
       // elongated objects need a measurable material/color difference (e.g. a pen).
       const solidObject=fill>.82&&aspect<4&&Math.min(bw,bh)>=3;
       const differentMaterial=mean>12&&chroma>.10;
-      const textileShadow=dark&&!solidObject&&(!differentMaterial||fill<.55);
-      if(!textileShadow)for(let q=0;q<tail;q++)protection[queue[q]]=1;
+      // A measurable fabric tint surviving in the dark patch is stronger
+      // evidence than its bounding box. Neutral-on-neutral remains ambiguous.
+      const surroundChroma=(Math.max(R,G,B)-Math.min(R,G,B))/Math.max(1,R+G+B);
+      const sameFabric=mean>8&&surroundChroma>.06&&chroma<.045;
+      const textileShadow=dark&&(sameFabric||(!solidObject&&(!differentMaterial||fill<.55)));
+      if(!textileShadow&&(multiscale||solidObject))for(let q=0;q<tail;q++)protection[queue[q]]=1;
     }
   }
+  // Integrate contrast over wider distances: a blurred object boundary may have
+  // no large single-pixel step. Only propagate confirmed object interiors from
+  // these coarser passes, never their generic edge protection (folds have edges too).
+  if(multiscale)for(const step of [3,6]){
+    const w=Math.ceil(W/step),h=Math.ceil(H/step),pixels=new Uint8ClampedArray(w*h*4),selection=new Float32Array(w*h);
+    for(let y=0;y<h;y++)for(let x=0;x<w;x++){
+      let r=0,g=0,b=0,count=0,alpha=1;
+      for(let yy=y*step;yy<Math.min(H,(y+1)*step);yy++)for(let xx=x*step;xx<Math.min(W,(x+1)*step);xx++){
+        const i=yy*W+xx;r+=p[i*4];g+=p[i*4+1];b+=p[i*4+2];count++;alpha=Math.min(alpha,mask[i]);
+      }
+      const i=y*w+x;pixels.set([r/count,g/count,b/count,255],i*4);selection[i]=alpha;
+    }
+    const coarse=analyzeGarmentPixels(pixels,w,h,selection,false);
+    const map={width:w,height:h,protection:coarse.objects};
+    for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+      const i=y*W+x;
+      // Use block coordinates, including partial final blocks, to avoid shifting
+      // protection on image sizes that are not divisible by the sampling step.
+      if(mask[i]>.5)protection[i]=Math.max(protection[i],garmentProtectionAt(map,x,y,w*step,h*step));
+    }
+  }
+  const objects=protection.slice();
   // Protect abrupt/reflective detail even when it connects to a larger region.
   for(let y=0;y<H;y++)for(let x=0;x<W;x++){
     const i=y*W+x;if(mask[i]<=.5)continue;
@@ -1429,7 +1455,7 @@ function analyzeGarmentPixels(p,W,H,mask){
   for(let i=0;i<n;i++)if(mask[i]>.5){const w=mask[i]*(1-soft[i]);hist[Math.round(garmentLuminance(p,i*4)*255)]+=w;weight+=w;}
   let sum=0,median=128;
   for(let v=0;v<256;v++){sum+=hist[v];if(sum>=weight*.5){median=v;break;}}
-  return {width:W,height:H,protection:soft,reference:Math.max(.008,median/255)};
+  return {width:W,height:H,protection:soft,objects,reference:Math.max(.008,median/255)};
 }
 function getGarmentColorAnalysis(){
   if(garmentColorAnalysis?.mask===state.mask)return garmentColorAnalysis;

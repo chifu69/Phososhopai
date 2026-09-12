@@ -1,8 +1,8 @@
-# PHOTO IA 15.35.4 — Garment Shadow Refinement
+# PHOTO IA 15.35.5 — Garment Detail Refinement
 
 Color de ropa tiñe también las costuras y sombras profundas, con una elevación controlada del negro. Conserva luces, sombras y textura, con protección local para objetos de bolsillo. Se mantiene la cobertura de selfies recortadas de 15.35.2.
 
-Consulta `CHANGELOG-15.35.4.md`. Pruebas locales: `node tests/garment-recolor.test.cjs`.
+Consulta `CHANGELOG-15.35.5.md`. Pruebas locales: `node tests/garment-recolor.test.cjs`.
 
 ## Antecedentes: 15.35.2 — Clothing Mask Crop Fix
 
@@ -20,6 +20,6 @@ Esta versión parte de PHOTO IA 15.35.1 y corrige el corte horizontal de **Camis
 - Smart, retoque corporal y herramientas creativas sin cambios funcionales intencionales.
 
 ## Caché PWA
-La versión actual y la caché son 15.35.4 para que Safari/iPhone cargue los scripts actualizados.
+La versión actual y la caché son 15.35.5 para que Safari/iPhone cargue los scripts actualizados.
 
 Consulta `CHANGELOG-15.35.2.md` para el detalle técnico.

@@ -86,3 +86,22 @@ assert.equal(t.garmentMaskAlpha(1,1,4,4),.25);
 assert.equal(t.garmentMaskAlpha(2,1,4,4),.75);
 assert.equal(t.garmentMaskAlpha(3,1,4,4),1);
 console.log('PASS: black seams, curved collar, tapered folds, hue/floor bounds, midtones, neutral radio, dark pen, neckline feather');
+// Soft boundaries must not connect a radio interior to the entire shirt.
+for(const shift of [0,1,2]){
+ for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+  const distance=Math.max(30+shift-x,x-49-shift,35-y,y-64,0);
+  const v=Math.round(20+110*Math.min(1,distance/6));pixels.set([v,v,v,255],(y*W+x)*4);
+ }
+ const blurred=t.analyzeGarmentPixels(pixels,W,H,mask);
+ assert(blurred.protection[50*W+40]>.95,'Blurred radio interior must be protected across sampling alignments');
+ assert(blurred.protection[100*W+100]<.1,'Distant fabric must remain editable');
+}
+// A compact shadow with the fabric tint is not an accessory just because it is rectangular.
+for(let y=0;y<H;y++)for(let x=0;x<W;x++)pixels.set(x>=30&&x<46&&y>=35&&y<59?[24,19,14,255]:[120,95,70,255],(y*W+x)*4);
+const compact=t.analyzeGarmentPixels(pixels,W,H,mask);
+assert(compact.protection[47*W+38]<.1,'Compact same-tint textile shadow must recolor');
+context.state.mask={width:W,height:H,data:new Uint8Array(W*H).fill(255)};
+context.analysis=compact;vm.runInContext('garmentColorAnalysis={...analysis,mask:state.mask};',context);
+const result=t.garmentColorDataUrl('#2050d0',100),patch=(47*W+38)*4;
+assert(result[patch+2]>result[patch]+15,'Compact fabric shadow must take target hue');
+console.log('PASS: soft object boundaries, sampling alignment, compact fabric shadows and rendered hue');
