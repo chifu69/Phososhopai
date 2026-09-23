@@ -1,0 +1,38 @@
+PHOTO IA 15.36.1 — WARDROBE ROUTING FIX
+
+Este paquete NO reemplaza PHOTO IA con la vieja base 15.1.
+Aplica únicamente el arreglo correcto sobre PHOTO IA 15.36.0 actual.
+
+CAMBIOS:
+- ai-studio.js y wardrobe-engine.js usan la misma detección de ropa.
+- Reconoce: ponme, vísteme, pantalones, suit, además de los términos existentes.
+- Cambiar fondo ya no es secuestrado por Wardrobe Engine cuando el prompt menciona ropa.
+- Conserva las mejoras 15.36.0 actuales.
+- Sube la caché PWA a 15.36.1.
+- Crea una prueba de regresión.
+
+WINDOWS:
+1. Copia los 3 archivos UPDATE-* a la RAÍZ de tu PHOTO IA 15.36.0 actual.
+2. Ejecuta UPDATE-PHOTO-IA-15.36.1.bat.
+3. Debe terminar con: "Regression test OK".
+4. No subas los archivos UPDATE-* a GitHub; sube los archivos de PHOTO IA que el updater modificó.
+
+MAC:
+1. Copia los UPDATE-* a la raíz de PHOTO IA 15.36.0.
+2. Abre Terminal en esa carpeta.
+3. Ejecuta: ./UPDATE-PHOTO-IA-15.36.1.command
+
+ARCHIVOS QUE MODIFICA:
+- ai-studio.js
+- wardrobe-engine.js
+- index.html
+- sw.js
+- manifest.webmanifest
+- README.md
+
+ARCHIVOS QUE CREA:
+- CHANGELOG-15.36.1.md
+- tests/wardrobe-routing.test.cjs
+
+SEGURIDAD:
+El updater valida todos los patrones antes de escribir. Si una prueba falla después de escribir, restaura los archivos originales automáticamente.
