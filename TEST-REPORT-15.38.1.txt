@@ -1,4 +1,4 @@
-PHOTO IA 15.38.1 — TEST REPORT
+PHOTO IA 15.40.0 — ADVANCED SELECTION TEST REPORT
 
 Motivo del fix:
 - Safari/iPhone reportó: no available backend found. ERR: [wasm] TypeError: Importing a module script failed.

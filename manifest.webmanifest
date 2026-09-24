@@ -1,8 +1,8 @@
 {
-  "name": "PHOTO IA 15.38.1 Local AI Fill",
+  "name": "PHOTO IA 15.40.0 Advanced Selection",
   "short_name": "PHOTO IA",
   "description": "Editor fotográfico privado por capas con selección local, previews seguros y Alienware opcional.",
-  "start_url": "./?v=15.38.1",
+  "start_url": "./?v=15.40.0",
   "display": "standalone",
   "background_color": "#edf2f6",
   "theme_color": "#101820",

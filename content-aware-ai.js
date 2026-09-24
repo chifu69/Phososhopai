@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.38.1';
+const VERSION='15.40.0';
 
 // ---------------------------------------------------------------------------
 // Pure helpers. Kept DOM-free so regression tests can require this file.
@@ -231,6 +231,22 @@ function boot(){
     try{const s=await window.PhotoONNX?.inpaintStatus?.();el.textContent=s?.cached?'MI-GAN local listo':'MI-GAN 28 MB · se instalará una sola vez';el.classList.toggle('ready',!!s?.cached)}
     catch(_){el.textContent='MI-GAN 28 MB · pendiente'}
   }
+  function importMask(alpha,width,height,{label='Selección IA'}={}){
+    if(!api.state.photo)throw new Error('Abre una foto primero.');
+    if(!alpha||!width||!height)throw new Error('La máscara no es válida.');
+    ensureCanvases();
+    clearCanvases();
+    const src=document.createElement('canvas');src.width=width;src.height=height;const sctx=src.getContext('2d',{willReadFrequently:true});
+    const img=sctx.createImageData(width,height);
+    for(let i=0,j=0;i<alpha.length;i++,j+=4){const a=alpha[i]||0;img.data[j]=255;img.data[j+1]=255;img.data[j+2]=255;img.data[j+3]=a;}
+    sctx.putImageData(img,0,0);
+    maskCtx.save();maskCtx.clearRect(0,0,sourceW,sourceH);maskCtx.imageSmoothingEnabled=true;maskCtx.drawImage(src,0,0,sourceW,sourceH);maskCtx.restore();
+    overlayCtx.save();overlayCtx.clearRect(0,0,sourceW,sourceH);overlayCtx.drawImage(maskCanvas,0,0);overlayCtx.globalCompositeOperation='source-in';overlayCtx.fillStyle='rgba(255,45,70,.48)';overlayCtx.fillRect(0,0,sourceW,sourceH);overlayCtx.restore();
+    ensureOverlay();
+    setStatus(`Selección importada: ${label}. Ajusta o pulsa Aplicar AI Fill.`, 'ready');
+    if(overlayObj){overlayObj.dirty=true;canvas.requestRenderAll();}
+  }
+
   async function installModel(){
     if(!window.PhotoONNX){setStatus('ONNX Runtime no está disponible.','error');return}
     setBusy(true);setStatus('Instalando MI-GAN local… la primera vez puede tardar.','working');
@@ -284,6 +300,7 @@ function boot(){
   document.addEventListener('photoia:image-cleared',()=>{++inferenceToken;end({clear:true});maskCanvas=maskCtx=overlayCanvas=overlayCtx=null;sourceW=sourceH=0});
   document.addEventListener('photoia:photo-replaced',()=>{if(active){end({clear:true});maskCanvas=maskCtx=overlayCanvas=overlayCtx=null;sourceW=sourceH=0;api.setCanvasMode?.('move',{openPanel:false,announce:false})}});
   window.addEventListener('resize',()=>{if(active){syncOverlayTransform();canvas.requestRenderAll()}});
+  window.PhotoAIFill={version:VERSION,importMask,clearSelection:()=>{clearCanvases();removeOverlay();},apply,installModel,refreshModelStatus,get selectionBounds(){const a=getMaskAlpha();return getMaskBounds(a,sourceW,sourceH)}};
   refreshModelStatus();
 }
 window.addEventListener('photoia-ready',boot,{once:true});

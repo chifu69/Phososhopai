@@ -1185,9 +1185,62 @@ async function setMask(mask,width,height,label){
     try{fabric.Image.fromURL(url,img=>img?finish(null,img):finish(makeError('No pude mostrar la máscara.')));}catch(err){finish(err);}
   }),6000,'La máscara tardó demasiado en mostrarse. Intenta de nuevo.',state.operation);
   updateUI();
+  try{window.dispatchEvent(new CustomEvent('photoia:segmentation-mask-changed',{detail:{action:'set',label,width,height}}));}catch(_){ }
 }
 function showMask(show=true){if(!state.maskOverlay)return;state.maskOverlay.visible=show;api().state.canvas.requestRenderAll();setStatus(show?'Máscara visible':'Máscara oculta',show?'ready':'');}
-function clearMask(){removeMaskOverlay();state.mask=null;state.maskKind='';state.tapMode=false;state.garmentTapMode=false;setStatus('Sin máscara');updateUI();}
+function clearMask(){removeMaskOverlay();state.mask=null;state.maskKind='';state.tapMode=false;state.garmentTapMode=false;setStatus('Sin máscara');updateUI();try{window.dispatchEvent(new CustomEvent('photoia:segmentation-mask-changed',{detail:{action:'clear'}}));}catch(_){}}
+async function replaceMask(mask,width,height,label='Selección avanzada'){
+  if(!mask||!width||!height)throw makeError('La máscara avanzada no es válida.');
+  await setMask(mask,width,height,label);
+  setStatus(`${label} lista.`, 'ready');
+  api()?.toast(label);
+}
+async function growCurrentMask(steps=1,label='Selección expandida'){
+  if(!state.mask)throw makeError('Primero crea una selección.');
+  const s=Math.max(1,Math.min(20,Math.round(Math.abs(Number(steps)||1))));
+  let mask=Uint8Array.from(state.mask.data);
+  mask=dilate(mask,state.mask.width,state.mask.height,s);
+  mask=blurMask(mask,state.mask.width,state.mask.height,1);
+  await setMask(mask,state.mask.width,state.mask.height,label);
+  setStatus(`${label}: borde expandido ${s} paso(s).`,'ready');
+}
+async function shrinkCurrentMask(steps=1,label='Selección contraída'){
+  if(!state.mask)throw makeError('Primero crea una selección.');
+  const s=Math.max(1,Math.min(20,Math.round(Math.abs(Number(steps)||1))));
+  let mask=Uint8Array.from(state.mask.data);
+  mask=erode(mask,state.mask.width,state.mask.height,s);
+  mask=blurMask(mask,state.mask.width,state.mask.height,1);
+  await setMask(mask,state.mask.width,state.mask.height,label);
+  setStatus(`${label}: borde contraído ${s} paso(s).`,'ready');
+}
+async function softenCurrentMask(passes=1,label='Selección suavizada'){
+  if(!state.mask)throw makeError('Primero crea una selección.');
+  const s=Math.max(1,Math.min(12,Math.round(Math.abs(Number(passes)||1))));
+  let mask=Uint8Array.from(state.mask.data);
+  mask=blurMask(mask,state.mask.width,state.mask.height,s);
+  await setMask(mask,state.mask.width,state.mask.height,label);
+  setStatus(`${label}: borde suavizado.`,'ready');
+}
+async function invertCurrentMask(label='Selección invertida'){
+  if(!state.mask)throw makeError('Primero crea una selección.');
+  const mask=new Uint8Array(state.mask.data.length);
+  for(let i=0;i<mask.length;i++)mask[i]=255-(state.mask.data[i]||0);
+  await setMask(mask,state.mask.width,state.mask.height,label);
+  setStatus(`${label}: ahora muestra el área opuesta.`,'ready');
+}
+async function keepLargestCurrentMask(label='Selección principal'){
+  if(!state.mask)throw makeError('Primero crea una selección.');
+  let mask=thresholdMask(state.mask.data,70);
+  mask=largestCenterComponent(mask,state.mask.width,state.mask.height);
+  mask=blurMask(mask,state.mask.width,state.mask.height,1);
+  await setMask(mask,state.mask.width,state.mask.height,label);
+  setStatus(`${label}: dejé solo el componente principal.`,'ready');
+}
+function currentMaskStats(){
+  if(!state.mask)return {label:'',area:0,coverage:0,width:0,height:0};
+  const {data,width,height,label}=state.mask;let area=0;for(const v of data)if(v>70)area++;
+  return {label:label||state.maskKind||'Selección',area,coverage:area/(width*height),width,height};
+}
 async function createCutout(){
   if(!state.mask||!state.workCanvas)return api()?.toast('Primero crea una máscara.');
   const operation=beginOperation('Quitando el fondo…');
@@ -1624,7 +1677,7 @@ function resumeAfterWardrobe(){
 document.addEventListener('photoia:wardrobe-engine-enter',suspendForWardrobe);
 document.addEventListener('photoia:wardrobe-engine-leave',resumeAfterWardrobe);
 
-window.PhotoSegmentation={version:VERSION,getPoseLandmarks,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,segmentGarmentUpper,segmentGarmentLower,segmentGarmentDress,segmentGarmentShoes,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,showWorkerDiagnostics,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,get diagnostics(){return {...state.workerDiag}},get mask(){return state.mask},get maskKind(){return state.maskKind},isSkinMask,isGarmentMask,adjustSkinTone,previewSkinTone,cancelSkinTonePreview,beginSkinToneSession,beginGarmentColorSession,previewGarmentColor,cancelGarmentColorPreview,applyGarmentColor,beginGarmentTapMode,beginHairColorSession,previewHairColor,cancelHairColorPreview,applyHairColor};
+window.PhotoSegmentation={version:VERSION,getPoseLandmarks,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,segmentGarmentUpper,segmentGarmentLower,segmentGarmentDress,segmentGarmentShoes,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,showWorkerDiagnostics,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,replaceMask,growCurrentMask,shrinkCurrentMask,softenCurrentMask,invertCurrentMask,keepLargestCurrentMask,currentMaskStats,get diagnostics(){return {...state.workerDiag}},get mask(){return state.mask},get maskKind(){return state.maskKind},isSkinMask,isGarmentMask,adjustSkinTone,previewSkinTone,cancelSkinTonePreview,beginSkinToneSession,beginGarmentColorSession,previewGarmentColor,cancelGarmentColorPreview,applyGarmentColor,beginGarmentTapMode,beginHairColorSession,previewHairColor,cancelHairColorPreview,applyHairColor};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();
 })();

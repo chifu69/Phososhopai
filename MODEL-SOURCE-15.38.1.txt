@@ -1,4 +1,4 @@
-PHOTO IA 15.38.1 — MODELO LOCAL AI FILL
+PHOTO IA 15.40.0 — MODELO ADVANCED SELECTION
 
 Modelo: MI-GAN ONNX pipeline v2
 Proyecto original: Picsart AI Research — MI-GAN (ICCV 2023)

@@ -1,45 +1,12 @@
-# PHOTO IA 15.38.1 — Local AI Fill
+# PHOTO IA 15.40.0 — Advanced Selection
 
-Añade eliminación/reconstrucción de objetos 100% local durante la inferencia con MI-GAN + ONNX Runtime Web. La primera vez instala el modelo oficial (~28 MB) y el runtime ONNX/WASM necesario (~14 MB); PHOTO IA intenta conservarlos en caché para reutilizarlos. La selección se pinta en rojo, se procesa solo una región alrededor del objeto y el resultado se integra con Undo/Redo sin usar Alienware.
+Esta versión sube la pestaña de selección a un nivel más avanzado.
 
-Consulta `CHANGELOG-15.38.1.md`. Pruebas: `node tests/content-aware-math.test.cjs` y `node tests/local-ai-fill-integration.test.cjs`.
+## Novedades
+- botón **🧠 Sujeto HD** para una selección de sujeto con refinado inicial
+- afinado avanzado de máscara con **expandir, encoger, suavizar, invertir y solo principal**
+- estadísticas rápidas de la selección actual
+- integración directa con **AI Fill** y recorte
+- nuevas utilidades expuestas por `PhotoSegmentation` para edición de máscara
 
-## Base conservada: PHOTO IA 15.37.0 — Curvas + Máscara
-
-# PHOTO IA 15.36.1 — Wardrobe Routing Fix
-
-Corrige el enrutamiento de Cambiar ropa sin perder las mejoras de PHOTO IA 15.36.0. `ai-studio.js` reutiliza el detector de intención de `wardrobe-engine.js`, reconoce también "ponme", "vísteme", "pantalones" y "suit", y protege el modo Cambiar fondo cuando una petición mezcla escenario y vestuario.
-
-Prueba de regresión: `node tests/wardrobe-routing.test.cjs`.
-
-## Base: PHOTO IA 15.36.0 — Mejora automática
-
-Analiza la fotografía o aplica directamente la mejora automática de luz, sombras y color. Receta adaptativa con límites para retratos, modo compatible y protección al cambiar de foto durante el proceso.
-
-Consulta `CHANGELOG-15.36.0.md`. Pruebas: `node tests/smart-enhance.test.cjs` y `node tests/garment-recolor.test.cjs`.
-
-## Antecedentes: PHOTO IA 15.35.5 — Garment Detail Refinement
-
-Color de ropa tiñe también las costuras y sombras profundas, con una elevación controlada del negro. Conserva luces, sombras y textura, con protección local para objetos de bolsillo. Se mantiene la cobertura de selfies recortadas de 15.35.2.
-
-Consulta `CHANGELOG-15.35.5.md`. Pruebas locales: `node tests/garment-recolor.test.cjs`.
-
-## Antecedentes: 15.35.2 — Clothing Mask Crop Fix
-
-Esta versión parte de PHOTO IA 15.35.1 y corrige el corte horizontal de **Camisa / Top** visto en selfies y fotos recortadas.
-
-## Color de ropa / Camisa
-- Si la misma máscara de ropa continúa de forma ancha y centrada hasta el borde inferior de la foto, PHOTO IA ahora conserva esa continuación en lugar de cortar siempre cerca de la cadera o en el 56% de la máscara.
-- Si las rodillas/tobillos sí son visibles, se mantiene el límite anatómico para no convertir el pantalón en parte de la camisa.
-- El fallback local también detecta cuándo la prenda se estrecha o se separa como piernas y evita extender la camisa hasta abajo.
-
-## Conservado de 15.35.1
-- Hotfix de selección y color de cabello.
-- Vestido de una sola pieza.
-- Tono de piel natural.
-- Smart, retoque corporal y herramientas creativas sin cambios funcionales intencionales.
-
-## Caché PWA
-La versión actual y la caché son 15.36.0 para que Safari/iPhone cargue los scripts actualizados.
-
-Consulta `CHANGELOG-15.35.2.md` para el detalle técnico.
+Consulta `CHANGELOG-15.40.0.md`.
