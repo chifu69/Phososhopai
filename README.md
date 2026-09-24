@@ -1,8 +1,8 @@
-# PHOTO IA 15.38.0 — Local AI Fill
+# PHOTO IA 15.38.1 — Local AI Fill
 
-Añade eliminación/reconstrucción de objetos 100% local durante la inferencia con MI-GAN + ONNX Runtime Web. La primera vez puede instalar aproximadamente 28 MB del modelo oficial y lo conserva en caché local. La selección se pinta en rojo, se procesa solo una región alrededor del objeto y el resultado se integra con Undo/Redo sin usar Alienware.
+Añade eliminación/reconstrucción de objetos 100% local durante la inferencia con MI-GAN + ONNX Runtime Web. La primera vez instala el modelo oficial (~28 MB) y el runtime ONNX/WASM necesario (~14 MB); PHOTO IA intenta conservarlos en caché para reutilizarlos. La selección se pinta en rojo, se procesa solo una región alrededor del objeto y el resultado se integra con Undo/Redo sin usar Alienware.
 
-Consulta `CHANGELOG-15.38.0.md`. Pruebas: `node tests/content-aware-math.test.cjs` y `node tests/local-ai-fill-integration.test.cjs`.
+Consulta `CHANGELOG-15.38.1.md`. Pruebas: `node tests/content-aware-math.test.cjs` y `node tests/local-ai-fill-integration.test.cjs`.
 
 ## Base conservada: PHOTO IA 15.37.0 — Curvas + Máscara
 

@@ -1,6 +1,6 @@
-PHOTO IA 15.38.0 — LOCAL AI FILL
+PHOTO IA 15.38.1 — LOCAL AI FILL
 
-NUEVO: herramienta AI Fill local con MI-GAN ONNX. La primera preparación del modelo requiere Internet para descargar ~28 MB; después la inferencia funciona en el dispositivo y no usa Alienware.
+NUEVO: herramienta AI Fill local con MI-GAN ONNX. La primera preparación requiere Internet para descargar el modelo (~28 MB) y el runtime ONNX/WASM necesario (~14 MB). Después, la inferencia de AI Fill ocurre en el dispositivo y no usa Alienware.
 
 Uso rápido:
 1. Abre una foto.

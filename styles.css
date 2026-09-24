@@ -811,6 +811,6 @@ body.photoia-pro-ui{overflow-x:hidden}
 .mode-tool[data-canvas-mode="mask"] span{filter:saturate(1.1)}
 @media(max-width:680px){#curves-editor{max-width:240px}}
 
-/* PHOTO IA 15.38.0 — Local AI Fill */
+/* PHOTO IA 15.38.1 — Local AI Fill */
 .aifill-model-row{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);border-radius:15px;background:var(--surface2);margin:10px 0 14px}.aifill-model-status{font-weight:850;color:var(--muted);font-size:.82rem}.aifill-model-status.ready{color:#167446}.aifill-actions{grid-template-columns:2fr 1fr}.aifill-status{margin:12px 0 0;padding:11px 13px;border-radius:13px;background:var(--surface2);color:var(--muted);font-size:.82rem;font-weight:750;line-height:1.4}.aifill-status[data-kind="error"]{color:#b42318;background:#fff1f0}.aifill-status[data-kind="working"]{color:#8a5a00;background:#fff8e6}.aifill-status[data-kind="ready"]{color:#167446;background:#e9fff2}.mode-tool[data-canvas-mode="aifill"] span{filter:saturate(1.2)}
 @media(max-width:650px){.aifill-model-row{align-items:stretch;flex-direction:column}.aifill-actions{grid-template-columns:1fr}.aifill-pane .creative-buttons{grid-template-columns:1fr 1fr}}

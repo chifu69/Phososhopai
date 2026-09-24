@@ -1,20 +1,20 @@
-const CACHE='photo-ia-15-38-0-local-ai-fill';
-const VERSION='15.38.0';
+const CACHE='photo-ia-15-38-1-local-ai-fill';
+const VERSION='15.38.1';
 const CORE=[
- './','./index.html','./styles.css?v=15.38.0','./ui-layout.js?v=15.38.0','./app.js?v=15.38.0',
- './creative-tools.js?v=15.38.0','./curves-tool.js?v=15.38.0','./mask-tool.js?v=15.38.0','./brain.js?v=15.38.0',
- './opencv-engine.js?v=15.38.0','./smart-core.js?v=15.38.0','./wardrobe-engine.js?v=15.38.0','./ai-studio.js?v=15.38.0',
- './vision.js?v=15.38.0','./onnx-engine.js?v=15.38.0','./content-aware-ai.js?v=15.38.0','./segmentation.js?v=15.38.0','./segmentation-worker.js?v=15.38.0','./body-retouch.js?v=15.38.0','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png'
+ './','./index.html','./styles.css?v=15.38.1','./ui-layout.js?v=15.38.1','./app.js?v=15.38.1',
+ './creative-tools.js?v=15.38.1','./curves-tool.js?v=15.38.1','./mask-tool.js?v=15.38.1','./brain.js?v=15.38.1',
+ './opencv-engine.js?v=15.38.1','./smart-core.js?v=15.38.1','./wardrobe-engine.js?v=15.38.1','./ai-studio.js?v=15.38.1',
+ './vision.js?v=15.38.1','./onnx-engine.js?v=15.38.1','./content-aware-ai.js?v=15.38.1','./segmentation.js?v=15.38.1','./segmentation-worker.js?v=15.38.1','./body-retouch.js?v=15.38.1','./manifest.webmanifest','./assets/icons/icon-192.png','./assets/icons/icon-512.png'
 ];
 const ASSETS=[
  {local:'./assets/mediapipe/tasks-vision.esm.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35/+esm',name:'MediaPipe Tasks Vision 0.10.35',required:false,timeout:30000},
- {local:'./assets/vendor/fabric.min.js?v=15.38.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
- {local:'./assets/vendor/cropper.min.js?v=15.38.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
- {local:'./assets/vendor/cropper.min.css?v=15.38.0',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
- {local:'./assets/vendor/tf.min.js?v=15.38.0',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
- {local:'./assets/vendor/coco-ssd.min.js?v=15.38.0',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
- {local:'./assets/vendor/opencv.js?v=15.38.0',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
- {local:'./assets/mediapipe/vision_bundle.mjs?v=15.38.0',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
+ {local:'./assets/vendor/fabric.min.js?v=15.38.1',remote:'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js',name:'Editor de capas',required:true},
+ {local:'./assets/vendor/cropper.min.js?v=15.38.1',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js',name:'Herramienta de recorte',required:true},
+ {local:'./assets/vendor/cropper.min.css?v=15.38.1',remote:'https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css',name:'Estilos de recorte',required:true},
+ {local:'./assets/vendor/tf.min.js?v=15.38.1',remote:'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js',name:'TensorFlow móvil',required:false},
+ {local:'./assets/vendor/coco-ssd.min.js?v=15.38.1',remote:'https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js',name:'Detector de objetos',required:false},
+ {local:'./assets/vendor/opencv.js?v=15.38.1',remote:'https://docs.opencv.org/4.x/opencv.js',name:'OpenCV avanzado',required:false},
+ {local:'./assets/mediapipe/vision_bundle.mjs?v=15.38.1',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/vision_bundle.mjs',name:'MediaPipe Vision ESM 1.0.1',required:false,timeout:30000},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.js',name:'WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_internal.wasm',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_internal.wasm',name:'Motor WASM SIMD',required:false},
  {local:'./assets/mediapipe/wasm/vision_wasm_nosimd_internal.js',remote:'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.0.1/wasm/vision_wasm_nosimd_internal.js',name:'WASM compatible',required:false},
@@ -26,7 +26,7 @@ const ASSETS=[
  {local:'./assets/models/selfie_multiclass_256x256.tflite',remote:'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_multiclass_256x256/float32/latest/selfie_multiclass_256x256.tflite',name:'MediaPipe multiclase: cabello, piel, rostro y ropa',required:false,timeout:60000},
  {local:'./assets/models/face_landmarker.task',remote:'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/latest/face_landmarker.task',name:'Face Landmarker',required:false,timeout:60000},
  {local:'./assets/models/pose_landmarker_lite.task',remote:'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task',name:'Pose Landmarker Lite',required:false,timeout:60000},
- {local:'./assets/vendor/ort.min.js?v=15.38.0',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort.min.js',name:'ONNX Runtime Web',required:false,timeout:30000},
+ {local:'./assets/vendor/ort.min.js?v=15.38.1',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort.min.js',name:'ONNX Runtime Web',required:false,timeout:30000},
  {local:'./assets/onnx/ort-wasm-simd-threaded.mjs',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort-wasm-simd-threaded.mjs',name:'ONNX WASM loader',required:false,timeout:30000},
  {local:'./assets/onnx/ort-wasm-simd-threaded.wasm',remote:'https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort-wasm-simd-threaded.wasm',name:'ONNX WASM runtime',required:false,timeout:30000},
  {local:'./assets/models/migan_pipeline_v2.onnx',remote:'https://huggingface.co/andraniksargsyan/migan/resolve/main/migan_pipeline_v2.onnx',name:'MI-GAN Local AI Fill (28 MB)',required:false,timeout:240000}
@@ -42,7 +42,10 @@ async function cacheRemote(asset){
  const response=await fetchWithTimeout(asset.remote,asset.timeout|| (asset.required?25000:12000));
  if(!response.ok) throw new Error(`${response.status} ${asset.remote}`);
  const cache=await caches.open(CACHE);
+ // Keep both aliases: PHOTO IA's same-origin virtual path and the original
+ // CDN URL used by ORT dynamic module imports on Safari/iOS.
  await cache.put(localKey(asset.local),response.clone());
+ try{await cache.put(asset.remote,response.clone())}catch(_){ }
 }
 async function notify(data){
  const clients=await self.clients.matchAll({includeUncontrolled:true,type:'window'});
@@ -75,6 +78,20 @@ self.addEventListener('message',e=>{
 self.addEventListener('fetch',e=>{
  if(e.request.method!=='GET') return;
  const url=new URL(e.request.url);
+ const remoteAsset=ASSETS.find(a=>a.remote===e.request.url);
+ if(remoteAsset){
+  e.respondWith((async()=>{
+   const cache=await caches.open(CACHE);
+   const hit=await cache.match(e.request);
+   if(hit)return hit;
+   try{
+    const fresh=await fetchWithTimeout(remoteAsset.remote,remoteAsset.timeout||(remoteAsset.required?25000:12000));
+    if(fresh.ok){try{await cache.put(e.request,fresh.clone())}catch(_){ }return fresh}
+    return fresh;
+   }catch(err){return new Response('Offline resource unavailable',{status:503,headers:{'Content-Type':'text/plain'}})}
+  })());
+  return;
+ }
  if(url.origin!==location.origin) return;
  e.respondWith((async()=>{
   const cache=await caches.open(CACHE);

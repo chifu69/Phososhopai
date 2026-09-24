@@ -1,9 +1,11 @@
 (() => {
 'use strict';
-const VERSION='1.1-ort-web-migan';
-const SCRIPT='./assets/vendor/ort.min.js?v=15.38.0';
-const REMOTE='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/ort.min.js';
-const WASM_PATH='./assets/onnx/';
+const VERSION='1.1.1-ort-web-migan-ios';
+const SCRIPT='./assets/vendor/ort.min.js?v=15.38.1';
+const ORT_DIST='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/';
+const REMOTE=ORT_DIST+'ort.min.js';
+const ORT_MJS=ORT_DIST+'ort-wasm-simd-threaded.mjs';
+const ORT_WASM=ORT_DIST+'ort-wasm-simd-threaded.wasm';
 const MODEL_LOCAL='./assets/models/migan_pipeline_v2.onnx';
 const MODEL_REMOTE='https://huggingface.co/andraniksargsyan/migan/resolve/main/migan_pipeline_v2.onnx';
 const MODEL_SHA256='6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b';
@@ -24,9 +26,14 @@ async function load(){
 }
 function configure(){
   if(!window.ort?.env)return;
+  // iOS/Safari can fail when the ORT glue module is resolved through a newly
+  // activated service worker. Point ORT at absolute, version-matched CDN URLs
+  // for its .mjs + .wasm pair. The service worker caches these exact URLs for
+  // later reuse, while inference itself still runs entirely on-device.
   window.ort.env.wasm.numThreads=1;
   window.ort.env.wasm.simd=true;
-  window.ort.env.wasm.wasmPaths=WASM_PATH;
+  window.ort.env.wasm.proxy=false;
+  window.ort.env.wasm.wasmPaths={mjs:ORT_MJS,wasm:ORT_WASM};
   lastError='';
 }
 async function healthCheck(){try{await load();return {...status(),ok:true};}catch(err){return {...status(),ok:false,error:String(err?.message||err)}}}

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.38.0';
+const VERSION='15.38.1';
 
 // ---------------------------------------------------------------------------
 // Pure math: monotone cubic Hermite interpolation (Fritsch–Carlson).

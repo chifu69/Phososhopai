@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.38.0';
+const VERSION='15.38.1';
 
 // ---------------------------------------------------------------------------
 // Pure helpers. Kept DOM-free so regression tests can require this file.
