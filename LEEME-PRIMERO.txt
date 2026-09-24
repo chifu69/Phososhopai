@@ -1,3 +1,14 @@
+PHOTO IA 15.38.0 — LOCAL AI FILL
+
+NUEVO: herramienta AI Fill local con MI-GAN ONNX. La primera preparación del modelo requiere Internet para descargar ~28 MB; después la inferencia funciona en el dispositivo y no usa Alienware.
+
+Uso rápido:
+1. Abre una foto.
+2. En el lienzo elige ✨ AI Fill.
+3. Pinta de rojo lo que quieres quitar.
+4. Pulsa “Aplicar AI Fill local”.
+5. Si no te gusta, usa Undo.
+
 PHOTO IA 15.36.1 — WARDROBE ROUTING FIX
 
 Este paquete NO reemplaza PHOTO IA con la vieja base 15.1.

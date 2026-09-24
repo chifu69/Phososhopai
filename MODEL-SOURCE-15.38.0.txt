@@ -1,0 +1,16 @@
+PHOTO IA 15.38.0 — MODELO LOCAL AI FILL
+
+Modelo: MI-GAN ONNX pipeline v2
+Proyecto original: Picsart AI Research — MI-GAN (ICCV 2023)
+Licencia del proyecto: MIT
+Modelo ONNX preconvertido: andraniksargsyan/migan — migan_pipeline_v2.onnx
+Tamaño aproximado: 28.1 MB
+SHA-256 esperado: 6f1f3530a1a2324b19752018ce756088b07973cda8d7d890034ace5c8a48c40b
+Fuente configurada en PHOTO IA:
+https://huggingface.co/andraniksargsyan/migan/resolve/main/migan_pipeline_v2.onnx
+
+Funcionamiento:
+- La primera preparación puede descargar el modelo desde esa fuente.
+- PHOTO IA verifica el SHA-256 cuando Web Crypto está disponible.
+- El modelo queda guardado en CacheStorage local del navegador.
+- Las fotos y máscaras no se envían al modelo remoto: la inferencia ocurre en ONNX Runtime Web/WASM dentro del dispositivo.

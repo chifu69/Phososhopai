@@ -1,3 +1,11 @@
+# PHOTO IA 15.38.0 — Local AI Fill
+
+Añade eliminación/reconstrucción de objetos 100% local durante la inferencia con MI-GAN + ONNX Runtime Web. La primera vez puede instalar aproximadamente 28 MB del modelo oficial y lo conserva en caché local. La selección se pinta en rojo, se procesa solo una región alrededor del objeto y el resultado se integra con Undo/Redo sin usar Alienware.
+
+Consulta `CHANGELOG-15.38.0.md`. Pruebas: `node tests/content-aware-math.test.cjs` y `node tests/local-ai-fill-integration.test.cjs`.
+
+## Base conservada: PHOTO IA 15.37.0 — Curvas + Máscara
+
 # PHOTO IA 15.36.1 — Wardrobe Routing Fix
 
 Corrige el enrutamiento de Cambiar ropa sin perder las mejoras de PHOTO IA 15.36.0. `ai-studio.js` reutiliza el detector de intención de `wardrobe-engine.js`, reconoce también "ponme", "vísteme", "pantalones" y "suit", y protege el modo Cambiar fondo cuando una petición mezcla escenario y vestuario.

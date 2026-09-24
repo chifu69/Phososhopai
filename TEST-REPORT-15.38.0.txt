@@ -1,0 +1,58 @@
+PHOTO IA 15.38.0 — TEST REPORT
+Generated: 2026-09-24T19:02:54Z
+
+JavaScript syntax:
+  PASS UPDATE-PHOTO-IA-15.36.1.js
+  PASS ai-studio.js
+  PASS app.js
+  PASS body-retouch.js
+  PASS brain.js
+  PASS connection-router.js
+  PASS content-aware-ai.js
+  PASS creative-tools.js
+  PASS curves-tool.js
+  PASS mask-tool.js
+  PASS onnx-engine.js
+  PASS opencv-engine.js
+  PASS segmentation-worker.js
+  PASS segmentation.js
+  PASS smart-core.js
+  PASS sw.js
+  PASS ui-layout.js
+  PASS vision.js
+  PASS wardrobe-engine.js
+  PASS tests/content-aware-math.test.cjs
+  PASS tests/curves-math.test.cjs
+  PASS tests/garment-recolor.test.cjs
+  PASS tests/local-ai-fill-integration.test.cjs
+  PASS tests/smart-enhance.test.cjs
+  PASS tests/wardrobe-routing.test.cjs
+
+Regression tests:
+--- tests/content-aware-math.test.cjs ---
+content-aware-math.test.cjs: OK
+--- tests/local-ai-fill-integration.test.cjs ---
+local-ai-fill-integration.test.cjs: OK
+--- tests/curves-math.test.cjs ---
+curves-math.test.cjs: OK (identity, endpoints, linearity, monotonicity, no-dip, compose, identity-state detection)
+--- tests/wardrobe-routing.test.cjs ---
+wardrobe-routing.test.cjs: OK
+--- tests/garment-recolor.test.cjs ---
+PASS: texture, neutral dyes, pocket objects, mask immutability, crop-edge coverage, zero intensity, renderer
+PASS: black seams, curved collar, tapered folds, hue/floor bounds, midtones, neutral radio, dark pen, neckline feather
+PASS: soft object boundaries, sampling alignment, compact fabric shadows and rendered hue
+--- tests/smart-enhance.test.cjs ---
+[Smart] Using compatible enhancement Error: simulated OpenCV failure
+    at Object.enhanceCurrent (/mnt/data/photoia_1538/tests/smart-enhance.test.cjs:25:68)
+    at Object.apply (evalmachine.<anonymous>:10:44)
+    at /mnt/data/photoia_1538/tests/smart-enhance.test.cjs:26:26
+    at Object.<anonymous> (/mnt/data/photoia_1538/tests/smart-enhance.test.cjs:32:3)
+    at Module._compile (node:internal/modules/cjs/loader:1730:14)
+    at Object..js (node:internal/modules/cjs/loader:1895:10)
+    at Module.load (node:internal/modules/cjs/loader:1465:32)
+    at Function._load (node:internal/modules/cjs/loader:1282:12)
+    at TracingChannel.traceSync (node:diagnostics_channel:322:14)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:235:24)
+PASS: adaptive exposure, balanced photos, highlights, monotone tone, portrait limits, fallback, duplicate click and stale-photo guards
+
+RESULT: PASS

@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.37.0';
+const VERSION='15.38.0';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -24,7 +24,7 @@ function processing(on,label='Procesando…'){
    window.scrollTo(0,state.processingScrollY||0);
  }
 }
-function setEnabled(enabled){document.querySelectorAll('[data-command],[data-preset],#command-input,#command-btn,#compare-btn,#reset-btn,#new-photo-btn,#rotate-left,#rotate-right,#flip-x,#crop-btn,#add-text,#add-sticker,#download-btn,.slider-list input,#create-text,#draw-pencil,#draw-marker,#draw-off,#clear-drawing,[data-add-shape],[data-sticker],[data-text-preset],[data-canvas-mode]').forEach(el=>el.disabled=!enabled)}
+function setEnabled(enabled){document.querySelectorAll('[data-command],[data-preset],#command-input,#command-btn,#compare-btn,#reset-btn,#new-photo-btn,#rotate-left,#rotate-right,#flip-x,#crop-btn,#add-text,#add-sticker,#download-btn,.slider-list input,#create-text,#draw-pencil,#draw-marker,#draw-off,#clear-drawing,[data-add-shape],[data-sticker],[data-text-preset],[data-canvas-mode],[data-aifill-brush],#aifill-apply,#aifill-clear,#aifill-cancel,#aifill-brush-size,#aifill-expand,#aifill-feather').forEach(el=>el.disabled=!enabled)}
 function normalize(text){return String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim()}
 function getPhotoDisplayRatio(){
  const p=state.photo;
