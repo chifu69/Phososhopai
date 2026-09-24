@@ -806,3 +806,7 @@ body.photoia-pro-ui{overflow-x:hidden}
 .body-retouch-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}.body-retouch-actions button{min-height:52px;font-weight:800}
 @media(max-width:680px){.body-retouch-box{padding:14px}.body-retouch-grid,.body-retouch-actions{grid-template-columns:1fr}}
 @media(prefers-color-scheme:dark){.body-retouch-box{background:linear-gradient(145deg,rgba(25,35,47,.96),rgba(34,28,43,.96))}}
+.curves-editor-wrap{display:flex;justify-content:center;margin-top:14px}
+#curves-editor{width:100%;max-width:276px;aspect-ratio:1/1;border:1px solid var(--line);border-radius:18px;background:var(--surface2);touch-action:none;cursor:crosshair}
+.mode-tool[data-canvas-mode="mask"] span{filter:saturate(1.1)}
+@media(max-width:680px){#curves-editor{max-width:240px}}

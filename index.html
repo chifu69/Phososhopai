@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 15.36.0 con selección estable, Smart resiliente y retoque corporal sutil.">
+  <meta name="description" content="PHOTO IA 15.37.0 con selección estable, Smart resiliente y retoque corporal sutil.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="./assets/vendor/cropper.min.css?v=15.36.0" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css'">
-  <link rel="stylesheet" href="styles.css?v=15.36.0">
-  <title>PHOTO IA 15.36.0 — Dress + Natural Skin</title>
+  <link rel="stylesheet" href="./assets/vendor/cropper.min.css?v=15.37.0" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css'">
+  <link rel="stylesheet" href="styles.css?v=15.37.0">
+  <title>PHOTO IA 15.37.0 — Dress + Natural Skin</title>
 </head>
 <body>
 <div class="app-shell">
@@ -110,6 +110,7 @@
         <button class="mode-tool" data-canvas-mode="sticker" type="button" disabled><span>😀</span><small>Sticker</small></button>
         <button class="mode-tool" data-canvas-mode="text" type="button" disabled><span>🔤</span><small>Texto</small></button>
         <button class="mode-tool" data-canvas-mode="shape" type="button" disabled><span>⬜</span><small>Forma</small></button>
+        <button class="mode-tool" data-canvas-mode="mask" type="button" disabled><span>🩹</span><small>Máscara</small></button>
       </div>
       <p id="mode-help" class="mode-help">Modo Mover: toca un objeto para seleccionarlo, moverlo, rotarlo o cambiar su tamaño.</p>
       <div id="canvas-wrap" class="canvas-wrap">
@@ -156,6 +157,20 @@
       </div>
     </section>
 
+    <section class="panel curves-panel">
+      <div class="section-heading"><div><p class="eyebrow">CURVAS</p><h2>Control de tono por canal</h2></div><button id="curves-reset" class="text-btn">Restablecer</button></div>
+      <div class="creative-tabs" role="tablist">
+        <button class="creative-tab active" data-curve-channel="rgb">RGB</button>
+        <button class="creative-tab" data-curve-channel="r">R</button>
+        <button class="creative-tab" data-curve-channel="g">G</button>
+        <button class="creative-tab" data-curve-channel="b">B</button>
+      </div>
+      <div class="curves-editor-wrap">
+        <canvas id="curves-editor" width="276" height="276"></canvas>
+      </div>
+      <p class="mode-help">Toca la línea para agregar un punto y arrástralo. Doble toque sobre un punto para quitarlo.</p>
+    </section>
+
     <section class="panel transform">
       <div class="section-heading"><div><p class="eyebrow">TRANSFORMAR</p><h2>Encuadre y diseño</h2></div></div>
       <div class="button-row">
@@ -169,13 +184,14 @@
     <section class="panel creative-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CREATIVE STUDIO</p><h2>Texto, dibujo y formas</h2></div>
-        <span class="engine-badge">7.3.0</span>
+        <span class="engine-badge">7.4.0</span>
       </div>
       <div class="creative-tabs" role="tablist">
         <button class="creative-tab active" data-tool-tab="text">🔤 Texto</button>
         <button class="creative-tab" data-tool-tab="draw">🖌 Dibujar</button>
         <button class="creative-tab" data-tool-tab="shapes">⬜ Formas</button>
         <button class="creative-tab" data-tool-tab="stickers">😀 Stickers</button>
+        <button class="creative-tab" data-tool-tab="mask">🩹 Máscara</button>
       </div>
 
       <div class="creative-pane active" data-tool-pane="text">
@@ -246,6 +262,22 @@
         <div id="sticker-grid" class="sticker-grid">
           <button data-sticker="😀" disabled>😀</button><button data-sticker="😂" disabled>😂</button><button data-sticker="😎" disabled>😎</button><button data-sticker="❤️" disabled>❤️</button><button data-sticker="🔥" disabled>🔥</button><button data-sticker="⭐" disabled>⭐</button><button data-sticker="👍" disabled>👍</button><button data-sticker="🤖" disabled>🤖</button><button data-sticker="💯" disabled>💯</button><button data-sticker="🎉" disabled>🎉</button><button data-sticker="⚠️" disabled>⚠️</button><button data-sticker="✅" disabled>✅</button>
         </div>
+      </div>
+
+      <div class="creative-pane" data-tool-pane="mask">
+        <p class="mode-help">Selecciona una capa en Mover (o deja ninguna para usar la fotografía) y pulsa 🩹 Máscara arriba del lienzo para empezar a pintar.</p>
+        <div class="button-row creative-buttons">
+          <button data-mask-brush="hide" class="secondary active">🖌 Ocultar</button>
+          <button data-mask-brush="reveal" class="secondary">🩹 Revelar</button>
+          <button id="mask-invert" class="secondary" disabled>🔄 Invertir</button>
+          <button id="mask-reset" class="secondary danger" disabled>🗑 Restablecer</button>
+        </div>
+        <div class="tool-grid">
+          <label>Tamaño<input id="mask-brush-size" type="range" min="5" max="200" value="40"><output id="mask-brush-size-out">40</output></label>
+          <label>Pluma<input id="mask-brush-feather" type="range" min="0" max="100" value="60"><output id="mask-brush-feather-out">60%</output></label>
+          <label>Opacidad<input id="mask-brush-opacity" type="range" min="10" max="100" value="100"><output id="mask-brush-opacity-out">100%</output></label>
+        </div>
+        <button id="mask-remove" class="text-btn" disabled>Quitar máscara por completo</button>
       </div>
 
       <div class="selected-properties">
@@ -401,7 +433,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 15.36.0 • Dress + Natural Skin</footer>
+  <footer>PHOTO IA 15.37.0 • Wardrobe Routing Fix</footer>
 </div>
 
 <div id="local-install" class="local-install" hidden>
@@ -419,31 +451,33 @@
 <div id="crop-modal" class="crop-modal" hidden>
   <div class="crop-card"><div class="modal-head"><h2>Recorte profesional</h2><button id="crop-close" class="icon-btn">×</button></div><div class="crop-stage"><img id="crop-image" alt="Imagen para recortar"></div><div class="crop-ratios"><button data-ratio="NaN">Libre</button><button data-ratio="1">1:1</button><button data-ratio="0.8">4:5</button><button data-ratio="1.7777778">16:9</button></div><button id="crop-apply" class="primary wide">Aplicar recorte</button></div>
 </div>
-<div id="pwa-version-badge" class="pwa-version-badge" aria-label="Versión de PHOTO IA">PHOTO IA v15.36.0 · Dress + Natural Skin</div>
+<div id="pwa-version-badge" class="pwa-version-badge" aria-label="Versión de PHOTO IA">PHOTO IA v15.37.0 · Wardrobe Routing Fix</div>
 <div id="processing" class="processing" hidden><span></span><b>Procesando…</b><button id="processing-cancel" class="processing-cancel" hidden>Cancelar</button></div>
 <div id="toast" class="toast" role="status"></div>
 
-  <script src="ui-layout.js?v=15.36.0"></script>
-<script src="./assets/vendor/fabric.min.js?v=15.36.0" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js'"></script>
-<script src="./assets/vendor/cropper.min.js?v=15.36.0" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js'"></script>
-<script src="app.js?v=15.36.0"></script>
-<script src="creative-tools.js?v=15.36.0"></script>
-<script src="brain.js?v=15.36.0"></script>
-<script src="opencv-engine.js?v=15.36.0"></script>
-<script src="smart-core.js?v=15.36.0"></script>
-<script src="connection-router.js?v=15.36.0"></script>
-<script src="wardrobe-engine.js?v=15.36.0"></script>
-<script src="ai-studio.js?v=15.36.0"></script>
-<script src="./assets/vendor/tf.min.js?v=15.36.0" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js'"></script>
-<script src="./assets/vendor/coco-ssd.min.js?v=15.36.0" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'"></script>
-<script src="vision.js?v=15.36.0"></script>
-<script src="onnx-engine.js?v=15.36.0"></script>
-<script src="segmentation.js?v=15.36.0"></script>
-<script src="body-retouch.js?v=15.36.0"></script>
-<script async src="./assets/vendor/opencv.js?v=15.36.0" onload="window.dispatchEvent(new Event('opencv-script-loaded'))" onerror="this.onerror=null;this.src='https://docs.opencv.org/4.x/opencv.js'"></script>
+  <script src="ui-layout.js?v=15.37.0"></script>
+<script src="./assets/vendor/fabric.min.js?v=15.37.0" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js'"></script>
+<script src="./assets/vendor/cropper.min.js?v=15.37.0" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js'"></script>
+<script src="app.js?v=15.37.0"></script>
+<script src="creative-tools.js?v=15.37.0"></script>
+<script src="curves-tool.js?v=15.37.0"></script>
+<script src="mask-tool.js?v=15.37.0"></script>
+<script src="brain.js?v=15.37.0"></script>
+<script src="opencv-engine.js?v=15.37.0"></script>
+<script src="smart-core.js?v=15.37.0"></script>
+<script src="connection-router.js?v=15.37.0"></script>
+<script src="wardrobe-engine.js?v=15.37.0"></script>
+<script src="ai-studio.js?v=15.37.0"></script>
+<script src="./assets/vendor/tf.min.js?v=15.37.0" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js'"></script>
+<script src="./assets/vendor/coco-ssd.min.js?v=15.37.0" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'"></script>
+<script src="vision.js?v=15.37.0"></script>
+<script src="onnx-engine.js?v=15.37.0"></script>
+<script src="segmentation.js?v=15.37.0"></script>
+<script src="body-retouch.js?v=15.37.0"></script>
+<script async src="./assets/vendor/opencv.js?v=15.37.0" onload="window.dispatchEvent(new Event('opencv-script-loaded'))" onerror="this.onerror=null;this.src='https://docs.opencv.org/4.x/opencv.js'"></script>
 <script>
 (() => {
-  const VERSION='15.36.0';
+  const VERSION='15.37.0';
   const box=document.getElementById('local-install');
   const bar=document.getElementById('local-install-bar');
   const percent=document.getElementById('local-install-percent');

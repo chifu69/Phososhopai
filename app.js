@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.36.0';
+const VERSION='15.37.0';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -91,7 +91,7 @@ function rehydratePhotoAdjustments(){
  const a=state.photo.photoAdjustments||{};
  sliders.forEach(id=>{if(!(id in a))return;const v=Number(a[id])||0;const el=$(id),out=$(`${id}-out`);if(el)el.value=String(v);if(out)out.textContent=String(v)});
 }
-function restoreJSON(json){state.canvas.loadFromJSON(json,()=>{state.photo=state.canvas.getObjects().find(o=>o.photoRole==='main')||null;rehydratePhotoAdjustments();state.canvas.requestRenderAll();updateHistoryButtons();renderLayers()})}
+function restoreJSON(json){state.canvas.loadFromJSON(json,()=>{state.photo=state.canvas.getObjects().find(o=>o.photoRole==='main')||null;rehydratePhotoAdjustments();state.canvas.requestRenderAll();updateHistoryButtons();renderLayers();document.dispatchEvent(new CustomEvent('photoia:photo-replaced',{detail:{preserveFilters:true}}))})}
 function undo(){if(state.history.length<2)return;state.future.push(state.history.pop());restoreJSON(state.history[state.history.length-1])}
 function redo(){if(!state.future.length)return;const next=state.future.pop();state.history.push(next);restoreJSON(next)}
 function restoreHistoryIndex(index){
@@ -316,7 +316,12 @@ async function applyProcessedImageDataUrl(dataUrl,commit=true,guard=null,options
  if(preserveFilters&&next.filters.length)next.applyFilters();
  state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();
  if(preserveFilters)rehydratePhotoAdjustments();else resetSliderUI();
- normalizePhotoVisualState();state.canvas.requestRenderAll();if(commit)snapshot();return true;
+ normalizePhotoVisualState();state.canvas.requestRenderAll();if(commit)snapshot();
+ // Lets tools that keep their own UI state in sync with state.photo (e.g. the
+ // curves editor) know the underlying fabric object instance was swapped,
+ // whether or not its filters/adjustments carried over.
+ document.dispatchEvent(new CustomEvent('photoia:photo-replaced',{detail:{preserveFilters}}));
+ return true;
 }
 
 async function applyPreset(name){
@@ -531,7 +536,11 @@ window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv
 window.PhotoIA={
   get state(){return state},
   snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,restoreJSON,restoreHistoryIndex,undo,redo,reset,download,
-  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,exportPhotoDataUrl,getPhotoAnalysisCanvas,getOriginalAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand
+  setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,exportPhotoDataUrl,getPhotoAnalysisCanvas,getOriginalAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand,
+  // Exposed so curves-tool.js can compose its LUT-based filter into the same
+  // per-photo filter list (keyed by __key) that brightness/contrast/etc. use,
+  // instead of duplicating filter-stack management in a second place.
+  replaceFilter,getFilters
 };
 document.addEventListener('DOMContentLoaded',init);
 })();

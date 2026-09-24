@@ -2,7 +2,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const STORE='photoia-ai-studio-v4';
-const ENGINE_VERSION='15.34';
+const ENGINE_VERSION='15.36.1';
 const SAME_ORIGIN=((location.protocol==='https:'&&location.port==='8443')||(location.protocol==='http:'&&location.port==='8189'))?location.origin:'';
 const TAILSCALE_URL='https://100.79.114.52:8443';
 const state={main:null,reference:null,controller:null,history:[],settings:{url:SAME_ORIGIN,token:'PHOTOIA-LOCAL-2026'},activeUrl:'',online:false,activeRouteKind:'',mode:'image_edit'};
@@ -152,8 +152,13 @@ function normalizedText(value){
 function classifyEdit(prompt){
  const t=normalizedText(prompt);
  if(state.mode==='portrait_id')return 'portrait_id';
- const clothing=/\b(ropa|camisa|playera|pantalon|vestido|traje|chaqueta|chamarra|abrigo|sueter|sudadera|uniforme|zapatos|botas|gorra|sombrero|ponme|visteme|cambia.*ropa|wear|shirt|pants|dress|jacket|coat|sweater|outfit|uniform|shoes|boots|hat)\b/.test(t);
- const scene=/\b(fondo|paisaje|playa|alaska|nieve|montana|bosque|ciudad|calle|atardecer|amanecer|desierto|campo|oficina|estudio|background|beach|snow|mountain|forest|city|sunset|desert|landscape)\b/.test(t)||state.mode==='replace_background';
+ const wardrobe=window.PhotoWardrobeEngine;
+ const clothing=typeof wardrobe?.hasClothingIntent==='function'
+  ? wardrobe.hasClothingIntent(prompt)
+  : /\b(ropa|camisa|playera|pantalon|pantalones|vestido|traje|chaqueta|chamarra|abrigo|sueter|sudadera|uniforme|zapatos|botas|gorra|sombrero|ponme|visteme|cambia.*ropa|wear|shirt|pants|dress|suit|jacket|coat|sweater|outfit|uniform|shoes|boots|hat)\b/.test(t);
+ const scene=(typeof wardrobe?.hasSceneIntent==='function'
+  ? wardrobe.hasSceneIntent(prompt)
+  : /\b(fondo|paisaje|playa|alaska|nieve|montana|bosque|ciudad|calle|atardecer|amanecer|desierto|campo|oficina|estudio|background|beach|snow|mountain|forest|city|sunset|desert|landscape)\b/.test(t))||state.mode==='replace_background';
  if(scene&&clothing)return 'scene_and_wardrobe';
  if(scene)return 'background_only';
  if(clothing)return 'wardrobe_only';

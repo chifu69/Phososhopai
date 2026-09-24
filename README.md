@@ -1,4 +1,10 @@
-# PHOTO IA 15.36.0 — Mejora automática
+# PHOTO IA 15.36.1 — Wardrobe Routing Fix
+
+Corrige el enrutamiento de Cambiar ropa sin perder las mejoras de PHOTO IA 15.36.0. `ai-studio.js` reutiliza el detector de intención de `wardrobe-engine.js`, reconoce también "ponme", "vísteme", "pantalones" y "suit", y protege el modo Cambiar fondo cuando una petición mezcla escenario y vestuario.
+
+Prueba de regresión: `node tests/wardrobe-routing.test.cjs`.
+
+## Base: PHOTO IA 15.36.0 — Mejora automática
 
 Analiza la fotografía o aplica directamente la mejora automática de luz, sombras y color. Receta adaptativa con límites para retratos, modo compatible y protección al cambiar de foto durante el proceso.
 
