@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>PHOTO IA ONNX LAB 1.0 — Hair & Clothing Recolor</title>
+<link rel="stylesheet" href="onnx-lab.css?v=1.0.0">
+</head>
+<body>
+<div class="shell">
+  <div class="topbar">
+    <div class="brand"><h1>PHOTO IA</h1><p>Local experimental model laboratory</p></div>
+    <div class="lab-badge">🧪 ONNX LAB 1.0</div>
+  </div>
+  <div class="warning"><strong>EXPERIMENTAL — Does not modify PHOTO IA stable.</strong> This page is completely independent. Delete the ONNX-LAB files to remove it.</div>
+
+  <div class="grid">
+    <aside class="panel stack">
+      <h2>Experiment</h2>
+      <label class="file-btn primary">📷 Open Photo<input id="file-input" type="file" accept="image/*"></label>
+
+      <div class="mode-grid">
+        <button id="mode-hair" data-mode="hair" class="active" disabled>💇 Hair Recolor</button>
+        <button id="mode-clothing" data-mode="clothing" disabled>👕 Clothing Recolor</button>
+      </div>
+
+      <div id="clothing-regions" class="region-grid" hidden>
+        <button data-region="upper" class="active" disabled>Upper garment</button>
+        <button data-region="lower" disabled>Lower garment</button>
+        <button data-region="dress" disabled>Dress</button>
+        <button data-region="shoes" disabled>Shoes</button>
+        <button data-region="auto" disabled style="grid-column:1/-1">Automatic garment detection</button>
+      </div>
+
+      <label class="field">Target color
+        <div class="target-row"><input id="target-text" value="#d52f45" spellcheck="false"><input id="target-color" type="color" value="#d52f45"></div>
+      </label>
+      <div class="preset-row" aria-label="Color presets">
+        <button class="swatch" data-color="#111111" style="background:#111"></button>
+        <button class="swatch" data-color="#6f412c" style="background:#6f412c"></button>
+        <button class="swatch" data-color="#d59a52" style="background:#d59a52"></button>
+        <button class="swatch" data-color="#d52f45" style="background:#d52f45"></button>
+        <button class="swatch" data-color="#2d63d8" style="background:#2d63d8"></button>
+        <button class="swatch" data-color="#7651d6" style="background:#7651d6"></button>
+        <button class="swatch" data-color="#e9e6dd" style="background:#e9e6dd"></button>
+      </div>
+
+      <label class="field">Recolor intensity <output id="intensity-out">85%</output><input id="intensity" type="range" min="10" max="100" value="85"></label>
+      <label class="check"><input id="preserve-shadows" type="checkbox" checked> Preserve shadows</label>
+      <label class="check"><input id="preserve-highlights" type="checkbox" checked> Preserve highlights</label>
+      <label class="check"><input id="preserve-texture" type="checkbox" checked> Preserve texture</label>
+
+      <div class="model-box">
+        <div class="model-line"><span>Semantic model</span><strong id="parser-status">Not installed</strong></div>
+        <div class="model-line"><span>Recolor model</span><strong id="recolor-status">Not installed</strong></div>
+        <div class="model-line"><span>ONNX backend</span><strong id="backend-status">Not loaded</strong></div>
+        <div class="progress"><span id="download-bar"></span></div>
+        <p id="download-label" class="small">Models are downloaded only when you prepare/run the LAB.</p>
+      </div>
+
+      <div class="row"><button id="prepare-models">⬇️ Prepare models</button><button id="apply" class="primary" disabled>✨ Apply</button></div>
+      <div class="row"><button id="reset" disabled>↩ Reset</button><button id="save" disabled>💾 Save Result</button></div>
+      <button id="clear-cache" class="danger">Delete LAB model cache</button>
+      <p class="small">The photo itself never leaves this browser. Only ONNX model files are downloaded.</p>
+    </aside>
+
+    <main class="panel viewer">
+      <div class="viewer-head">
+        <h2>Preview</h2>
+        <div class="view-tabs">
+          <button data-view="result" class="active">ONNX Result</button>
+          <button data-view="original">Original</button>
+          <button data-view="mask">Mask</button>
+          <button data-view="compare">Before / After</button>
+        </div>
+      </div>
+      <div id="stage" class="stage"><div class="empty"><strong>Open a photo</strong><p>Then choose Hair or Clothing and run the local ONNX pipeline.</p></div></div>
+      <div id="status" class="status">Ready. No photo loaded.</div>
+    </main>
+  </div>
+
+  <details class="panel">
+    <summary>🧪 Diagnostics</summary>
+    <div class="row" style="margin:10px 0"><button id="show-mask">Show generated mask</button><button id="copy-diagnostics">Copy diagnostics</button></div>
+    <pre id="diagnostics" class="diag">Runtime loaded: no
+Active backend: Not loaded
+Parser model: not installed
+Recolor model: not installed</pre>
+  </details>
+  <div class="footer">PHOTO IA ONNX LAB 1.0 • disposable experiment • no stable PHOTO IA files modified</div>
+</div>
+
+<script src="onnx-lab-models.js?v=1.0.0"></script>
+<script src="onnx-lab-engine.js?v=1.0.0"></script>
+<script src="onnx-lab-recolor.js?v=1.0.0"></script>
+<script src="onnx-lab.js?v=1.0.0"></script>
+</body>
+</html>
