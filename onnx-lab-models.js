@@ -1,66 +1,18 @@
 (() => {
 'use strict';
-
-const MODELS = {
-  parser: {
-    id: 'schp-lip-20-int8-static',
-    kind: 'semantic-segmentation',
-    filename: 'schp-lip-20-int8-static.onnx',
-    source: 'https://huggingface.co/pirocheto/schp-lip-20/resolve/main/onnx/schp-lip-20-int8-static.onnx?download=true',
-    project: 'https://huggingface.co/pirocheto/schp-lip-20',
-    license: 'MIT',
-    approximateBytes: 66 * 1024 * 1024,
-    inputNames: ['pixel_values'],
-    outputNames: ['logits', 'parsing_logits', 'edge_logits'],
-    inputShape: [1, 3, 473, 473],
-    inputType: 'float32',
-    normalization: {
-      range: '[0,1] then channel-wise normalize',
-      meanRGB: [0.406, 0.456, 0.485],
-      stdRGB: [0.225, 0.224, 0.229],
-      note: 'SCHP uses RGB tensors with BGR-indexed training constants.'
-    },
-    expectedImageSize: '473x473 direct bilinear resize',
-    labels: [
-      'Background','Hat','Hair','Glove','Sunglasses','Upper-clothes','Dress','Coat','Socks','Pants',
-      'Jumpsuits','Scarf','Skirt','Face','Left-arm','Right-arm','Left-leg','Right-leg','Left-shoe','Right-shoe'
-    ],
-    regions: {
-      hair: [2],
-      upper: [5, 7],
-      lower: [9, 12],
-      dress: [6, 10],
-      shoes: [18, 19],
-      garmentAuto: [5, 6, 7, 9, 10, 12, 18, 19]
-    },
-    verified: true,
-    notes: 'Real ONNX human parsing model. INT8 static model reported by its project at about 65-66 MB with 99.09% pixel agreement vs FP32.'
-  },
-
-  recolor: {
-    id: 'manga-colorization-v2-fp16',
-    kind: 'guided-colorization-experimental',
-    filename: 'manga-colorize-fp16.onnx',
-    source: 'https://huggingface.co/Faridzar/manga-colorization-v2-onnx/resolve/main/manga-colorize-fp16.onnx?download=true',
-    project: 'https://huggingface.co/Faridzar/manga-colorization-v2-onnx',
-    license: 'MIT',
-    approximateBytes: 61.7 * 1024 * 1024,
-    inputNames: ['input'],
-    outputNames: ['rgb'],
-    inputShape: [1, 5, 'H', 'W'],
-    inputType: 'float32',
-    normalization: {
-      channel0: 'grayscale 0..1',
-      channels1to3: 'color hint ((c - 0.5) / 0.5); zero outside hint region',
-      channel4: 'hint mask 0..1',
-      spatial: 'H and W must be multiples of 32'
-    },
-    expectedImageSize: 'LAB uses 512x512 for iPhone stability',
-    maskFormat: 'semantic mask converted to soft hint mask; only selected region is composited back',
-    verified: true,
-    warning: 'This recolor generator was trained for manga/anime colorization, not photographic hair or garments. It is intentionally used only in this disposable LAB to test transfer to photos. Do not promote to stable PHOTO IA based on architecture alone.'
-  }
+const MB=1024*1024;
+const MODELS={
+parser:{id:'schp-lip-20-int8-static',feature:'Recolor semantic selection',kind:'semantic-segmentation',filename:'schp-lip-20-int8-static.onnx',source:'https://huggingface.co/pirocheto/schp-lip-20/resolve/main/onnx/schp-lip-20-int8-static.onnx?download=true',project:'https://huggingface.co/pirocheto/schp-lip-20',license:'MIT',approximateBytes:66*MB,inputNames:['pixel_values'],outputNames:['logits','parsing_logits','edge_logits'],inputShape:[1,3,473,473],inputType:'float32',normalization:{meanRGB:[0.406,0.456,0.485],stdRGB:[0.225,0.224,0.229],range:'RGB [0,1], channel-wise normalization'},expectedImageSize:'473×473',labels:['Background','Hat','Hair','Glove','Sunglasses','Upper-clothes','Dress','Coat','Socks','Pants','Jumpsuits','Scarf','Skirt','Face','Left-arm','Right-arm','Left-leg','Right-leg','Left-shoe','Right-shoe'],regions:{hair:[2],upper:[5,7],lower:[9,12],dress:[6,10],shoes:[18,19],garmentAuto:[5,6,7,9,10,12,18,19]},verified:true,ready:true,notes:'Same parser used by ONNX LAB 1.0.'},
+recolor:{id:'manga-colorization-v2-fp16',feature:'Hair & clothing recolor',kind:'guided-colorization-experimental',filename:'manga-colorize-fp16.onnx',source:'https://huggingface.co/Faridzar/manga-colorization-v2-onnx/resolve/main/manga-colorize-fp16.onnx?download=true',project:'https://huggingface.co/Faridzar/manga-colorization-v2-onnx',license:'MIT',approximateBytes:61.7*MB,inputNames:['input'],outputNames:['rgb'],inputShape:[1,5,'H','W'],inputType:'float32',normalization:{channel0:'grayscale 0..1',channels1to3:'target color hint mapped to -1..1',channel4:'soft hint mask 0..1',spatial:'H/W multiples of 32'},expectedImageSize:'512×512 on iPhone; 640×640 elsewhere',maskFormat:'soft semantic mask',verified:true,ready:true,warning:'Trained for manga/anime, not photos. Retained because LAB 1.0 produced strong photographic results in the user test; it remains experimental.'},
+superres2x:{id:'real-esrgan-rrdbnet-x2-fp32',feature:'Super Resolution 2×',kind:'super-resolution',filename:'real_esrgan_x2.onnx',source:'https://huggingface.co/SceneWorks/real-esrgan-onnx/resolve/main/real_esrgan_x2.onnx?download=true',project:'https://huggingface.co/SceneWorks/real-esrgan-onnx',license:'BSD-3-Clause',approximateBytes:67.1*MB,inputNames:['input'],outputNames:['output'],inputShape:[1,3,'H','W'],outputShape:[1,3,'2H','2W'],inputType:'float32',normalization:'RGB float32 [0,1]',expectedImageSize:'Dynamic H/W; LAB uses tiled inference',scale:2,tileIOS:128,tileDefault:192,pad:8,verified:true,ready:true},
+superres4x:{id:'real-esrgan-rrdbnet-x4-fp32',feature:'Super Resolution 4×',kind:'super-resolution',filename:'real_esrgan_x4.onnx',source:'https://huggingface.co/SceneWorks/real-esrgan-onnx/resolve/main/real_esrgan_x4.onnx?download=true',project:'https://huggingface.co/SceneWorks/real-esrgan-onnx',license:'BSD-3-Clause',approximateBytes:67.1*MB,inputNames:['input'],outputNames:['output'],inputShape:[1,3,'H','W'],outputShape:[1,3,'4H','4W'],inputType:'float32',normalization:'RGB float32 [0,1]',expectedImageSize:'Dynamic H/W; LAB uses tiled inference',scale:4,tileIOS:96,tileDefault:128,pad:6,verified:true,ready:true},
+depth:{id:'depth-anything-v2-small-quantized',feature:'Depth / Portrait Blur',kind:'monocular-depth',filename:'model_quantized.onnx',source:'https://huggingface.co/onnx-community/depth-anything-v2-small/resolve/main/onnx/model_quantized.onnx?download=true',project:'https://huggingface.co/onnx-community/depth-anything-v2-small',license:'Apache-2.0',approximateBytes:27.3*MB,inputNames:['pixel_values'],outputNames:['predicted_depth'],inputShape:[1,3,518,518],outputShape:[1,518,518],inputType:'float32',normalization:{meanRGB:[0.485,0.456,0.406],stdRGB:[0.229,0.224,0.225],range:'RGB [0,1]'},expectedImageSize:'518×518 in LAB',verified:true,ready:true},
+background:{id:'u2netp-background-fp32',feature:'Background Separation',kind:'salient-object-segmentation',filename:'u2netp.onnx',source:'https://huggingface.co/edgetools/u2netp/resolve/main/u2netp.onnx?download=true',project:'https://huggingface.co/edgetools/u2netp',license:'Apache-2.0',approximateBytes:4.57*MB,inputNames:['input.1'],outputNames:['d0','d1','d2','d3','d4','d5','d6'],inputShape:[1,3,320,320],inputType:'float32',normalization:{meanRGB:[0.485,0.456,0.406],stdRGB:[0.229,0.224,0.225],range:'RGB [0,1]'},expectedImageSize:'320×320',maskFormat:'soft salient-subject alpha mask',verified:true,ready:true},
+denoise:{id:'denoise-not-ready',feature:'AI Denoise',filename:'MODEL NOT INSTALLED',project:'https://huggingface.co/qualcomm/DnCNN',license:'MIT',inputNames:['not selected'],outputNames:['not selected'],inputShape:['not selected'],normalization:'not selected',expectedImageSize:'not selected',verified:false,ready:false,notReadyReason:'MODEL NOT INSTALLED / EXPERIMENT NOT READY. Qualcomm publishes a real DnCNN ONNX release, but LAB 2.0 does not select a browser-direct RGB adapter until its exact exported tensor contract is verified from the actual ONNX file.'},
+deblur:{id:'deblur-not-ready',feature:'AI Deblur',filename:'MODEL NOT INSTALLED',license:'Not selected',inputNames:['not selected'],outputNames:['not selected'],inputShape:['not selected'],normalization:'not selected',expectedImageSize:'not selected',verified:false,ready:false,notReadyReason:'MODEL NOT INSTALLED / EXPERIMENT NOT READY. No deblur ONNX was promoted because a trustworthy browser-ready model contract and provenance were not verified strongly enough.'},
+faceRestore:{id:'face-restore-not-ready',feature:'Face Restoration',filename:'MODEL NOT INSTALLED',project:'https://huggingface.co/HowToSD/GFPGAN-ONNX',license:'Upstream GFPGAN Apache-2.0 + third-party notices',inputNames:['not selected'],outputNames:['not selected'],inputShape:['not selected'],normalization:'not selected',expectedImageSize:'not selected',verified:false,ready:false,notReadyReason:'MODEL NOT INSTALLED / EXPERIMENT NOT READY. A common GFPGAN ONNX export is about 340 MB and was not enabled for iPhone memory safety.'},
+colorize:{id:'colorize-not-ready',feature:'B&W Colorization',filename:'MODEL NOT INSTALLED',project:'https://huggingface.co/aimi-models/editor-tools',license:'Candidate DDColor: Apache-2.0',inputNames:['not selected'],outputNames:['not selected'],inputShape:['not selected'],normalization:'not selected',expectedImageSize:'not selected',verified:false,ready:false,notReadyReason:'MODEL NOT INSTALLED / EXPERIMENT NOT READY. A verified DDColor ONNX candidate is very large (~870 MB), so LAB 2.0 does not enable it on iPhone.'},
+objectSelect:{id:'object-select-not-ready',feature:'Advanced Object Selection',filename:'MODEL NOT INSTALLED',license:'Not selected',inputNames:['not selected'],outputNames:['not selected'],inputShape:['not selected'],normalization:'not selected',expectedImageSize:'not selected',verified:false,ready:false,notReadyReason:'MODEL NOT INSTALLED / EXPERIMENT NOT READY. Automatic subject separation is available through U2Netp, but tap-prompted arbitrary object selection is intentionally not faked without a verified interactive ONNX encoder/decoder pair.'}
 };
-
-window.PhotoIALabModels = Object.freeze(MODELS);
+window.PhotoIALabModels=Object.freeze(MODELS);
 })();

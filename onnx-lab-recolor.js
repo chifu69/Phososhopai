@@ -136,7 +136,7 @@ function maskFromLogits(logits, dims, mode, model) {
   for (let i = 0; i < plane; i++) if (set.has(labels[i])) { hard[i] = 255; count++; }
   if (count < plane * 0.001) throw new Error(`${regionName(selectedMode)} was not detected in this photo.`);
   const soft = blurMask(hard, W, H, selectedMode === 'hair' ? 2 : 1);
-  return { alpha: soft, width: W, height: H, mode: selectedMode, label: regionName(selectedMode), coverage: count / plane };
+  return { alpha: soft, width: W, height: H, mode: selectedMode, label: regionName(selectedMode), coverage: count / plane, labels };
 }
 
 function recolorInputFromCanvas(sourceCanvas, mask, targetHex, size = 512) {
@@ -179,6 +179,37 @@ function tensorRgbToCanvas(tensor, dims) {
   return c;
 }
 
+
+function protectMask(mask, { protectFace = false, protectSkin = false } = {}) {
+  if (!mask?.labels || (!protectFace && !protectSkin)) return mask;
+  const protectedIds = new Set();
+  if (protectFace) protectedIds.add(13);
+  if (protectSkin) [13,14,15,16,17].forEach(x => protectedIds.add(x));
+  const alpha = Uint8ClampedArray.from(mask.alpha);
+  for (let i = 0; i < alpha.length; i++) if (protectedIds.has(mask.labels[i])) alpha[i] = 0;
+  const softened = blurMask(alpha, mask.width, mask.height, 1);
+  return { ...mask, alpha: softened };
+}
+
+function subjectMaskFromLogits(logits, dims, model) {
+  const C = dims[1] || 20, H = dims[2] || 473, W = dims[3] || 473;
+  const plane = H * W;
+  const labels = new Uint8Array(plane);
+  const hard = new Uint8ClampedArray(plane);
+  let count = 0;
+  for (let i = 0; i < plane; i++) {
+    let best = 0, bestV = -Infinity;
+    for (let c = 0; c < C; c++) {
+      const v = logits[c * plane + i];
+      if (v > bestV) { bestV = v; best = c; }
+    }
+    labels[i] = best;
+    if (best !== 0) { hard[i] = 255; count++; }
+  }
+  if (count < plane * 0.01) throw new Error('No human subject was confidently detected.');
+  return { alpha: blurMask(hard, W, H, 2), width: W, height: H, mode: 'subject', label: 'Human subject', coverage: count / plane, labels };
+}
+
 function compositeToOriginal(image, generatedCanvas, mask, options = {}) {
   const W = image.naturalWidth || image.width, H = image.naturalHeight || image.height;
   const out = document.createElement('canvas'); out.width = W; out.height = H;
@@ -203,6 +234,7 @@ function compositeToOriginal(image, generatedCanvas, mask, options = {}) {
   const protectShadows = !!options.preserveShadows;
   const protectHighlights = !!options.preserveHighlights;
   const preserveTexture = !!options.preserveTexture;
+  const protectLogos = !!options.protectLogos;
 
   for (let i = 0; i < W * H; i++) {
     const p = i * 4;
@@ -211,6 +243,18 @@ function compositeToOriginal(image, generatedCanvas, mask, options = {}) {
     const lum = (0.2126 * bd[p] + 0.7152 * bd[p + 1] + 0.0722 * bd[p + 2]) / 255;
     if (protectShadows && lum < 0.22) a *= 0.45 + lum * 2.5;
     if (protectHighlights && lum > 0.80) a *= Math.max(0.35, 1 - (lum - 0.80) * 2.8);
+    if (protectLogos) {
+      const x = i % W, y = (i / W) | 0;
+      if (x > 0 && x < W - 1 && y > 0 && y < H - 1) {
+        const li = p - 4, ri = p + 4, ui = p - W * 4, di = p + W * 4;
+        const l0 = 0.2126*bd[li] + 0.7152*bd[li+1] + 0.0722*bd[li+2];
+        const l1 = 0.2126*bd[ri] + 0.7152*bd[ri+1] + 0.0722*bd[ri+2];
+        const l2 = 0.2126*bd[ui] + 0.7152*bd[ui+1] + 0.0722*bd[ui+2];
+        const l3 = 0.2126*bd[di] + 0.7152*bd[di+1] + 0.0722*bd[di+2];
+        const edge = Math.min(1, (Math.abs(l1-l0)+Math.abs(l3-l2))/150);
+        a *= 1 - edge * 0.55;
+      }
+    }
 
     let rr = gd[p], gg = gd[p + 1], bb = gd[p + 2];
     if (preserveTexture) {
@@ -235,6 +279,8 @@ window.PhotoIALabRecolor = {
   tensorRgbToCanvas,
   compositeToOriginal,
   maskCanvas,
-  regionName
+  regionName,
+  protectMask,
+  subjectMaskFromLogits
 };
 })();

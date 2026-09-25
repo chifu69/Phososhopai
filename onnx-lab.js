@@ -1,280 +1,77 @@
 (() => {
 'use strict';
-const $ = id => document.getElementById(id);
-const models = () => window.PhotoIALabModels;
-const engine = () => window.PhotoIALabEngine;
-const recolor = () => window.PhotoIALabRecolor;
+const $=id=>document.getElementById(id);
+const models=()=>window.PhotoIALabModels;
+const engine=()=>window.PhotoIALabEngine;
+const recolor=()=>window.PhotoIALabRecolor;
+const restore=()=>window.PhotoIALabRestore;
+const depthLab=()=>window.PhotoIALabDepth;
+const selection=()=>window.PhotoIALabSelection;
 
-const state = {
-  file: null, image: null, originalUrl: '', resultUrl: '', maskUrl: '',
-  resultCanvas: null, mask: null, generatedCanvas: null,
-  mode: 'hair', region: 'upper', view: 'result', busy: false,
-  parserRecord: null, recolorRecord: null,
-  times: { segmentation: 0, recolor: 0, total: 0 },
-  inferenceSize: '', lastError: '', detectedRegion: '',
-  modelInfo: { parser: null, recolor: null }
-};
+const state={experiment:'recolor',file:null,image:null,originalUrl:'',view:'result',busy:false,mode:'hair',region:'upper',srScale:2,bgOp:'remove',resultCanvas:null,resultPreviewUrl:'',resultMime:'image/jpeg',mask:null,maskUrl:'',backgroundBaseMask:null,depth:null,depthCanvas:null,depthUrl:'',generatedCanvas:null,protectionAlpha:null,variants:{},selectedVariant:'balanced',sessions:{},modelInfo:{},times:{preprocess:0,inference:0,postprocess:0,total:0,segmentation:0,recolor:0},inferenceSize:'',lastError:'',detectedRegion:'',lastRunModel:'',lastRunBackend:'-'};
+const EXPERIMENT_MODELS={recolor:['parser','recolor'],denoise:['denoise'],deblur:['deblur'],superres:()=>[state.srScale===4?'superres4x':'superres2x'],depth:['depth'],portrait:['depth'],background:['background'],face:['faceRestore'],colorize:['colorize'],object:['objectSelect']};
+const APPLY_LABELS={recolor:'✨ Apply Recolor',denoise:'🧼 Run Denoise',deblur:'🎯 Run Deblur',superres:'🔍 Run Super Resolution',depth:'🗺 Generate Depth',portrait:'📷 Apply Portrait Blur',background:'✂️ Apply Background',face:'🙂 Restore Face',colorize:'🌈 Colorize',object:'🪄 Select Object'};
 
-function setStatus(text, kind = '') {
-  const el = $('status'); el.textContent = text; el.dataset.kind = kind;
+function setStatus(text,kind=''){const el=$('status');el.textContent=text;el.dataset.kind=kind;}
+function setProgress(loaded,total,label){const pct=total?Math.min(100,Math.round(loaded/total*100)):0;$('download-bar').style.width=`${pct}%`;$('download-label').textContent=total?`${label} — ${pct}% (${engine().bytesLabel(loaded)} / ${engine().bytesLabel(total)})`:`${label} — ${engine().bytesLabel(loaded)}`;}
+function resetProgress(label='Models download only when needed.'){$('download-bar').style.width='0%';$('download-label').textContent=label;}
+function currentModelKeys(){const v=EXPERIMENT_MODELS[state.experiment];return typeof v==='function'?v():v||[];}
+function experimentReady(){const keys=currentModelKeys();return keys.length>0&&keys.every(k=>models()[k]?.ready);}
+function setBusy(on){state.busy=on;updateEnabled();}
+function updateEnabled(){const has=!!state.image,ready=experimentReady();$('apply').disabled=state.busy||!has||!ready;$('prepare-current').disabled=state.busy||!ready;$('file-input').disabled=state.busy;$('reset').disabled=state.busy||!has;$('save').disabled=state.busy||!state.resultCanvas;document.querySelectorAll('[data-mode]').forEach(b=>b.disabled=state.busy||!has);document.querySelectorAll('[data-region]').forEach(b=>b.disabled=state.busy||!has||state.mode!=='clothing');$('apply').textContent=APPLY_LABELS[state.experiment]||'✨ Apply';}
+function canvasPreviewUrl(canvas,maxSide=1400,mime='image/jpeg'){if(!canvas)return'';const scale=Math.min(1,maxSide/Math.max(canvas.width,canvas.height));let src=canvas;if(scale<1){src=document.createElement('canvas');src.width=Math.max(1,Math.round(canvas.width*scale));src.height=Math.max(1,Math.round(canvas.height*scale));const c=src.getContext('2d',{alpha:mime==='image/png'});c.imageSmoothingEnabled=true;c.imageSmoothingQuality='high';c.drawImage(canvas,0,0,src.width,src.height);}const url=src.toDataURL(mime,mime==='image/jpeg'?.9:undefined);if(src!==canvas){src.width=src.height=1;}return url;}
+function clearResult({keepDepth=false,keepBackgroundMask=false}={}){state.resultCanvas=null;state.resultPreviewUrl='';state.resultMime='image/jpeg';state.generatedCanvas=null;state.protectionAlpha=null;state.variants={};state.selectedVariant='balanced';state.detectedRegion='';if(!keepBackgroundMask){state.mask=null;state.maskUrl='';state.backgroundBaseMask=null;}if(!keepDepth){state.depth=null;state.depthCanvas=null;state.depthUrl='';}state.times={preprocess:0,inference:0,postprocess:0,total:0,segmentation:0,recolor:0};state.inferenceSize='';$('variant-strip').hidden=true;$('variant-strip').innerHTML='';updateEnabled();}
+function sanitizeHex(value){const v=String(value||'').trim();if(/^#[0-9a-f]{6}$/i.test(v))return v.toLowerCase();if(/^[0-9a-f]{6}$/i.test(v))return`#${v.toLowerCase()}`;return null;}
+function syncColor(hex){const h=sanitizeHex(hex);if(!h)return false;$('target-color').value=h;$('target-text').value=h;return true;}
+function readFile(file){return new Promise((resolve,reject)=>{const url=URL.createObjectURL(file),img=new Image();img.onload=()=>resolve({img,url});img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error('Could not decode this image.'));};img.src=url;});}
+async function openPhoto(file){if(!file)return;try{if(state.originalUrl?.startsWith('blob:'))URL.revokeObjectURL(state.originalUrl);const{img,url}=await readFile(file);state.file=file;state.image=img;state.originalUrl=url;state.lastError='';clearResult();state.view='original';setStatus(`Photo loaded: ${img.naturalWidth}×${img.naturalHeight}. All inference stays on this device.`,'ready');updateSRDimensions();renderView();updateEnabled();await refreshModelStatuses();updateDiagnostics();}catch(err){state.lastError=String(err?.message||err);setStatus(state.lastError,'error');}}
+function selectedRegionMode(){return state.mode==='hair'?'hair':state.region;}
+function updateSRDimensions(){const p=$('sr-dimensions');if(!state.image){p.textContent='Open a photo to see output dimensions.';return;}const s=state.srScale,W=state.image.naturalWidth*s,H=state.image.naturalHeight*s,mp=W*H/1e6;p.textContent=`${s}× output: ${W}×${H} (${mp.toFixed(1)} MP).`;}
+
+async function getSession(key,onProgress){if(state.sessions[key])return state.sessions[key];const model=models()[key],record=await engine().createSessionForModel(model,{onProgress:onProgress||((x)=>setProgress(x.loaded,x.total,x.cached?`${model.feature} from cache`:`Downloading ${model.feature}`))});state.sessions[key]=record;state.lastRunModel=model.filename;state.lastRunBackend=record.backend;return record;}
+async function prepareCurrent(){if(state.busy||!experimentReady())return;setBusy(true);state.lastError='';try{for(const key of currentModelKeys()){const model=models()[key];setStatus(`Preparing ${model.feature}…`);await getSession(key);}setProgress(1,1,'Current experiment ready');setStatus('Current ONNX experiment is ready.','ready');}catch(err){state.lastError=String(err?.message||err);setStatus(`Model preparation failed: ${state.lastError}`,'error');}finally{setBusy(false);await refreshModelStatuses();updateDiagnostics();}}
+
+async function runRecolorSegmentation(sourceCanvas){const t0=performance.now(),model=models().parser,rec=await getSession('parser'),prep=recolor().schpInputFromCanvas(sourceCanvas,model),tensor=new ort.Tensor('float32',prep.data,model.inputShape);let outputs;try{outputs=await rec.session.run({[rec.session.inputNames?.[0]||'pixel_values']:tensor});}finally{try{tensor.dispose?.();}catch(_){}}const out=outputs.parsing_logits||outputs.logits||outputs[rec.session.outputNames?.[0]]||Object.values(outputs)[0];if(!out)throw new Error(`Parser did not return logits. Outputs: ${Object.keys(outputs).join(', ')}`);const mask=recolor().maskFromLogits(out.data,out.dims,selectedRegionMode(),model);state.times.segmentation=performance.now()-t0;state.detectedRegion=mask.label;try{for(const v of Object.values(outputs))v?.dispose?.();}catch(_){}return mask;}
+async function runRecolorGenerator(sourceCanvas,mask){const t0=performance.now(),model=models().recolor,rec=await getSession('recolor'),target=sanitizeHex($('target-text').value)||$('target-color').value,prep=recolor().recolorInputFromCanvas(sourceCanvas,mask,target,engine().isIOS?512:640);state.inferenceSize=`${prep.width}×${prep.height}`;const tensor=new ort.Tensor('float32',prep.data,[1,5,prep.height,prep.width]);let outputs;try{outputs=await rec.session.run({[rec.session.inputNames?.[0]||'input']:tensor});}finally{try{tensor.dispose?.();}catch(_){}}const out=outputs.rgb||outputs[rec.session.outputNames?.[0]]||Object.values(outputs)[0];if(!out)throw new Error(`Recolor model did not return RGB. Outputs: ${Object.keys(outputs).join(', ')}`);const generated=recolor().tensorRgbToCanvas(out.data,out.dims);state.times.recolor=performance.now()-t0;try{for(const v of Object.values(outputs))v?.dispose?.();}catch(_){}return generated;}
+function recolorOptions(intensity){return{intensity,preserveShadows:$('preserve-shadows').checked,preserveHighlights:$('preserve-highlights').checked,preserveTexture:$('preserve-texture').checked,protectionAlpha:state.protectionAlpha,protectLogos:$('protect-logos').checked};}
+function variantIntensities(){const b=Number($('intensity').value)/100;return{light:Math.max(.18,b*.58),balanced:b,strong:Math.min(1,b+.18)};}
+function buildVariantPreviews(){const preview=recolor().canvasForImage(state.image,engine().isIOS?720:920),ints=variantIntensities(),out={};for(const[name,intensity]of Object.entries(ints)){const c=recolor().compositeToOriginal(preview,state.generatedCanvas,state.mask,recolorOptions(intensity));out[name]={intensity,preview:canvasPreviewUrl(c,900,'image/jpeg')};c.width=c.height=1;}preview.width=preview.height=1;state.variants=out;renderVariants();}
+function renderVariants(){const strip=$('variant-strip');if(!Object.keys(state.variants).length){strip.hidden=true;strip.innerHTML='';return;}strip.hidden=false;strip.innerHTML='';const titles={light:'Light',balanced:'Balanced',strong:'Strong'};for(const key of['light','balanced','strong']){const v=state.variants[key],card=document.createElement('div');card.className='variant-card'+(state.selectedVariant===key?' selected':'');card.innerHTML=`<img alt="${titles[key]} recolor preview"><div><strong>${titles[key]} · ${Math.round(v.intensity*100)}%</strong><button type="button">Choose ${titles[key]}</button></div>`;card.querySelector('img').src=v.preview;card.querySelector('button').onclick=()=>chooseVariant(key);strip.append(card);}}
+function chooseVariant(key){if(!state.variants[key]||!state.generatedCanvas||!state.mask)return;const t0=performance.now();setStatus(`Applying ${key} recolor at original resolution…`);try{const c=recolor().compositeToOriginal(state.image,state.generatedCanvas,state.mask,recolorOptions(state.variants[key].intensity));state.resultCanvas=c;state.resultMime='image/jpeg';state.resultPreviewUrl=canvasPreviewUrl(c,1500,'image/jpeg');state.selectedVariant=key;state.times.postprocess=performance.now()-t0;state.view='result';setStatus(`${key[0].toUpperCase()+key.slice(1)} recolor selected. Original pixels outside the mask are preserved.`,'ready');renderVariants();renderView();updateEnabled();updateDiagnostics();}catch(err){state.lastError=String(err?.message||err);setStatus(state.lastError,'error');}}
+async function runRecolor(){if(!syncColor($('target-text').value))throw new Error('Target color must be a valid #RRGGBB value.');const total0=performance.now();await getSession('parser');await getSession('recolor');const analysis=recolor().canvasForImage(state.image,engine().isIOS?768:960);setStatus(`Running ONNX semantic selection for ${selectedRegionMode()}…`);state.mask=await runRecolorSegmentation(analysis);state.maskUrl=recolor().maskCanvas(state.mask.alpha,state.mask.width,state.mask.height,'overlay').toDataURL('image/png');state.protectionAlpha=recolor().protectionFromLabels(state.mask.labels,state.mask.width,state.mask.height,{protectSkin:$('protect-skin').checked,protectFace:$('protect-face').checked});setStatus(`Detected ${state.mask.label}. Running ONNX guided recolor…`);state.generatedCanvas=await runRecolorGenerator(analysis,state.mask);analysis.width=analysis.height=1;buildVariantPreviews();state.selectedVariant='balanced';chooseVariant('balanced');state.times.total=performance.now()-total0;setStatus(`Recolor complete locally. Compare Light / Balanced / Strong below. Total ${(state.times.total/1000).toFixed(1)} s.`,'ready');}
+
+async function runSuperResolution(){const total0=performance.now(),key=state.srScale===4?'superres4x':'superres2x',model=models()[key],rec=await getSession(key);state.inferenceSize=`tiled ${engine().isIOS?model.tileIOS:model.tileDefault}px cores`;setStatus(`Running Real-ESRGAN ${state.srScale}× in tiles…`);const c=await restore().superResolve(state.image,rec,model,{onProgress:p=>{const pct=Math.round(p.done/p.total*100);setStatus(`Super Resolution ${state.srScale}× — tile ${p.done}/${p.total} (${pct}%)`);$('download-bar').style.width=`${pct}%`;$('download-label').textContent=`Tiled inference — ${pct}%`;}});state.resultCanvas=c;state.resultMime='image/jpeg';state.resultPreviewUrl=canvasPreviewUrl(c,1500,'image/jpeg');state.times.inference=performance.now()-total0;state.times.total=state.times.inference;state.view='result';setStatus(`Super Resolution ${state.srScale}× complete: ${c.width}×${c.height}.`,'ready');}
+async function ensureDepth(){if(state.depth&&state.depthCanvas)return;const total0=performance.now(),model=models().depth,rec=await getSession('depth');setStatus('Running Depth Anything V2 Small locally…');const r=await depthLab().estimate(state.image,rec,model);state.depth=r.depth;state.depthCanvas=r.canvas;state.depthUrl=r.canvas.toDataURL('image/png');state.inferenceSize=r.inferenceSize;state.times.preprocess=r.preprocessMs;state.times.inference=r.inferenceMs;state.times.total=performance.now()-total0;}
+async function runDepth(){await ensureDepth();state.resultCanvas=state.depthCanvas;state.resultPreviewUrl=state.depthUrl;state.resultMime='image/png';state.view='depth';setStatus(`Depth map ready locally in ${(state.times.total/1000).toFixed(1)} s. Brighter = nearer in this LAB.`,'ready');}
+async function runPortrait(){const total0=performance.now();await ensureDepth();setStatus('Building progressive depth-aware portrait blur…');const post0=performance.now(),r=depthLab().portraitBlur(state.image,state.depth,Number($('portrait-strength').value),{isIOS:engine().isIOS});state.resultCanvas=r.canvas;state.resultPreviewUrl=canvasPreviewUrl(r.canvas,1500,'image/jpeg');state.resultMime='image/jpeg';state.times.postprocess=performance.now()-post0;state.times.total=performance.now()-total0;state.view='result';setStatus(`Portrait Blur ready. Center focus depth ${r.focusDepth.toFixed(2)}; total ${(state.times.total/1000).toFixed(1)} s.`,'ready');}
+async function ensureBackgroundMask(){if(state.backgroundBaseMask)return;const total0=performance.now(),model=models().background,rec=await getSession('background');setStatus('Running U²-Netp subject separation locally…');const r=await selection().segmentSubject(state.image,rec,model);state.backgroundBaseMask=r.mask;state.inferenceSize=r.inferenceSize;state.times.preprocess=r.preprocessMs;state.times.inference=r.inferenceMs;state.times.total=performance.now()-total0;}
+async function runBackground(){const total0=performance.now();await ensureBackgroundMask();const refined=selection().refine(state.backgroundBaseMask,{edge:Number($('bg-edge').value),feather:Number($('bg-feather').value),keepMain:$('bg-main').checked,invertMask:$('bg-invert').checked});state.mask=refined;state.maskUrl=selection().maskCanvas(refined,true).toDataURL('image/png');setStatus(`Applying ${state.bgOp} with the local subject mask…`);const post0=performance.now(),c=selection().applyBackground(state.image,refined,{operation:state.bgOp,color:$('bg-color').value,blurStrength:Number($('bg-blur').value),isIOS:engine().isIOS});state.resultCanvas=c;state.resultMime=state.bgOp==='remove'?'image/png':'image/jpeg';state.resultPreviewUrl=canvasPreviewUrl(c,1500,state.resultMime);state.times.postprocess=performance.now()-post0;state.times.total=performance.now()-total0;state.view='result';setStatus(`Background ${state.bgOp} complete locally.`,'ready');}
+async function applyCurrent(){if(!state.image||state.busy||!experimentReady())return;setBusy(true);state.lastError='';resetProgress('Processing locally…');try{if(state.experiment==='recolor')await runRecolor();else if(state.experiment==='superres')await runSuperResolution();else if(state.experiment==='depth')await runDepth();else if(state.experiment==='portrait')await runPortrait();else if(state.experiment==='background')await runBackground();else throw new Error(models()[currentModelKeys()[0]]?.notReadyReason||'MODEL NOT INSTALLED / EXPERIMENT NOT READY');}catch(err){state.lastError=String(err?.message||err);setStatus(`ONNX experiment failed: ${state.lastError}`,'error');}finally{setBusy(false);await refreshModelStatuses();renderView();updateDiagnostics();}}
+
+function makeImg(src,alt){const img=document.createElement('img');img.src=src;img.alt=alt;return img;}
+function renderView(){const stage=$('stage');stage.innerHTML='';document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===state.view));if(!state.image){stage.innerHTML='<div class="empty"><strong>Open a photo</strong><p>Choose an experiment and run it locally.</p></div>';return;}if(state.view==='mask'){if(!state.maskUrl)stage.innerHTML='<div class="empty">No mask yet. Run Recolor or Background first.</div>';else stage.append(makeImg(state.maskUrl,'Generated ONNX mask'));return;}if(state.view==='depth'){if(!state.depthUrl)stage.innerHTML='<div class="empty">No depth map yet. Run Depth or Portrait Blur first.</div>';else stage.append(makeImg(state.depthUrl,'Depth map'));return;}if(state.view==='compare'){const wrap=document.createElement('div');wrap.className='compare';const a=document.createElement('figure'),b=document.createElement('figure');a.append(makeImg(state.originalUrl,'Before'));a.insertAdjacentHTML('beforeend','<figcaption>Before</figcaption>');if(state.resultPreviewUrl)b.append(makeImg(state.resultPreviewUrl,'After'));else b.innerHTML='<div class="empty">Run the experiment first.</div>';b.insertAdjacentHTML('beforeend','<figcaption>After</figcaption>');wrap.append(a,b);stage.append(wrap);return;}if(state.view==='original'||!state.resultCanvas){stage.append(makeImg(state.originalUrl,'Original'));return;}stage.append(state.resultCanvas);}
+function reset(){if(!state.image)return;clearResult();state.view='original';state.lastError='';setStatus('Result reset. Original photo preserved.','ready');renderView();updateDiagnostics();}
+function saveResult(){if(!state.resultCanvas)return;const mime=state.resultMime||'image/jpeg',ext=mime==='image/png'?'png':'jpg';setStatus('Preparing local output file…');state.resultCanvas.toBlob(blob=>{if(!blob)return setStatus('Could not create output file.','error');const a=document.createElement('a'),url=URL.createObjectURL(blob);a.href=url;a.download=`photo-ia-onnx-lab2-${state.experiment}-${Date.now()}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),5000);setStatus('Result saved locally.','ready');},mime,mime==='image/jpeg'?.95:undefined);}
+
+function setExperiment(name){state.experiment=name;document.querySelectorAll('[data-experiment]').forEach(b=>b.classList.toggle('active',b.dataset.experiment===name));document.querySelectorAll('[data-pane]').forEach(p=>p.classList.toggle('active',p.dataset.pane===name));state.view=state.resultCanvas?'result':'original';resetProgress();updateEnabled();refreshCurrentModelStatus();renderView();updateDiagnostics();}
+async function refreshCurrentModelStatus(){const el=$('current-model-status'),keys=currentModelKeys();if(!keys.length){el.textContent='No model selected';return;}if(!experimentReady()){el.textContent='EXPERIMENT NOT READY';el.className='status-failed';return;}const stats=await Promise.all(keys.map(k=>engine().modelStatus(models()[k]))),all=stats.every(s=>s.cached);el.textContent=all?'Cached / ready':'Not installed';el.className=all?'status-ready':'';$('backend-status').textContent=engine().backend;}
+async function refreshModelStatuses(){const list=$('model-list');list.innerHTML='';for(const[key,m]of Object.entries(models())){let status={cached:false,bytes:0};if(m.ready)status=await engine().modelStatus(m);state.modelInfo[key]=status;const row=document.createElement('div');row.className='model-item';const stateText=m.ready?(status.cached?`Cached ${engine().bytesLabel(status.bytes)}`:'Not installed'):'Not ready';row.innerHTML=`<div><strong>${m.feature}</strong><small>${m.filename} · ${m.license||'license not selected'}</small></div><span class="model-size ${status.cached?'status-ready':(!m.ready?'status-failed':'')}">${stateText}</span><button type="button" ${(!m.ready||!status.cached)?'disabled':''}>Delete</button>`;row.querySelector('button').onclick=async()=>{await engine().deleteModelCache(m);state.sessions[key]=null;setStatus(`${m.feature} cache deleted. Stable PHOTO IA was not touched.`,'ready');await refreshModelStatuses();};list.append(row);}await refreshCurrentModelStatus();updateDiagnostics();}
+function maskCoverage(){if(!state.mask?.alpha)return'-';let n=0;for(const v of state.mask.alpha)if(v>80)n++;return`${(n/state.mask.alpha.length*100).toFixed(2)}%`;}
+function updateDiagnostics(){const keys=currentModelKeys(),lines=[`Active experiment: ${state.experiment}`,`Runtime loaded: ${window.ort?.InferenceSession?'yes':'no'}`,`ONNX Runtime Web: ${engine().ortVersion}`,`WebGPU available: ${navigator.gpu?'yes':'no'}`,`Active backend: ${engine().backend}`,`Last backend/model: ${state.lastRunBackend} / ${state.lastRunModel||'-'}`,`iPhone/iPad mode: ${engine().isIOS?'yes (WASM threads=1)':'no'}`,''];for(const key of keys){const m=models()[key],r=state.sessions[key],s=state.modelInfo[key];lines.push(`Model: ${m.feature}`,`  file: ${m.filename}`,`  status: ${!m.ready?'MODEL NOT INSTALLED / EXPERIMENT NOT READY':r?'session loaded':s?.cached?'cached, session not loaded':'not installed'}`,`  size: ${r?engine().bytesLabel(r.bytes):s?.bytes?engine().bytesLabel(s.bytes):engine().bytesLabel(m.approximateBytes||0)+' expected'}`,`  inputs: ${r?.session?.inputNames?.join(', ')||m.inputNames?.join(', ')||'-'}`,`  outputs: ${r?.session?.outputNames?.join(', ')||m.outputNames?.join(', ')||'-'}`);if(!m.ready)lines.push(`  reason: ${m.notReadyReason}`);lines.push('');}lines.push(`Inference dimensions: ${state.inferenceSize||'-'}`,`Detected region: ${state.detectedRegion||'-'}`,`Mask coverage: ${maskCoverage()}`,`Depth map: ${state.depth?`${state.depth.width}×${state.depth.height}`:'-'}`,`Preprocess time: ${state.times.preprocess?state.times.preprocess.toFixed(0)+' ms':'-'}`,`Segmentation time: ${state.times.segmentation?state.times.segmentation.toFixed(0)+' ms':'-'}`,`ONNX inference/recolor time: ${(state.times.inference||state.times.recolor)?(state.times.inference||state.times.recolor).toFixed(0)+' ms':'-'}`,`Postprocess time: ${state.times.postprocess?state.times.postprocess.toFixed(0)+' ms':'-'}`,`Total processing time: ${state.times.total?state.times.total.toFixed(0)+' ms':'-'}`,`Memory-related failure: ${state.lastError&&engine().memoryLikeError(state.lastError)?'yes':'none detected'}`,`Exact error: ${state.lastError||'none'}`,'','PRIVACY: image bytes stay in this browser. Only verified model/runtime files are downloaded.');$('diagnostics').textContent=lines.join('\n');}
+
+function bind(){
+  $('file-input').addEventListener('change',e=>openPhoto(e.target.files?.[0]));
+  document.querySelectorAll('[data-experiment]').forEach(b=>b.addEventListener('click',()=>setExperiment(b.dataset.experiment)));
+  document.querySelectorAll('[data-mode]').forEach(b=>b.addEventListener('click',()=>{state.mode=b.dataset.mode;document.querySelectorAll('[data-mode]').forEach(x=>x.classList.toggle('active',x===b));$('clothing-regions').hidden=state.mode!=='clothing';updateEnabled();}));
+  document.querySelectorAll('[data-region]').forEach(b=>b.addEventListener('click',()=>{state.region=b.dataset.region;document.querySelectorAll('[data-region]').forEach(x=>x.classList.toggle('active',x===b));}));
+  document.querySelectorAll('[data-sr]').forEach(b=>b.addEventListener('click',()=>{state.srScale=Number(b.dataset.sr);document.querySelectorAll('[data-sr]').forEach(x=>x.classList.toggle('active',x===b));updateSRDimensions();refreshCurrentModelStatus();}));
+  document.querySelectorAll('[data-bgop]').forEach(b=>b.addEventListener('click',()=>{state.bgOp=b.dataset.bgop;document.querySelectorAll('[data-bgop]').forEach(x=>x.classList.toggle('active',x===b));}));
+  $('target-color').addEventListener('input',e=>syncColor(e.target.value));$('target-text').addEventListener('change',e=>{if(!syncColor(e.target.value))setStatus('Target color must be #RRGGBB.','error');});document.querySelectorAll('[data-color]').forEach(b=>b.addEventListener('click',()=>syncColor(b.dataset.color)));
+  $('intensity').addEventListener('input',e=>$('intensity-out').textContent=`${e.target.value}%`);$('portrait-strength').addEventListener('input',e=>$('portrait-strength-out').textContent=`${e.target.value}%`);$('bg-blur').addEventListener('input',e=>$('bg-blur-out').textContent=`${e.target.value}%`);$('bg-edge').addEventListener('input',e=>$('bg-edge-out').textContent=e.target.value);$('bg-feather').addEventListener('input',e=>$('bg-feather-out').textContent=e.target.value);
+  $('prepare-current').addEventListener('click',prepareCurrent);$('apply').addEventListener('click',applyCurrent);$('reset').addEventListener('click',reset);$('save').addEventListener('click',saveResult);
+  $('clear-cache').addEventListener('click',async()=>{if(state.busy)return;setBusy(true);try{await engine().clearModelCache();state.sessions={};setStatus('All LAB model caches deleted. Stable PHOTO IA was not touched.','ready');}catch(err){state.lastError=String(err?.message||err);setStatus(state.lastError,'error');}finally{setBusy(false);await refreshModelStatuses();}});
+  document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>{state.view=b.dataset.view;renderView();}));$('show-mask').addEventListener('click',()=>{state.view='mask';renderView();});$('copy-diagnostics').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('diagnostics').textContent);setStatus('Diagnostics copied.','ready');}catch(_){setStatus('Could not copy diagnostics.','error');}});
+  window.addEventListener('pagehide',()=>engine().releaseAll());
 }
-function setBusy(on) {
-  state.busy = on;
-  $('apply').disabled = on || !state.image;
-  $('prepare-models').disabled = on;
-  $('file-input').disabled = on;
-  [...document.querySelectorAll('[data-mode],[data-region]')].forEach(b => b.disabled = on || !state.image);
-}
-function setProgress(loaded, total, label) {
-  const pct = total ? Math.min(100, Math.round(loaded / total * 100)) : 0;
-  $('download-bar').style.width = `${pct}%`;
-  $('download-label').textContent = total ? `${label} — ${pct}% (${engine().bytesLabel(loaded)} / ${engine().bytesLabel(total)})` : `${label} — ${engine().bytesLabel(loaded)}`;
-}
-
-function sanitizeHex(value) {
-  const v = String(value || '').trim();
-  if (/^#[0-9a-f]{6}$/i.test(v)) return v.toLowerCase();
-  if (/^[0-9a-f]{6}$/i.test(v)) return `#${v.toLowerCase()}`;
-  return null;
-}
-function syncColor(hex) {
-  const h = sanitizeHex(hex); if (!h) return false;
-  $('target-color').value = h; $('target-text').value = h; return true;
-}
-
-async function refreshModelStatuses() {
-  const m = models();
-  const [p, r] = await Promise.all([engine().modelStatus(m.parser), engine().modelStatus(m.recolor)]);
-  state.modelInfo.parser = p; state.modelInfo.recolor = r;
-  $('parser-status').textContent = p.cached ? `Cached ${engine().bytesLabel(p.bytes)}` : 'Not installed';
-  $('recolor-status').textContent = r.cached ? `Cached ${engine().bytesLabel(r.bytes)}` : 'Not installed';
-  $('parser-status').className = p.cached ? 'status-ready' : '';
-  $('recolor-status').className = r.cached ? 'status-ready' : '';
-  $('backend-status').textContent = engine().backend;
-  updateDiagnostics();
-}
-
-async function prepareModels() {
-  if (state.busy) return;
-  setBusy(true); state.lastError = '';
-  try {
-    setStatus('Loading ONNX Runtime and semantic model…');
-    const p = await engine().createSessionForModel(models().parser, { onProgress: x => setProgress(x.loaded, x.total, x.cached ? 'Semantic model from local cache' : 'Downloading semantic model') });
-    state.parserRecord = p;
-    $('parser-status').textContent = `Ready ${engine().bytesLabel(p.bytes)}`; $('parser-status').className = 'status-ready';
-    $('backend-status').textContent = p.backend;
-
-    setStatus('Loading ONNX recolor model…');
-    const r = await engine().createSessionForModel(models().recolor, { onProgress: x => setProgress(x.loaded, x.total, x.cached ? 'Recolor model from local cache' : 'Downloading recolor model') });
-    state.recolorRecord = r;
-    $('recolor-status').textContent = `Ready ${engine().bytesLabel(r.bytes)}`; $('recolor-status').className = 'status-ready';
-    $('backend-status').textContent = r.backend;
-    setProgress(1, 1, 'Models ready');
-    setStatus('Both ONNX models are ready. You can run the experiment.');
-  } catch (err) {
-    state.lastError = String(err?.message || err);
-    setStatus(`Model preparation failed: ${state.lastError}`, 'error');
-    if (!state.parserRecord) { $('parser-status').textContent = 'Failed'; $('parser-status').className = 'status-failed'; }
-    if (!state.recolorRecord) { $('recolor-status').textContent = 'Failed'; $('recolor-status').className = 'status-failed'; }
-  } finally {
-    setBusy(false); await refreshModelStatuses();
-  }
-}
-
-function readFile(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => resolve({ img, url });
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Could not decode this image.')); };
-    img.src = url;
-  });
-}
-
-async function openPhoto(file) {
-  if (!file) return;
-  try {
-    if (state.originalUrl?.startsWith('blob:')) URL.revokeObjectURL(state.originalUrl);
-    const { img, url } = await readFile(file);
-    state.file = file; state.image = img; state.originalUrl = url; state.resultUrl = ''; state.maskUrl = ''; state.resultCanvas = null; state.mask = null; state.generatedCanvas = null; state.lastError = ''; state.detectedRegion = '';
-    $('mode-hair').disabled = false; $('mode-clothing').disabled = false;
-    [...document.querySelectorAll('[data-region]')].forEach(b => b.disabled = state.mode !== 'clothing');
-    $('apply').disabled = false; $('reset').disabled = false; $('save').disabled = true;
-    setStatus(`Photo loaded: ${img.naturalWidth}×${img.naturalHeight}. Inference will use reduced local copies.`);
-    state.view = 'original'; renderView(); updateDiagnostics();
-  } catch (err) { setStatus(String(err?.message || err), 'error'); }
-}
-
-function selectedRegionMode() { return state.mode === 'hair' ? 'hair' : state.region; }
-
-async function ensureSessions() {
-  if (!state.parserRecord) state.parserRecord = await engine().createSessionForModel(models().parser, { onProgress: x => setProgress(x.loaded, x.total, x.cached ? 'Semantic model cache' : 'Downloading semantic model') });
-  if (!state.recolorRecord) state.recolorRecord = await engine().createSessionForModel(models().recolor, { onProgress: x => setProgress(x.loaded, x.total, x.cached ? 'Recolor model cache' : 'Downloading recolor model') });
-  $('backend-status').textContent = engine().backend;
-}
-
-async function runSegmentation(sourceCanvas) {
-  const t0 = performance.now();
-  const model = models().parser, rec = state.parserRecord;
-  const prep = recolor().schpInputFromCanvas(sourceCanvas, model);
-  const tensor = new ort.Tensor('float32', prep.data, model.inputShape);
-  let outputs;
-  try { outputs = await rec.session.run({ pixel_values: tensor }); }
-  finally { try { tensor.dispose?.(); } catch (_) {} }
-  const out = outputs.parsing_logits || outputs.logits || outputs[rec.session.outputNames?.[0]];
-  if (!out) throw new Error(`Parser did not return logits. Outputs: ${Object.keys(outputs).join(', ')}`);
-  const mask = recolor().maskFromLogits(out.data, out.dims, selectedRegionMode(), model);
-  state.times.segmentation = performance.now() - t0;
-  state.detectedRegion = mask.label;
-  try { for (const v of Object.values(outputs)) v?.dispose?.(); } catch (_) {}
-  return mask;
-}
-
-async function runRecolor(sourceCanvas, mask) {
-  const t0 = performance.now();
-  const model = models().recolor, rec = state.recolorRecord;
-  const target = sanitizeHex($('target-text').value) || $('target-color').value;
-  const prep = recolor().recolorInputFromCanvas(sourceCanvas, mask, target, engine().isIOS ? 512 : 640);
-  state.inferenceSize = `${prep.width}×${prep.height}`;
-  const tensor = new ort.Tensor('float32', prep.data, [1, 5, prep.height, prep.width]);
-  let outputs;
-  try { outputs = await rec.session.run({ input: tensor }); }
-  finally { try { tensor.dispose?.(); } catch (_) {} }
-  const out = outputs.rgb || outputs[rec.session.outputNames?.[0]];
-  if (!out) throw new Error(`Recolor model did not return rgb. Outputs: ${Object.keys(outputs).join(', ')}`);
-  const generated = recolor().tensorRgbToCanvas(out.data, out.dims);
-  state.times.recolor = performance.now() - t0;
-  try { for (const v of Object.values(outputs)) v?.dispose?.(); } catch (_) {}
-  return generated;
-}
-
-async function apply() {
-  if (!state.image || state.busy) return;
-  if (!syncColor($('target-text').value)) return setStatus('Target color must be a valid #RRGGBB value.', 'error');
-  setBusy(true); state.lastError = ''; const total0 = performance.now();
-  try {
-    setStatus('Preparing local ONNX sessions…');
-    await ensureSessions();
-    const analysis = recolor().canvasForImage(state.image, engine().isIOS ? 768 : 960);
-    setStatus(`Running ONNX semantic selection for ${selectedRegionMode()}…`);
-    const mask = await runSegmentation(analysis);
-    state.mask = mask;
-    state.maskUrl = recolor().maskCanvas(mask.alpha, mask.width, mask.height, 'overlay').toDataURL('image/png');
-
-    setStatus(`Detected ${mask.label}. Running ONNX guided recolor…`);
-    const generated = await runRecolor(analysis, mask);
-    state.generatedCanvas = generated;
-
-    setStatus('Compositing selected region back at original resolution…');
-    const result = recolor().compositeToOriginal(state.image, generated, mask, {
-      intensity: Number($('intensity').value) / 100,
-      preserveShadows: $('preserve-shadows').checked,
-      preserveHighlights: $('preserve-highlights').checked,
-      preserveTexture: $('preserve-texture').checked
-    });
-    state.resultCanvas = result;
-    state.resultUrl = result.toDataURL('image/jpeg', 0.94);
-    state.times.total = performance.now() - total0;
-    state.view = 'result';
-    $('save').disabled = false;
-    setStatus(`Done locally. ${mask.label} detected; ONNX recolor completed in ${(state.times.total / 1000).toFixed(1)} s.`);
-    renderView();
-  } catch (err) {
-    state.lastError = String(err?.message || err);
-    state.resultCanvas = null; state.resultUrl = '';
-    setStatus(`ONNX experiment failed: ${state.lastError}`, 'error');
-  } finally {
-    setBusy(false); await refreshModelStatuses(); updateDiagnostics();
-  }
-}
-
-function makeImg(src, alt) { const img = document.createElement('img'); img.src = src; img.alt = alt; return img; }
-function renderView() {
-  const stage = $('stage'); stage.innerHTML = '';
-  document.querySelectorAll('[data-view]').forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
-  if (!state.image) { stage.innerHTML = '<div class="empty"><strong>Open a photo</strong><p>Then choose Hair or Clothing and run the local ONNX pipeline.</p></div>'; return; }
-  if (state.view === 'mask') {
-    if (!state.maskUrl) stage.innerHTML = '<div class="empty">No generated mask yet. Run Apply first.</div>'; else stage.append(makeImg(state.maskUrl, 'Generated semantic mask'));
-    return;
-  }
-  if (state.view === 'compare') {
-    const wrap = document.createElement('div'); wrap.className = 'compare';
-    const a = document.createElement('figure'), b = document.createElement('figure');
-    a.append(makeImg(state.originalUrl, 'Before')); const ca = document.createElement('figcaption'); ca.textContent = 'Before'; a.append(ca);
-    if (state.resultUrl) b.append(makeImg(state.resultUrl, 'After')); else b.innerHTML = '<div class="empty">Run Apply</div>';
-    const cb = document.createElement('figcaption'); cb.textContent = 'After'; b.append(cb); wrap.append(a, b); stage.append(wrap); return;
-  }
-  if (state.view === 'original' || !state.resultUrl) stage.append(makeImg(state.originalUrl, 'Original')); else stage.append(makeImg(state.resultUrl, 'ONNX recolor result'));
-}
-
-function reset() {
-  state.resultUrl = ''; state.maskUrl = ''; state.resultCanvas = null; state.mask = null; state.generatedCanvas = null; state.lastError = ''; state.detectedRegion = ''; state.times = { segmentation: 0, recolor: 0, total: 0 }; state.inferenceSize = '';
-  $('save').disabled = true; state.view = 'original'; setStatus('Result reset. Original photo preserved.'); renderView(); updateDiagnostics();
-}
-function saveResult() {
-  if (!state.resultCanvas) return;
-  state.resultCanvas.toBlob(blob => {
-    if (!blob) return setStatus('Could not create output file.', 'error');
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `photo-ia-onnx-lab-${Date.now()}.jpg`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
-  }, 'image/jpeg', 0.95);
-}
-
-function updateDiagnostics() {
-  const p = state.parserRecord, r = state.recolorRecord;
-  const lines = [
-    `Runtime loaded: ${window.ort?.InferenceSession ? 'yes' : 'no'}`,
-    `ONNX Runtime Web: ${engine().ortVersion}`,
-    `Active backend: ${engine().backend}`,
-    `iPhone/iPad mode: ${engine().isIOS ? 'yes (WASM threads=1)' : 'no'}`,
-    `Parser model: ${p ? 'loaded' : (state.modelInfo.parser?.cached ? 'cached, session not created' : 'not installed')}`,
-    `Parser size: ${p ? engine().bytesLabel(p.bytes) : engine().bytesLabel(state.modelInfo.parser?.bytes || 0)}`,
-    `Parser input names: ${p?.session?.inputNames?.join(', ') || models().parser.inputNames.join(', ')}`,
-    `Parser output names: ${p?.session?.outputNames?.join(', ') || models().parser.outputNames.join(', ')}`,
-    `Recolor model: ${r ? 'loaded' : (state.modelInfo.recolor?.cached ? 'cached, session not created' : 'not installed')}`,
-    `Recolor size: ${r ? engine().bytesLabel(r.bytes) : engine().bytesLabel(state.modelInfo.recolor?.bytes || 0)}`,
-    `Recolor input names: ${r?.session?.inputNames?.join(', ') || models().recolor.inputNames.join(', ')}`,
-    `Recolor output names: ${r?.session?.outputNames?.join(', ') || models().recolor.outputNames.join(', ')}`,
-    `Inference image dimensions: ${state.inferenceSize || '-'}`,
-    `Detected region: ${state.detectedRegion || '-'}`,
-    `Mask coverage: ${state.mask ? (state.mask.coverage * 100).toFixed(2) + '%' : '-'}`,
-    `Segmentation time: ${state.times.segmentation ? state.times.segmentation.toFixed(0) + ' ms' : '-'}`,
-    `Recolor time: ${state.times.recolor ? state.times.recolor.toFixed(0) + ' ms' : '-'}`,
-    `Total processing time: ${state.times.total ? state.times.total.toFixed(0) + ' ms' : '-'}`,
-    `Memory-related/last failure: ${state.lastError || 'none detected'}`,
-    '',
-    'EXPERIMENTAL RECOLOR WARNING:',
-    models().recolor.warning
-  ];
-  $('diagnostics').textContent = lines.join('\n');
-}
-
-function bind() {
-  $('file-input').addEventListener('change', e => openPhoto(e.target.files?.[0]));
-  document.querySelectorAll('[data-mode]').forEach(b => b.addEventListener('click', () => {
-    state.mode = b.dataset.mode; document.querySelectorAll('[data-mode]').forEach(x => x.classList.toggle('active', x === b));
-    $('clothing-regions').hidden = state.mode !== 'clothing';
-    document.querySelectorAll('[data-region]').forEach(x => x.disabled = state.mode !== 'clothing' || !state.image);
-  }));
-  document.querySelectorAll('[data-region]').forEach(b => b.addEventListener('click', () => { state.region = b.dataset.region; document.querySelectorAll('[data-region]').forEach(x => x.classList.toggle('active', x === b)); }));
-  $('target-color').addEventListener('input', e => syncColor(e.target.value));
-  $('target-text').addEventListener('change', e => { if (!syncColor(e.target.value)) setStatus('Target color must be #RRGGBB.', 'error'); });
-  document.querySelectorAll('[data-color]').forEach(b => b.addEventListener('click', () => syncColor(b.dataset.color)));
-  $('intensity').addEventListener('input', e => $('intensity-out').textContent = `${e.target.value}%`);
-  $('prepare-models').addEventListener('click', prepareModels);
-  $('apply').addEventListener('click', apply);
-  $('reset').addEventListener('click', reset);
-  $('save').addEventListener('click', saveResult);
-  $('clear-cache').addEventListener('click', async () => {
-    if (state.busy) return;
-    setBusy(true); try { await engine().clearModelCache(); state.parserRecord = state.recolorRecord = null; setStatus('LAB model cache deleted. Stable PHOTO IA was not touched.'); } catch (e) { setStatus(String(e?.message || e), 'error'); } finally { setBusy(false); refreshModelStatuses(); }
-  });
-  document.querySelectorAll('[data-view]').forEach(b => b.addEventListener('click', () => { state.view = b.dataset.view; renderView(); }));
-  $('show-mask').addEventListener('click', () => { state.view = 'mask'; renderView(); });
-  $('copy-diagnostics').addEventListener('click', async () => { try { await navigator.clipboard.writeText($('diagnostics').textContent); setStatus('Diagnostics copied.'); } catch (_) { setStatus('Could not copy diagnostics.', 'error'); } });
-  window.addEventListener('pagehide', () => engine().releaseAll());
-}
-
-bind();
-refreshModelStatuses();
-updateDiagnostics();
+bind();setExperiment('recolor');refreshModelStatuses();updateEnabled();updateDiagnostics();
 })();
