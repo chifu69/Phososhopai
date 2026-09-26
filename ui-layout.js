@@ -1,14 +1,19 @@
 (() => {
 'use strict';
-const VERSION='15.36.0';
+const VERSION='15.37.0';
 const categoryMap={
  home:['.command-panel','.quick-actions'],smart:['.smart-core-panel','.vision-panel'],adjust:['.tools','.transform'],
  create:['.creative-panel','#object-inspector','.layers-panel'],ai:['#ai-studio'],export:['.export']
 };
 const $=id=>document.getElementById(id);
 
-function button(icon,label,id){const b=document.createElement('button');b.type='button';b.className='pro-dock-item';b.id=id;b.innerHTML=`<span>${icon}</span><small class="pro-dock-label">${label}</small>`;b.setAttribute('aria-label',label);return b}
-function createCard(icon,title,copy,action){const b=document.createElement('button');b.type='button';b.className='module-card';b.innerHTML=`<span>${icon}</span><div><strong>${title}</strong><small>${copy}</small></div>`;if(action)b.addEventListener('click',action);return b}
+// Shared line icons keep navigation consistent across platforms.
+function studioIcon(name){
+ const paths={home:'M3 10l9-7 9 7v10H3z M9 20v-7h6v7',smart:'M12 3l2.5 6.5L21 12l-6.5 2.5L12 21l-2.5-6.5L3 12l6.5-2.5z',adjust:'M4 7h16M4 17h16M8 4v6M16 14v6',create:'M4 20l4-1L20 7l-3-3L5 16z',ai:'M5 8h14v12H5z M9 12h.01M15 12h.01M9 16h6M12 8V3',export:'M12 3v12m-4-4l4 4 4-4M4 16v5h16v-5',clean:'M4 17l9-13 7 5-8 12H7z M9 11l7 5',select:'M4 9V4h5M15 4h5v5M20 15v5h-5M9 20H4v-5',history:'M4 5v5h5M4 10a8 8 0 1 1 0 5M12 7v5l3 2',inspect:'M15 15l6 6 M17 10a7 7 0 1 1-14 0 7 7 0 0 1 14 0',share:'M12 16V3m-4 4l4-4 4 4M5 12v9h14v-9',lab:'M9 3h6M10 3v7L4 20h16l-6-10V3M8 15h8',compare:'M12 3v18M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0',tool:'M4 7h16M4 12h16M4 17h16'};
+ return `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${paths[name==='inspector'?'inspect':name]||paths.tool}"/></svg>`;
+}
+function button(icon,label,id){const b=document.createElement('button');b.type='button';b.className='pro-dock-item';b.id=id;b.innerHTML=`<span>${studioIcon(id.replace('dock-',''))}</span><small class="pro-dock-label">${label}</small>`;b.setAttribute('aria-label',label);return b}
+function createCard(icon,title,copy,action){const b=document.createElement('button');b.type='button';b.className='module-card';b.innerHTML=`<span>${studioIcon('tool')}</span><div><strong>${title}</strong><small>${copy}</small></div>`;if(action)b.addEventListener('click',action);return b}
 
 function initAdaptiveWorkspace(){
  const main=document.querySelector('.app-shell > main'),workspace=main?.querySelector('.workspace'),oldTabs=$('studio-tabs'),modeToolbar=$('mode-toolbar');
@@ -22,8 +27,8 @@ function initAdaptiveWorkspace(){
   <div id="pro-create-tools" class="pro-create-tools" hidden><span>Herramientas</span></div><div id="pro-sheet-content" class="pro-sheet-content"></div>`;
  document.body.appendChild(sheet);const content=$('pro-sheet-content'),createTools=$('pro-create-tools');toolPanels.forEach(p=>{p.classList.add('pro-tool-panel');content.appendChild(p)});
  const dock=document.createElement('nav');dock.className='pro-dock pro-dock-left';dock.setAttribute('aria-label','Módulos de PHOTO IA');document.body.appendChild(dock);
- const nav=[...oldTabs.querySelectorAll('[data-studio-tab]')],titles={home:'Inicio',smart:'Smart',adjust:'Ajustes',create:'Crear',ai:'Alienware',export:'Guardar'};
- nav.forEach(b=>{b.classList.remove('studio-tab');b.classList.add('pro-dock-item','pro-nav-item');b.querySelector('small')?.classList.add('pro-dock-label');dock.appendChild(b)});oldTabs.remove();
+ const nav=[...oldTabs.querySelectorAll('[data-studio-tab]')],titles={home:'Inicio',smart:'Mejora automática',adjust:'Ajustes',create:'Crear',ai:'Estudio IA',export:'Guardar'};
+ nav.forEach(b=>{b.classList.remove('studio-tab');b.classList.add('pro-dock-item','pro-nav-item');b.querySelector('small')?.classList.add('pro-dock-label');b.querySelector('span').innerHTML=studioIcon(b.dataset.studioTab);if(b.dataset.studioTab==='smart')b.querySelector('small').textContent='Mejorar';if(b.dataset.studioTab==='ai')b.querySelector('small').textContent='Estudio IA';dock.appendChild(b)});oldTabs.remove();
  const modes=[...modeToolbar.querySelectorAll('[data-canvas-mode]')],erase=modes.find(b=>b.dataset.canvasMode==='erase'),createModes=modes.filter(b=>b!==erase);
  createModes.forEach(b=>{b.classList.remove('mode-tool','active');b.classList.add('pro-create-tool');createTools.appendChild(b)});modeToolbar.remove();
  if(erase){erase.remove();}
@@ -82,7 +87,7 @@ function openSkinTonePanel(){
        <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
          <div>
-           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.36.0</div>
+           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.37.0</div>
            <div style="font-size:1.45rem;font-weight:900;color:#111827;margin-top:3px;">Retoque de piel</div>
          </div>
          <button id="skin-tone-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800;">×</button>
@@ -182,7 +187,7 @@ async function openGarmentColorPanel(part){
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;box-shadow:0 -12px 50px rgba(0,0,0,.28);padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
   <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.36.0</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
+   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.37.0</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
    <button id="garment-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800">×</button>
   </div>
   <p style="color:#64748b;line-height:1.35">Cambia solo esta prenda conservando sombras, pliegues, textura y logos visibles.</p>
@@ -213,7 +218,7 @@ function openClothingColorChooser(){
  wrap.style.cssText='position:fixed;inset:0;z-index:2147483645;background:rgba(3,10,24,.50);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
  wrap.innerHTML=`
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box">
-  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.36.0</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.37.0</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
   <p style="color:#64748b">PHOTO IA usa Pose Landmarker + la máscara de Ropa para separar cada prenda. Si la ropa es de una sola pieza, usa Vestido 👗.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
    <button data-part="upper" class="secondary" style="padding:15px;border-radius:15px;font-weight:900">👕 Camisa / Top</button>
@@ -252,7 +257,7 @@ async function openHairColorPanel(){
   wrap.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(3,10,24,.56);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
   const swatches=colors.map(([hex,name],i)=>`<button type="button" class="hair-swatch" data-hair-color="${hex}" data-hair-name="${name}" aria-label="${name}" style="height:52px;border-radius:14px;border:${i===0?'3px solid #f59e0b':'2px solid #cbd5e1'};background:${hex};"></button>`).join('');
   wrap.innerHTML=`<div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.36.0</div><div style="font-size:1.4rem;font-weight:900">💇 Color de cabello</div></div><button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px">×</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.37.0</div><div style="font-size:1.4rem;font-weight:900">💇 Color de cabello</div></div><button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px">×</button></div>
     <p style="color:#64748b">Elige un tono natural. No se usa el selector de colores del iPhone.</p>
     <div style="font-weight:900;margin-bottom:10px">Tono natural</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px">${swatches}</div>
@@ -290,7 +295,7 @@ function buildSelection(){const n=document.createElement('section');n.className=
  // Adaptive Workspace Engine
  const root=document.documentElement;
  function requestLayout(){requestAnimationFrame(layout)}
- function layout(){const vv=window.visualViewport,w=Math.round(vv?.width||innerWidth),h=Math.round(vv?.height||innerHeight),land=w>h;let device=w<430?'compact':w<768?'phone':w<1100?'tablet':'desktop';root.dataset.device=device;root.dataset.orientation=land?'landscape':'portrait';root.style.setProperty('--aw-vw',`${w}px`);root.style.setProperty('--aw-vh',`${h}px`);root.style.setProperty('--aw-dock',device==='compact'?'28px':device==='phone'?'32px':device==='tablet'?'42px':'48px');const open=!sheet.hidden,snap=sheet.dataset.snap||'medium';let panel=0;if(open){if(device==='desktop')panel=Math.min(430,Math.round(w*.30));else panel=snap==='compact'?Math.round(h*.27):snap==='full'?Math.round(h*.76):Math.round(h*(land?.42:.46))}root.style.setProperty('--aw-panel-size',`${panel}px`);root.style.setProperty('--aw-canvas-h',`${Math.max(300,h-(device==='desktop'?110:84))}px`);document.body.classList.toggle('aw-landscape',land);document.body.classList.toggle('aw-keyboard',vv?innerHeight-vv.height>140:false);window.dispatchEvent(new CustomEvent('photoia:workspace-layout',{detail:{w,h,device,land,panel}}))}
+ function layout(){const vv=window.visualViewport,w=Math.round(vv?.width||innerWidth),h=Math.round(vv?.height||innerHeight),land=w>h;let device=w<430?'compact':w<768?'phone':w<1100?'tablet':'desktop';root.dataset.device=device;root.dataset.orientation=land?'landscape':'portrait';root.style.setProperty('--aw-vw',`${w}px`);root.style.setProperty('--aw-vh',`${h}px`);root.style.setProperty('--aw-dock',w<1000?'0px':'88px');const open=!sheet.hidden,snap=sheet.dataset.snap||'medium';let panel=0;if(open){if(w>=1000)panel=Math.min(430,Math.round(w*.30));else panel=snap==='compact'?Math.round(h*.27):snap==='full'?Math.round(h*.76):Math.round(h*(land?.42:.46))}root.style.setProperty('--aw-panel-size',`${panel}px`);root.style.setProperty('--aw-canvas-h',`${Math.max(300,h-(w>=1000?180:260))}px`);document.body.classList.toggle('aw-landscape',land);document.body.classList.toggle('aw-keyboard',vv?innerHeight-vv.height>140:false);window.dispatchEvent(new CustomEvent('photoia:workspace-layout',{detail:{w,h,device,land,panel}}))}
  window.addEventListener('resize',requestLayout);window.visualViewport?.addEventListener('resize',requestLayout);window.visualViewport?.addEventListener('scroll',requestLayout);new ResizeObserver(requestLayout).observe(document.body);requestLayout();
  document.addEventListener('photoia:image-loaded',()=>{compare.disabled=false;close();requestLayout()});document.addEventListener('photoia:preset-applied',()=>requestLayout());
 }

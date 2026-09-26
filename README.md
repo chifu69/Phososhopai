@@ -1,4 +1,10 @@
-# PHOTO IA 15.36.0 — Mejora automática
+# PHOTO IA 15.37.0 — Interfaz Studio
+
+Interfaz grafito con iconos SVG, etiquetas visibles y navegación inferior en móvil. Conserva el tema claro elegido y las herramientas existentes.
+
+Consulta `CHANGELOG-15.37.0.md`.
+
+## Antecedentes: PHOTO IA 15.36.0 — Mejora automática
 
 Analiza la fotografía o aplica directamente la mejora automática de luz, sombras y color. Receta adaptativa con límites para retratos, modo compatible y protección al cambiar de foto durante el proceso.
 
