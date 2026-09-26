@@ -1,0 +1,22 @@
+PHOTO IA 15.40.0 — ADVANCED SELECTION TEST REPORT
+
+Motivo del fix:
+- Safari/iPhone reportó: no available backend found. ERR: [wasm] TypeError: Importing a module script failed.
+
+Corrección:
+- ORT Web 1.23.0 usa rutas absolutas versionadas para ort-wasm-simd-threaded.mjs y .wasm.
+- numThreads=1 y wasm.proxy=false para el camino iOS/WASM.
+- Service worker también cachea los URLs remotos conocidos.
+
+Verificaciones locales:
+- node --check sobre todos los .js: OK
+- content-aware-math.test.cjs: OK
+- curves-math.test.cjs: OK
+- garment-recolor.test.cjs: OK
+- local-ai-fill-integration.test.cjs: OK
+- onnx-ios-loader.test.cjs: OK
+- smart-enhance.test.cjs: OK
+- wardrobe-routing.test.cjs: OK
+
+Pendiente:
+- Validación real de ONNX Runtime Web + MI-GAN en Safari/iPhone. Este entorno no ejecuta Safari iOS.

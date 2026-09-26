@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.37.0-smart-enhance';
+const VERSION='15.40.1-smart-enhance';
 const $=id=>document.getElementById(id),api=()=>window.PhotoIA,clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 let lastAnalysis=null,analysisSeq=0,applying=false;
 function status(t,c='ready'){const b=$('smart-core-badge');if(b){b.textContent=t;b.className=`smart-core-badge ${c}`}}

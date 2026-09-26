@@ -15,7 +15,9 @@ const onReady=()=>{
     erase:'Modo Borrar: toca un trazo para eliminarlo. Las fotos, textos y stickers están protegidos.',
     sticker:'Elige un sticker abajo. Después regresarás automáticamente a Mover.',
     text:'Configura el texto abajo. Después de agregarlo podrás moverlo libremente.',
-    shape:'Elige una forma abajo. Después podrás moverla, rotarla y cambiar su tamaño.'
+    shape:'Elige una forma abajo. Después podrás moverla, rotarla y cambiar su tamaño.',
+    mask:'Modo Máscara: pinta para ocultar o revelar la capa seleccionada (o la foto si no hay ninguna). No destruye píxeles: puedes invertir o restablecer cuando quieras.',
+    aifill:'Modo AI Fill: pinta de rojo el objeto que quieres quitar y aplica el relleno local con MI-GAN.'
   };
   let canvasMode='move';
   function setCanvasMode(mode,{openPanel=true,announce=true}={}){
@@ -24,22 +26,28 @@ const onReady=()=>{
     document.body.classList.toggle('drawing-active',mode==='draw');
     canvas.selection=mode==='move';
     canvas.skipTargetFind=!['move','erase'].includes(mode);
-    canvas.defaultCursor=mode==='erase'?'not-allowed':mode==='draw'?'crosshair':'default';
+    canvas.defaultCursor=mode==='erase'?'not-allowed':(['draw','mask','aifill'].includes(mode))?'crosshair':'default';
     canvas.hoverCursor=mode==='erase'?'not-allowed':'move';
+    // Mask mode paints directly on a per-object mask canvas via pointer
+    // events (see mask-tool.js), not through fabric object selection, so it
+    // is deliberately excluded here — objects stay locked in place while
+    // painting, same as every non-Move mode above.
     canvas.getObjects().forEach(obj=>{
       const movable=mode==='move'&&obj.photoRole!=='main'&&!obj.userLocked;
       obj.selectable=mode==='erase'?obj.layerType==='drawing':movable;
       obj.evented=mode==='erase'?obj.layerType==='drawing':(mode==='move'&&obj.photoRole!=='main'&&!obj.userLocked);
     });
-    canvas.discardActiveObject();canvas.requestRenderAll();
+    if(!['mask','aifill'].includes(mode))canvas.discardActiveObject();
+    canvas.requestRenderAll();
     document.querySelectorAll('[data-canvas-mode]').forEach(btn=>btn.classList.toggle('active',btn.dataset.canvasMode===mode));
     if($('mode-help'))$('mode-help').textContent=modeHelp[mode]||'';
     if(openPanel){
-      const tabMap={draw:'draw',sticker:'stickers',text:'text',shape:'shapes'};
+      const tabMap={draw:'draw',sticker:'stickers',text:'text',shape:'shapes',mask:'mask',aifill:'aifill'};
       const tab=tabMap[mode]&&document.querySelector(`[data-tool-tab="${tabMap[mode]}"]`);
       if(tab)tab.click();
     }
     if(announce)api.toast(modeHelp[mode].split(':')[0]);
+    document.dispatchEvent(new CustomEvent('photoia:canvas-mode-changed',{detail:{mode}}));
   }
   document.querySelectorAll('[data-canvas-mode]').forEach(btn=>btn.addEventListener('click',()=>setCanvasMode(btn.dataset.canvasMode)));
   canvas.on('mouse:down',event=>{
@@ -53,7 +61,7 @@ const onReady=()=>{
   document.querySelectorAll('.creative-tab').forEach(btn=>btn.addEventListener('click',()=>{
     document.querySelectorAll('.creative-tab').forEach(x=>x.classList.toggle('active',x===btn));
     document.querySelectorAll('.creative-pane').forEach(p=>p.classList.toggle('active',p.dataset.toolPane===btn.dataset.toolTab));
-    if(btn.dataset.toolTab!=='draw'&&canvasMode==='draw')setCanvasMode('move',{openPanel:false,announce:false});
+    if(btn.dataset.toolTab!==canvasMode&&['draw','mask','aifill'].includes(canvasMode))setCanvasMode('move',{openPanel:false,announce:false});
   }));
 
   const outputPair=(id,suffix='')=>{

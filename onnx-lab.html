@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b0f17">
+<title>PHOTO IA ONNX LAB 2.0 — Recolor + Restore + Depth</title>
+<link rel="stylesheet" href="onnx-lab.css?v=2.0.0">
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div class="brand"><h1>PHOTO IA</h1><p>Local experimental AI playground</p></div>
+    <div class="lab-badge">🧪 ONNX LAB 2.0</div>
+  </header>
+  <div class="warning"><strong>EXPERIMENTAL — Safe sandbox.</strong> This LAB does not modify PHOTO IA stable. Delete these ONNX-LAB files to remove the experiment.</div>
+
+  <div class="grid">
+    <aside class="panel stack controls">
+      <label class="file-btn primary">📷 Open Photo<input id="file-input" type="file" accept="image/*"></label>
+      <h2>Experiment</h2>
+      <div class="experiment-grid">
+        <button data-experiment="recolor" class="active">🎨 Recolor</button>
+        <button data-experiment="denoise">🧼 Denoise</button>
+        <button data-experiment="deblur">🎯 Deblur</button>
+        <button data-experiment="superres">🔍 Super Resolution</button>
+        <button data-experiment="depth">🗺 Depth</button>
+        <button data-experiment="portrait">📷 Portrait Blur</button>
+        <button data-experiment="background">✂️ Background</button>
+        <button data-experiment="face">🙂 Face Restore</button>
+        <button data-experiment="colorize">🌈 Colorize</button>
+        <button data-experiment="object">🪄 Object Selection</button>
+      </div>
+
+      <section class="experiment-pane active" data-pane="recolor">
+        <h2>🎨 Recolor Pro</h2>
+        <div class="mode-grid"><button id="mode-hair" data-mode="hair" class="active" disabled>💇 Hair</button><button id="mode-clothing" data-mode="clothing" disabled>👕 Clothing</button></div>
+        <div id="clothing-regions" class="region-grid" hidden>
+          <button data-region="upper" class="active" disabled>Upper garment</button><button data-region="lower" disabled>Lower garment</button><button data-region="dress" disabled>Dress</button><button data-region="shoes" disabled>Shoes</button><button data-region="auto" disabled class="wide-grid">Automatic garment</button>
+        </div>
+        <label class="field">Target color<div class="target-row"><input id="target-text" value="#6f412c" spellcheck="false"><input id="target-color" type="color" value="#6f412c"></div></label>
+        <div class="preset-row"><button class="swatch" data-color="#111111" style="background:#111"></button><button class="swatch" data-color="#6f412c" style="background:#6f412c"></button><button class="swatch" data-color="#d59a52" style="background:#d59a52"></button><button class="swatch" data-color="#d52f45" style="background:#d52f45"></button><button class="swatch" data-color="#2d63d8" style="background:#2d63d8"></button><button class="swatch" data-color="#7651d6" style="background:#7651d6"></button><button class="swatch" data-color="#e9e6dd" style="background:#e9e6dd"></button></div>
+        <label class="field">Balanced intensity <output id="intensity-out">80%</output><input id="intensity" type="range" min="20" max="100" value="80"></label>
+        <div class="check-grid"><label class="check"><input id="preserve-shadows" type="checkbox" checked> Preserve shadows</label><label class="check"><input id="preserve-highlights" type="checkbox" checked> Preserve highlights</label><label class="check"><input id="preserve-texture" type="checkbox" checked> Preserve texture</label><label class="check"><input id="protect-skin" type="checkbox"> Protect skin</label><label class="check"><input id="protect-face" type="checkbox"> Protect face</label><label class="check"><input id="protect-logos" type="checkbox"> Protect logos/detail (heuristic)</label></div>
+        <p class="small">Apply produces Light / Balanced / Strong previews. Choose one before saving.</p>
+      </section>
+
+      <section class="experiment-pane" data-pane="denoise"><h2>🧼 AI Denoise</h2><div class="not-ready"><strong>MODEL NOT INSTALLED / EXPERIMENT NOT READY</strong><p>DnCNN exists, but this LAB does not enable it until the actual browser-direct RGB tensor contract is verified.</p></div><div class="mode-grid muted-controls"><button disabled>Low</button><button disabled>Medium</button><button disabled>High</button></div></section>
+      <section class="experiment-pane" data-pane="deblur"><h2>🎯 AI Deblur / Sharpen</h2><div class="not-ready"><strong>MODEL NOT INSTALLED / EXPERIMENT NOT READY</strong><p>No deblur model was promoted without verified provenance and browser-ready input/output contract.</p></div></section>
+
+      <section class="experiment-pane" data-pane="superres"><h2>🔍 Super Resolution</h2><div class="mode-grid"><button id="sr-2x" data-sr="2" class="active">2× Real-ESRGAN</button><button id="sr-4x" data-sr="4">4× Real-ESRGAN</button></div><p id="sr-dimensions" class="small">Open a photo to see output dimensions.</p><p class="small">Tiled inference keeps the model tensor small. Unsafe giant outputs are blocked.</p></section>
+      <section class="experiment-pane" data-pane="depth"><h2>🗺 Depth Estimation</h2><p class="small">Depth Anything V2 Small generates a relative depth map. Brighter areas are treated as nearer in this LAB.</p></section>
+      <section class="experiment-pane" data-pane="portrait"><h2>📷 Portrait Blur</h2><label class="field">Blur strength <output id="portrait-strength-out">55%</output><input id="portrait-strength" type="range" min="10" max="100" value="55"></label><p class="small">Blur increases progressively with relative depth rather than using a hard foreground mask.</p></section>
+      <section class="experiment-pane" data-pane="background">
+        <h2>✂️ Background Separation</h2>
+        <div class="region-grid"><button data-bgop="remove" class="active">Remove background</button><button data-bgop="blur">Blur background</button><button data-bgop="solid">Solid color</button></div>
+        <label class="field">Background color<input id="bg-color" type="color" value="#20252f"></label>
+        <label class="field">Blur strength <output id="bg-blur-out">45%</output><input id="bg-blur" type="range" min="5" max="100" value="45"></label>
+        <details class="refine-box"><summary>Refine subject mask</summary><label class="field">Edge (- shrink / + expand) <output id="bg-edge-out">0</output><input id="bg-edge" type="range" min="-6" max="6" value="0"></label><label class="field">Feather <output id="bg-feather-out">1</output><input id="bg-feather" type="range" min="0" max="8" value="1"></label><label class="check"><input id="bg-main" type="checkbox" checked> Keep main component</label><label class="check"><input id="bg-invert" type="checkbox"> Invert mask</label></details>
+      </section>
+
+      <section class="experiment-pane" data-pane="face"><h2>🙂 Face Restore</h2><div class="not-ready"><strong>MODEL NOT INSTALLED / EXPERIMENT NOT READY</strong><p>GFPGAN ONNX candidates are too large for this iPhone-first LAB release.</p></div></section>
+      <section class="experiment-pane" data-pane="colorize"><h2>🌈 B&W Colorization</h2><div class="not-ready"><strong>MODEL NOT INSTALLED / EXPERIMENT NOT READY</strong><p>The verified DDColor ONNX candidate is too large for this iPhone-first release.</p></div></section>
+      <section class="experiment-pane" data-pane="object"><h2>🪄 Advanced Object Selection</h2><div class="not-ready"><strong>MODEL NOT INSTALLED / EXPERIMENT NOT READY</strong><p>Automatic subject separation is real in Background. Tap-prompted arbitrary object selection is not faked without a verified interactive ONNX pair.</p></div></section>
+
+      <div class="model-box"><div class="model-line"><span>Current model status</span><strong id="current-model-status">Not installed</strong></div><div class="model-line"><span>ONNX backend</span><strong id="backend-status">Not loaded</strong></div><div class="progress"><span id="download-bar"></span></div><p id="download-label" class="small">Models download only when needed.</p></div>
+      <div class="row"><button id="prepare-current">⬇️ Prepare current</button><button id="apply" class="primary" disabled>✨ Apply</button></div>
+      <div class="row"><button id="reset" disabled>↩ Reset</button><button id="save" disabled>💾 Save Result</button></div>
+      <p class="privacy-note">🔒 Processing locally on this device. Photos are never uploaded.</p>
+    </aside>
+
+    <main class="panel viewer">
+      <div class="viewer-head"><h2>Preview</h2><div class="view-tabs"><button data-view="result" class="active">Result</button><button data-view="original">Original</button><button data-view="mask">Mask</button><button data-view="depth">Depth Map</button><button data-view="compare">Before / After</button></div></div>
+      <div id="stage" class="stage"><div class="empty"><strong>Open a photo</strong><p>Choose an experiment and run it locally.</p></div></div>
+      <div id="variant-strip" class="variant-strip" hidden></div>
+      <div id="status" class="status">Ready. No photo loaded.</div>
+    </main>
+  </div>
+
+  <details class="panel models-panel"><summary>📦 LAB Model Manager</summary><div id="model-list" class="model-list"></div><button id="clear-cache" class="danger">Delete all LAB cached models</button></details>
+  <details class="panel diagnostics-panel"><summary>🧪 Diagnostics</summary><div class="row diag-actions"><button id="show-mask">Show generated mask</button><button id="copy-diagnostics">Copy Diagnostics</button></div><pre id="diagnostics" class="diag"></pre></details>
+  <div class="footer">PHOTO IA ONNX LAB 2.0 • disposable sandbox • no stable PHOTO IA files modified</div>
+</div>
+<script src="onnx-lab-models.js?v=2.0.0"></script>
+<script src="onnx-lab-engine.js?v=2.0.0"></script>
+<script src="onnx-lab-recolor.js?v=2.0.0"></script>
+<script src="onnx-lab-restore.js?v=2.0.0"></script>
+<script src="onnx-lab-depth.js?v=2.0.0"></script>
+<script src="onnx-lab-selection.js?v=2.0.0"></script>
+<script src="onnx-lab.js?v=2.0.0"></script>
+</body>
+</html>

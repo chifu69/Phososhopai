@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 15.37.0 con selección estable, Smart resiliente y retoque corporal sutil.">
+  <meta name="description" content="PHOTO IA 15.40.1 con Selección Avanzada, AI Fill local, Curvas, Máscara, Smart y retoque fotográfico privado.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="./assets/vendor/cropper.min.css?v=15.37.0" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css'">
-  <link rel="stylesheet" href="styles.css?v=15.37.0">
-  <title>PHOTO IA 15.37.0 — Dress + Natural Skin</title>
+  <link rel="stylesheet" href="./assets/vendor/cropper.min.css?v=15.40.1" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css'">
+  <link rel="stylesheet" href="styles.css?v=15.40.1">
+  <title>PHOTO IA 15.40.1 — Advanced Selection</title>
 </head>
 <body>
 <div class="app-shell">
@@ -111,6 +111,8 @@
         <button class="mode-tool" data-canvas-mode="sticker" type="button" disabled><span>😀</span><small>Sticker</small></button>
         <button class="mode-tool" data-canvas-mode="text" type="button" disabled><span>🔤</span><small>Texto</small></button>
         <button class="mode-tool" data-canvas-mode="shape" type="button" disabled><span>⬜</span><small>Forma</small></button>
+        <button class="mode-tool" data-canvas-mode="mask" type="button" disabled><span>🩹</span><small>Máscara</small></button>
+        <button class="mode-tool" data-canvas-mode="aifill" type="button" disabled><span>✨</span><small>AI Fill</small></button>
       </div>
       <p id="mode-help" class="mode-help">Modo Mover: toca un objeto para seleccionarlo, moverlo, rotarlo o cambiar su tamaño.</p>
       <div id="canvas-wrap" class="canvas-wrap">
@@ -157,6 +159,20 @@
       </div>
     </section>
 
+    <section class="panel curves-panel">
+      <div class="section-heading"><div><p class="eyebrow">CURVAS</p><h2>Control de tono por canal</h2></div><button id="curves-reset" class="text-btn">Restablecer</button></div>
+      <div class="creative-tabs" role="tablist">
+        <button class="creative-tab active" data-curve-channel="rgb">RGB</button>
+        <button class="creative-tab" data-curve-channel="r">R</button>
+        <button class="creative-tab" data-curve-channel="g">G</button>
+        <button class="creative-tab" data-curve-channel="b">B</button>
+      </div>
+      <div class="curves-editor-wrap">
+        <canvas id="curves-editor" width="276" height="276"></canvas>
+      </div>
+      <p class="mode-help">Toca la línea para agregar un punto y arrástralo. Doble toque sobre un punto para quitarlo.</p>
+    </section>
+
     <section class="panel transform">
       <div class="section-heading"><div><p class="eyebrow">TRANSFORMAR</p><h2>Encuadre y diseño</h2></div></div>
       <div class="button-row">
@@ -170,13 +186,16 @@
     <section class="panel creative-panel">
       <div class="section-heading">
         <div><p class="eyebrow">CREATIVE STUDIO</p><h2>Texto, dibujo y formas</h2></div>
-        <span class="engine-badge">7.3.0</span>
+        <span class="engine-badge">7.4.0</span>
       </div>
       <div class="creative-tabs" role="tablist">
         <button class="creative-tab active" data-tool-tab="text">🔤 Texto</button>
         <button class="creative-tab" data-tool-tab="draw">🖌 Dibujar</button>
         <button class="creative-tab" data-tool-tab="shapes">⬜ Formas</button>
         <button class="creative-tab" data-tool-tab="stickers">😀 Stickers</button>
+        <button class="creative-tab" data-tool-tab="mask">🩹 Máscara</button>
+        <button class="creative-tab" data-tool-tab="aifill">✨ AI Fill</button>
+        <button class="creative-tab" data-tool-tab="smartselect">🎯 Selección IA</button>
       </div>
 
       <div class="creative-pane active" data-tool-pane="text">
@@ -247,6 +266,93 @@
         <div id="sticker-grid" class="sticker-grid">
           <button data-sticker="😀" disabled>😀</button><button data-sticker="😂" disabled>😂</button><button data-sticker="😎" disabled>😎</button><button data-sticker="❤️" disabled>❤️</button><button data-sticker="🔥" disabled>🔥</button><button data-sticker="⭐" disabled>⭐</button><button data-sticker="👍" disabled>👍</button><button data-sticker="🤖" disabled>🤖</button><button data-sticker="💯" disabled>💯</button><button data-sticker="🎉" disabled>🎉</button><button data-sticker="⚠️" disabled>⚠️</button><button data-sticker="✅" disabled>✅</button>
         </div>
+      </div>
+
+      <div class="creative-pane" data-tool-pane="mask">
+        <p class="mode-help">Selecciona una capa en Mover (o deja ninguna para usar la fotografía) y pulsa 🩹 Máscara arriba del lienzo para empezar a pintar.</p>
+        <div class="button-row creative-buttons">
+          <button data-mask-brush="hide" class="secondary active">🖌 Ocultar</button>
+          <button data-mask-brush="reveal" class="secondary">🩹 Revelar</button>
+          <button id="mask-invert" class="secondary" disabled>🔄 Invertir</button>
+          <button id="mask-reset" class="secondary danger" disabled>🗑 Restablecer</button>
+        </div>
+        <div class="tool-grid">
+          <label>Tamaño<input id="mask-brush-size" type="range" min="5" max="200" value="40"><output id="mask-brush-size-out">40</output></label>
+          <label>Pluma<input id="mask-brush-feather" type="range" min="0" max="100" value="60"><output id="mask-brush-feather-out">60%</output></label>
+          <label>Opacidad<input id="mask-brush-opacity" type="range" min="10" max="100" value="100"><output id="mask-brush-opacity-out">100%</output></label>
+        </div>
+        <button id="mask-remove" class="text-btn" disabled>Quitar máscara por completo</button>
+      </div>
+
+
+      <div class="creative-pane smartselect-pane" data-tool-pane="smartselect">
+        <p class="mode-help"><strong>Selección avanzada:</strong> crea una máscara local de sujeto, cabello, piel, ropa u objeto; después afina borde, suaviza, invierte o conserva solo el objeto principal.</p>
+        <div class="button-row creative-buttons smartselect-row">
+          <button id="smartselect-subjecthd" class="primary" type="button" disabled>🧠 Sujeto HD</button>
+          <button id="smartselect-person" class="secondary" type="button" disabled>👤 Persona</button>
+          <button id="smartselect-face" class="secondary" type="button" disabled>🙂 Rostro</button>
+          <button id="smartselect-hair" class="secondary" type="button" disabled>💇 Cabello</button>
+          <button id="smartselect-skin" class="secondary" type="button" disabled>✨ Piel</button>
+          <button id="smartselect-object" class="secondary" type="button" disabled>☝️ Tocar objeto</button>
+        </div>
+        <div class="button-row creative-buttons smartselect-row">
+          <button id="smartselect-upper" class="secondary" type="button" disabled>👕 Prenda sup.</button>
+          <button id="smartselect-lower" class="secondary" type="button" disabled>👖 Prenda inf.</button>
+          <button id="smartselect-dress" class="secondary" type="button" disabled>👗 Vestido</button>
+          <button id="smartselect-shoes" class="secondary" type="button" disabled>👟 Zapatos</button>
+        </div>
+        <details class="smartselect-advanced" open>
+          <summary>🎛 Afinar selección</summary>
+          <div class="tool-grid">
+            <label>Borde (- encoge / + expande)<input id="smartselect-edge" type="range" min="-8" max="8" value="0" step="1" disabled><output id="smartselect-edge-out">0</output></label>
+            <label>Suavizado<input id="smartselect-soften" type="range" min="0" max="6" value="1" step="1" disabled><output id="smartselect-soften-out">1</output></label>
+          </div>
+          <div class="button-row creative-buttons smartselect-row">
+            <button id="smartselect-expand-btn" class="secondary" type="button" disabled>➕ Expandir</button>
+            <button id="smartselect-shrink-btn" class="secondary" type="button" disabled>➖ Encoger</button>
+            <button id="smartselect-soften-btn" class="secondary" type="button" disabled>🌫 Suavizar</button>
+            <button id="smartselect-apply-edge" class="secondary" type="button" disabled>✨ Aplicar afinado</button>
+          </div>
+          <div class="button-row creative-buttons smartselect-row">
+            <button id="smartselect-largest" class="secondary" type="button" disabled>🎯 Solo principal</button>
+            <button id="smartselect-invert" class="secondary" type="button" disabled>🔄 Invertir</button>
+          </div>
+        </details>
+        <div id="smartselect-stats" class="smartselect-stats"><small>Sin máscara activa.</small></div>
+        <div class="button-row creative-buttons smartselect-row">
+          <button id="smartselect-show" class="secondary" type="button" disabled>👁 Mostrar</button>
+          <button id="smartselect-hide" class="secondary" type="button" disabled>🙈 Ocultar</button>
+          <button id="smartselect-refine" class="secondary" type="button" disabled>✨ Refinar</button>
+          <button id="smartselect-clear" class="secondary danger" type="button" disabled>🗑 Limpiar</button>
+        </div>
+        <div class="button-row creative-buttons smartselect-row">
+          <button id="smartselect-cutout" class="secondary" type="button" disabled>✂️ Crear recorte</button>
+          <button id="smartselect-aifill" class="primary" type="button" disabled>➡️ Enviar a AI Fill</button>
+        </div>
+        <p id="smartselect-status" class="smartselect-status">Abre una foto para empezar una selección avanzada local.</p>
+      </div>
+
+      <div class="creative-pane aifill-pane" data-tool-pane="aifill">
+        <p class="mode-help"><strong>AI Fill local:</strong> pinta de rojo el objeto que quieres quitar. MI-GAN reconstruye el fondo dentro del dispositivo; la primera instalación del modelo es de aproximadamente 28 MB.</p>
+        <div class="aifill-model-row">
+          <span id="aifill-model-status" class="aifill-model-status">Comprobando MI-GAN…</span>
+          <button id="aifill-install-model" class="secondary" type="button">Preparar modelo local</button>
+        </div>
+        <div class="button-row creative-buttons">
+          <button data-aifill-brush="paint" class="secondary active" type="button" disabled>🖌 Marcar para quitar</button>
+          <button data-aifill-brush="restore" class="secondary" type="button" disabled>↩ Restaurar selección</button>
+          <button id="aifill-clear" class="secondary danger" type="button" disabled>🗑 Limpiar selección</button>
+        </div>
+        <div class="tool-grid">
+          <label>Tamaño del pincel<input id="aifill-brush-size" type="range" disabled min="8" max="180" value="44"><output id="aifill-brush-size-out">44</output></label>
+          <label>Expandir borde<input id="aifill-expand" type="range" disabled min="0" max="24" value="8"><output id="aifill-expand-out">8 px</output></label>
+          <label>Suavizar unión<input id="aifill-feather" type="range" disabled min="0" max="24" value="8"><output id="aifill-feather-out">8 px</output></label>
+        </div>
+        <div class="button-row creative-buttons aifill-actions">
+          <button id="aifill-apply" class="primary" type="button" disabled>✨ Aplicar AI Fill local</button>
+          <button id="aifill-cancel" class="secondary" type="button" disabled>Cancelar</button>
+        </div>
+        <p id="aifill-status" class="aifill-status">Todo el procesamiento de AI Fill ocurre localmente en este dispositivo.</p>
       </div>
 
       <div class="selected-properties">
@@ -402,7 +508,7 @@
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 15.37.0 • Dress + Natural Skin</footer>
+  <footer>PHOTO IA 15.40.1 • Advanced Selection + AI Fill</footer>
 </div>
 
 <div id="local-install" class="local-install" hidden>
@@ -420,31 +526,35 @@
 <div id="crop-modal" class="crop-modal" hidden>
   <div class="crop-card"><div class="modal-head"><h2>Recorte profesional</h2><button id="crop-close" class="icon-btn">×</button></div><div class="crop-stage"><img id="crop-image" alt="Imagen para recortar"></div><div class="crop-ratios"><button data-ratio="NaN">Libre</button><button data-ratio="1">1:1</button><button data-ratio="0.8">4:5</button><button data-ratio="1.7777778">16:9</button></div><button id="crop-apply" class="primary wide">Aplicar recorte</button></div>
 </div>
-<div id="pwa-version-badge" class="pwa-version-badge" aria-label="Versión de PHOTO IA">PHOTO IA v15.37.0 · Dress + Natural Skin</div>
+<div id="pwa-version-badge" class="pwa-version-badge" aria-label="Versión de PHOTO IA">PHOTO IA v15.40.1 · Advanced Selection</div>
 <div id="processing" class="processing" hidden><span></span><b>Procesando…</b><button id="processing-cancel" class="processing-cancel" hidden>Cancelar</button></div>
 <div id="toast" class="toast" role="status"></div>
 
-  <script src="ui-layout.js?v=15.37.0"></script>
-<script src="./assets/vendor/fabric.min.js?v=15.37.0" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js'"></script>
-<script src="./assets/vendor/cropper.min.js?v=15.37.0" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js'"></script>
-<script src="app.js?v=15.37.0"></script>
-<script src="creative-tools.js?v=15.37.0"></script>
-<script src="brain.js?v=15.37.0"></script>
-<script src="opencv-engine.js?v=15.37.0"></script>
-<script src="smart-core.js?v=15.37.0"></script>
-<script src="connection-router.js?v=15.37.0"></script>
-<script src="wardrobe-engine.js?v=15.37.0"></script>
-<script src="ai-studio.js?v=15.37.0"></script>
-<script src="./assets/vendor/tf.min.js?v=15.37.0" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js'"></script>
-<script src="./assets/vendor/coco-ssd.min.js?v=15.37.0" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'"></script>
-<script src="vision.js?v=15.37.0"></script>
-<script src="onnx-engine.js?v=15.37.0"></script>
-<script src="segmentation.js?v=15.37.0"></script>
-<script src="body-retouch.js?v=15.37.0"></script>
-<script async src="./assets/vendor/opencv.js?v=15.37.0" onload="window.dispatchEvent(new Event('opencv-script-loaded'))" onerror="this.onerror=null;this.src='https://docs.opencv.org/4.x/opencv.js'"></script>
+  <script src="ui-layout.js?v=15.40.1"></script>
+<script src="./assets/vendor/fabric.min.js?v=15.40.1" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js'"></script>
+<script src="./assets/vendor/cropper.min.js?v=15.40.1" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js'"></script>
+<script src="app.js?v=15.40.1"></script>
+<script src="creative-tools.js?v=15.40.1"></script>
+<script src="curves-tool.js?v=15.40.1"></script>
+<script src="mask-tool.js?v=15.40.1"></script>
+<script src="brain.js?v=15.40.1"></script>
+<script src="opencv-engine.js?v=15.40.1"></script>
+<script src="smart-core.js?v=15.40.1"></script>
+<script src="connection-router.js?v=15.40.1"></script>
+<script src="wardrobe-engine.js?v=15.40.1"></script>
+<script src="ai-studio.js?v=15.40.1"></script>
+<script src="./assets/vendor/tf.min.js?v=15.40.1" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js'"></script>
+<script src="./assets/vendor/coco-ssd.min.js?v=15.40.1" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'"></script>
+<script src="vision.js?v=15.40.1"></script>
+<script src="onnx-engine.js?v=15.40.1"></script>
+<script src="content-aware-ai.js?v=15.40.1"></script>
+<script src="segmentation.js?v=15.40.1"></script>
+<script src="smart-select.js?v=15.40.1"></script>
+<script src="body-retouch.js?v=15.40.1"></script>
+<script async src="./assets/vendor/opencv.js?v=15.40.1" onload="window.dispatchEvent(new Event('opencv-script-loaded'))" onerror="this.onerror=null;this.src='https://docs.opencv.org/4.x/opencv.js'"></script>
 <script>
 (() => {
-  const VERSION='15.37.0';
+  const VERSION='15.40.1';
   const box=document.getElementById('local-install');
   const bar=document.getElementById('local-install-bar');
   const percent=document.getElementById('local-install-percent');

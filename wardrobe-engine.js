@@ -1,20 +1,22 @@
 (() => {
 'use strict';
 
-const VERSION='15.34';
+const VERSION='15.36.1';
 
 function normalize(value){
   return String(value||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
 }
 function hasClothingIntent(prompt){
   const t=normalize(prompt);
-  return /\b(ropa|camisa|playera|pantalon|pantalones|vestido|traje|chaqueta|chamarra|abrigo|sueter|sudadera|uniforme|zapatos|botas|gorra|sombrero|outfit|wear|shirt|pants|dress|suit|jacket|coat|sweater|uniform|shoes|boots|hat)\b/.test(t);
+  return /\b(ropa|camisa|playera|pantalon|pantalones|vestido|traje|chaqueta|chamarra|abrigo|sueter|sudadera|uniforme|zapatos|botas|gorra|sombrero|ponme|visteme|outfit|wear|shirt|pants|dress|suit|jacket|coat|sweater|uniform|shoes|boots|hat)\b/.test(t);
 }
 function hasSceneIntent(prompt){
   const t=normalize(prompt);
   return /\b(fondo|paisaje|playa|alaska|nieve|montana|bosque|ciudad|calle|atardecer|amanecer|desierto|campo|oficina|estudio|background|beach|snow|mountain|forest|city|sunset|desert|landscape)\b/.test(t);
 }
 function matches(mode,prompt){
+  // Cambiar fondo conserva el control de peticiones combinadas fondo + ropa.
+  if(mode==='replace_background') return false;
   if(mode==='change_clothes') return true;
   return hasClothingIntent(prompt) && !hasSceneIntent(prompt);
 }
@@ -141,6 +143,8 @@ async function run({url,token,source,prompt,reference,signal,onProgress}){
 
 window.PhotoWardrobeEngine={
   version:VERSION,
+  hasClothingIntent,
+  hasSceneIntent,
   matches,
   buildPrompt,
   enter,

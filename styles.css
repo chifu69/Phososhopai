@@ -806,6 +806,33 @@ body.photoia-pro-ui{overflow-x:hidden}
 .body-retouch-actions{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;margin-top:14px}.body-retouch-actions button{min-height:52px;font-weight:800}
 @media(max-width:680px){.body-retouch-box{padding:14px}.body-retouch-grid,.body-retouch-actions{grid-template-columns:1fr}}
 @media(prefers-color-scheme:dark){.body-retouch-box{background:linear-gradient(145deg,rgba(25,35,47,.96),rgba(34,28,43,.96))}}
+.curves-editor-wrap{display:flex;justify-content:center;margin-top:14px}
+#curves-editor{width:100%;max-width:276px;aspect-ratio:1/1;border:1px solid var(--line);border-radius:18px;background:var(--surface2);touch-action:none;cursor:crosshair}
+.mode-tool[data-canvas-mode="mask"] span{filter:saturate(1.1)}
+@media(max-width:680px){#curves-editor{max-width:240px}}
+
+/* PHOTO IA 15.40.0 — Advanced Selection + Local AI Fill */
+.aifill-model-row{display:flex;gap:10px;align-items:center;justify-content:space-between;padding:12px 14px;border:1px solid var(--line);border-radius:15px;background:var(--surface2);margin:10px 0 14px}.aifill-model-status{font-weight:850;color:var(--muted);font-size:.82rem}.aifill-model-status.ready{color:#167446}.aifill-actions{grid-template-columns:2fr 1fr}.aifill-status{margin:12px 0 0;padding:11px 13px;border-radius:13px;background:var(--surface2);color:var(--muted);font-size:.82rem;font-weight:750;line-height:1.4}.aifill-status[data-kind="error"]{color:#b42318;background:#fff1f0}.aifill-status[data-kind="working"]{color:#8a5a00;background:#fff8e6}.aifill-status[data-kind="ready"]{color:#167446;background:#e9fff2}.mode-tool[data-canvas-mode="aifill"] span{filter:saturate(1.2)}
+@media(max-width:650px){.aifill-model-row{align-items:stretch;flex-direction:column}.aifill-actions{grid-template-columns:1fr}.aifill-pane .creative-buttons{grid-template-columns:1fr 1fr}}
+
+
+/* PHOTO IA 15.40.0 — Advanced Selection */
+.smartselect-row{flex-wrap:wrap}
+.smartselect-pane .button-row .secondary,
+.smartselect-pane .button-row .primary{min-width:130px}
+.smartselect-status{margin-top:10px;padding:10px 12px;border-radius:12px;background:rgba(148,163,184,.12);border:1px solid rgba(148,163,184,.25);font-size:.94rem;line-height:1.4}
+.smartselect-status[data-kind='working']{background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.35)}
+.smartselect-status[data-kind='ready']{background:rgba(34,197,94,.10);border-color:rgba(34,197,94,.25)}
+.smartselect-status[data-kind='error']{background:rgba(239,68,68,.10);border-color:rgba(239,68,68,.28)}
+
+.smartselect-advanced{margin-top:10px;padding:10px 12px;border-radius:14px;background:rgba(15,23,42,.05);border:1px solid rgba(148,163,184,.22)}
+.smartselect-advanced summary{cursor:pointer;font-weight:800;margin-bottom:10px}
+.smartselect-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:10px 0;padding:10px 12px;border-radius:12px;background:rgba(2,132,199,.08);border:1px solid rgba(2,132,199,.18)}
+.smartselect-stats div,.smartselect-stats small{display:flex;flex-direction:column;gap:3px}
+.smartselect-stats strong{font-size:.98rem}
+.smartselect-stats small{color:#475569}
+@media (max-width:640px){.smartselect-stats{grid-template-columns:1fr 1fr}}
+
 
 /* PHOTO IA 15.37 — Studio interface. Existing editing controls retain their IDs. */
 :root{--bg:#eef0f3;--surface:#fff;--surface2:#f4f5f7;--text:#20232a;--muted:#646b79;--line:#dde0e6;--accent:#6366f1;--shadow:0 16px 48px #10121a14}
