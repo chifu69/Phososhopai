@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.40.1';
+const VERSION='15.40.2';
 const categoryMap={
  home:['.command-panel','.quick-actions'],smart:['.smart-core-panel','.vision-panel'],adjust:['.tools','.transform'],
  create:['.creative-panel','#object-inspector','.layers-panel'],ai:['#ai-studio'],export:['.export']
@@ -87,7 +87,7 @@ function openSkinTonePanel(){
        <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px;">
          <div>
-           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.40.1</div>
+           <div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.40.2</div>
            <div style="font-size:1.45rem;font-weight:900;color:#111827;margin-top:3px;">Retoque de piel</div>
          </div>
          <button id="skin-tone-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800;">×</button>
@@ -187,7 +187,7 @@ async function openGarmentColorPanel(part){
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;box-shadow:0 -12px 50px rgba(0,0,0,.28);padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
   <div style="width:54px;height:5px;border-radius:999px;background:#94a3b8;margin:0 auto 14px;"></div>
   <div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start">
-   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.40.1</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
+   <div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.40.2</div><div style="font-size:1.4rem;font-weight:900;color:#111827">${cfg.icon} Color de ${cfg.label}</div></div>
    <button id="garment-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px;font-weight:800">×</button>
   </div>
   <p style="color:#64748b;line-height:1.35">Cambia solo esta prenda conservando sombras, pliegues, textura y logos visibles.</p>
@@ -218,7 +218,7 @@ function openClothingColorChooser(){
  wrap.style.cssText='position:fixed;inset:0;z-index:2147483645;background:rgba(3,10,24,.50);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
  wrap.innerHTML=`
  <div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box">
-  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.40.1</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
+  <div style="display:flex;justify-content:space-between;align-items:center"><div><small style="font-weight:900;color:#f59e0b">PHOTO IA 15.40.2</small><h2 style="margin:3px 0">🎨 Cambiar color de ropa</h2></div><button id="cloth-x" style="border:0;background:#f1f5f9;border-radius:50%;width:42px;height:42px;font-size:26px">×</button></div>
   <p style="color:#64748b">PHOTO IA usa Pose Landmarker + la máscara de Ropa para separar cada prenda. Si la ropa es de una sola pieza, usa Vestido 👗.</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
    <button data-part="upper" class="secondary" style="padding:15px;border-radius:15px;font-weight:900">👕 Camisa / Top</button>
@@ -257,7 +257,7 @@ async function openHairColorPanel(){
   wrap.style.cssText='position:fixed;inset:0;z-index:2147483646;background:rgba(3,10,24,.56);display:flex;align-items:flex-end;justify-content:center;padding:12px;box-sizing:border-box;';
   const swatches=colors.map(([hex,name],i)=>`<button type="button" class="hair-swatch" data-hair-color="${hex}" data-hair-name="${name}" aria-label="${name}" style="height:52px;border-radius:14px;border:${i===0?'3px solid #f59e0b':'2px solid #cbd5e1'};background:${hex};"></button>`).join('');
   wrap.innerHTML=`<div style="width:min(680px,100%);background:#fff;border-radius:26px 26px 18px 18px;padding:16px 18px calc(18px + env(safe-area-inset-bottom));box-sizing:border-box;">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.40.1</div><div style="font-size:1.4rem;font-weight:900">💇 Color de cabello</div></div><button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px">×</button></div>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start"><div><div style="font-size:.78rem;font-weight:900;letter-spacing:.12em;color:#f59e0b;">PHOTO IA 15.40.2</div><div style="font-size:1.4rem;font-weight:900">💇 Color de cabello</div></div><button id="hair-x" type="button" style="border:0;background:#f1f5f9;border-radius:999px;width:42px;height:42px;font-size:26px">×</button></div>
     <p style="color:#64748b">Elige un tono natural. No se usa el selector de colores del iPhone.</p>
     <div style="font-weight:900;margin-bottom:10px">Tono natural</div>
     <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px">${swatches}</div>
@@ -295,7 +295,32 @@ function buildSelection(){const n=document.createElement('section');n.className=
  // Adaptive Workspace Engine
  const root=document.documentElement;
  function requestLayout(){requestAnimationFrame(layout)}
- function layout(){const vv=window.visualViewport,w=Math.round(vv?.width||innerWidth),h=Math.round(vv?.height||innerHeight),land=w>h;let device=w<430?'compact':w<768?'phone':w<1100?'tablet':'desktop';root.dataset.device=device;root.dataset.orientation=land?'landscape':'portrait';root.style.setProperty('--aw-vw',`${w}px`);root.style.setProperty('--aw-vh',`${h}px`);root.style.setProperty('--aw-dock',w<1000?'0px':'88px');const open=!sheet.hidden,snap=sheet.dataset.snap||'medium';let panel=0;if(open){if(w>=1000)panel=Math.min(430,Math.round(w*.30));else panel=snap==='compact'?Math.round(h*.27):snap==='full'?Math.round(h*.76):Math.round(h*(land?.42:.46))}root.style.setProperty('--aw-panel-size',`${panel}px`);root.style.setProperty('--aw-canvas-h',`${Math.max(300,h-(w>=1000?180:260))}px`);document.body.classList.toggle('aw-landscape',land);document.body.classList.toggle('aw-keyboard',vv?innerHeight-vv.height>140:false);window.dispatchEvent(new CustomEvent('photoia:workspace-layout',{detail:{w,h,device,land,panel}}))}
+ function layout(){
+  const vv=window.visualViewport,w=Math.round(vv?.width||innerWidth),h=Math.round(vv?.height||innerHeight),land=w>h;
+  const device=w<430?'compact':w<768?'phone':w<1100?'tablet':'desktop',sidePanel=window.matchMedia('(min-width:1000px), (max-width:999px) and (orientation:landscape) and (max-height:599px)').matches;
+  root.dataset.device=device;root.dataset.orientation=land?'landscape':'portrait';
+  document.body.classList.toggle('aw-landscape',land);document.body.classList.toggle('aw-keyboard',vv?innerHeight-vv.height>140:false);
+  root.style.setProperty('--aw-vw',`${w}px`);root.style.setProperty('--aw-vh',`${h}px`);root.style.setProperty('--aw-dock',w<1000?'0px':'88px');
+  const open=!sheet.hidden,snap=sheet.dataset.snap||'medium',wrap=$('canvas-wrap');
+  const viewportBottom=(vv?.offsetTop||0)+h;
+  const dockTop=w<1000?dock.getBoundingClientRect().top:viewportBottom;
+  let panel=0;
+  if(open){
+   if(sidePanel)panel=Math.min(w>=1000?430:360,Math.round(w*(w>=1000?.30:.42)));
+   else{
+    const desired=Math.round(h*(snap==='compact'?.27:snap==='full'?.76:.46));
+    // Leave room for the complete photo above the sheet, including its gap.
+    panel=Math.max(100,Math.min(desired,dockTop-wrap.getBoundingClientRect().top-152));
+   }
+  }
+  root.style.setProperty('--aw-panel-size',`${panel}px`);
+  // Measure final panel geometry (safe areas included); do not subtract an
+  // estimated fraction of its height, which allowed it to cover the photograph.
+  const top=wrap.getBoundingClientRect().top;
+  const bottom=open&&!sidePanel?Math.min(dockTop,sheet.getBoundingClientRect().top):Math.min(viewportBottom,dockTop);
+  root.style.setProperty('--aw-canvas-h',`${Math.max(64,Math.floor(bottom-top-(w>=1000?36:16)))}px`);
+  window.dispatchEvent(new CustomEvent('photoia:workspace-layout',{detail:{w,h,device,land,panel}}));
+ }
  window.addEventListener('resize',requestLayout);window.visualViewport?.addEventListener('resize',requestLayout);window.visualViewport?.addEventListener('scroll',requestLayout);new ResizeObserver(requestLayout).observe(document.body);requestLayout();
  document.addEventListener('photoia:image-loaded',()=>{compare.disabled=false;close();requestLayout()});document.addEventListener('photoia:preset-applied',()=>requestLayout());
 }

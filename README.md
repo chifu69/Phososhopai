@@ -1,6 +1,6 @@
-# PHOTO IA 15.40.1 — Interfaz Studio
+# PHOTO IA 15.40.2 — Interfaz Studio
 
-Nueva interfaz grafito con navegación móvil y etiquetas visibles. Conserva las funciones de selección avanzada, curvas, máscaras y AI Fill de 15.40.0. Consulta `CHANGELOG-15.40.1.md`.
+Interfaz Studio con lienzo ajustado al espacio visible y paneles que reservan sitio para la fotografía. Conserva las funciones de selección avanzada, curvas, máscaras y AI Fill de 15.40.0. Consulta `CHANGELOG-15.40.2.md`.
 
 ## Antecedentes: PHOTO IA 15.40.0 — Advanced Selection
 

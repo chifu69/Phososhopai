@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.40.1';
+const VERSION='15.40.2';
 const $=id=>document.getElementById(id);
 const IDS=['smartselect-subjecthd','smartselect-person','smartselect-face','smartselect-hair','smartselect-skin','smartselect-object','smartselect-upper','smartselect-lower','smartselect-dress','smartselect-shoes','smartselect-show','smartselect-hide','smartselect-refine','smartselect-clear','smartselect-cutout','smartselect-aifill','smartselect-expand-btn','smartselect-shrink-btn','smartselect-soften-btn','smartselect-apply-edge','smartselect-invert','smartselect-largest'];
 function boot(){

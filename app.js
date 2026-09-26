@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.40.1';
+const VERSION='15.40.2';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -37,9 +37,11 @@ function getPhotoDisplayRatio(){
 }
 function fitCanvas(){
  const wrap=$('canvas-wrap');
- const w=Math.max(280,Math.round(wrap.clientWidth));
+ const adaptive=document.body.classList.contains('photoia-adaptive-ui');
+ const w=Math.max(1,Math.round(wrap.clientWidth));
  let h;
- if(state.photo){
+ if(adaptive){h=Math.max(1,Math.round(wrap.clientHeight));}
+ else if(state.photo){
    const ratio=getPhotoDisplayRatio();
    const ideal=Math.round(w/ratio);
    const maxH=Math.max(360,Math.min(window.innerHeight*.72,760));
@@ -510,7 +512,17 @@ function init(){
  $('processing').hidden=true;
  document.body.classList.remove('modal-open');
  if(!window.fabric){if(initAttempts++<40){setTimeout(init,200);return}toast('No se pudo cargar el editor de capas. Conéctate una vez a Internet y vuelve a abrir PHOTO IA.');return}
- state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));state.canvas.on('selection:created',renderLayers);state.canvas.on('selection:updated',renderLayers);state.canvas.on('selection:cleared',renderLayers);state.canvas.on('object:modified',()=>snapshot());
+ state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));
+ // CSS panels and browser bars resize the wrapper without a window resize.
+ // Fit after layout settles, using its actual content box rather than photo ratio.
+ let fitFrame=0;
+ const scheduleFit=()=>{cancelAnimationFrame(fitFrame);fitFrame=requestAnimationFrame(()=>{
+  const wrap=$('canvas-wrap');
+  if(state.canvas&&(state.canvas.width!==wrap.clientWidth||state.canvas.height!==wrap.clientHeight))fitCanvas();
+ })};
+ new ResizeObserver(scheduleFit).observe($('canvas-wrap'));
+ window.addEventListener('photoia:workspace-layout',scheduleFit);
+ state.canvas.on('selection:created',renderLayers);state.canvas.on('selection:updated',renderLayers);state.canvas.on('selection:cleared',renderLayers);state.canvas.on('object:modified',()=>snapshot());
  let lastCanvasTap=0;
  state.canvas.on('mouse:down',()=>{
    const now=Date.now();

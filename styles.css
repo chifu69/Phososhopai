@@ -900,3 +900,15 @@ body.photoia-adaptive-ui{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI'
 @media(max-width:380px){.photoia-adaptive-ui .top-actions{gap:4px}.photoia-adaptive-ui .brand h1{font-size:11px}}
 @media(max-width:350px){.photoia-adaptive-ui .topbar{flex-wrap:wrap}.photoia-adaptive-ui .brand{width:100%;padding-bottom:4px}.photoia-adaptive-ui .top-actions{width:100%;justify-content:space-between}.photoia-adaptive-ui .studio-open{flex:1;margin-right:6px}}
 @media(max-width:999px){.photoia-adaptive-ui .toast{bottom:calc(96px + env(safe-area-inset-bottom));z-index:180;max-width:calc(100vw - 32px)}}
+
+/* 15.40.2: one measured viewport shared by CSS and the Fabric canvas. */
+.photoia-adaptive-ui .workspace .canvas-wrap,
+.photoia-adaptive-ui.pro-sheet-open .workspace .canvas-wrap{height:var(--aw-canvas-h)!important;min-height:0!important;max-height:none!important;transition:none!important}
+.photoia-adaptive-ui .workspace .canvas-container,
+.photoia-adaptive-ui .workspace canvas{max-height:none!important;max-width:none!important}
+.photoia-adaptive-ui .pro-tool-sheet,.photoia-adaptive-ui .app-shell{transition:none!important}
+@media(max-width:999px) and (orientation:landscape) and (max-height:599px){
+ .photoia-adaptive-ui.pro-sheet-open .app-shell{padding-right:calc(var(--aw-panel-size) + 16px)!important}
+ .photoia-adaptive-ui .pro-tool-sheet{top:82px!important;bottom:calc(90px + env(safe-area-inset-bottom))!important;left:auto!important;right:8px!important;width:var(--aw-panel-size)!important;height:auto!important;max-height:none!important}
+}
+.photoia-adaptive-ui .pro-tool-sheet{animation:none!important;transform:none!important}
