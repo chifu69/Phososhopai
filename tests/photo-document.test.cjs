@@ -1,0 +1,10 @@
+const assert=require('node:assert/strict'),D=require('../photo-document.js');
+const source={assetId:'original',mime:'image/png',width:4032,height:3024};
+let s=D.create(source,'foto');const first=D.token(s);s=D.commit(s,first,{operation:{id:'r',kind:'raster-result',params:{},assetId:'recolor',effectiveSize:{width:1800,height:1350}}});
+s=D.commit(s,D.token(s),{operation:{id:'m',kind:'smart',params:{exposure:.4}}});
+assert.equal(s.current.operations.length,2);assert.deepEqual(s.current.source,source);assert.throws(()=>D.commit(s,first,{}),/STALE_RESULT/);
+s=D.commit(s,D.token(s),{operation:{id:'m2',kind:'smart',params:{exposure:.6}}});assert.equal(s.current.operations.length,2);
+const rev=s.current.revision;s=D.undo(s);assert(s.current.revision>rev);assert.equal(s.current.operations[1].params.exposure,.4);s=D.redo(s);assert.equal(s.current.operations[1].params.exposure,.6);
+for(let i=0;i<60;i++)s=D.commit(s,D.token(s),{view:{i}});assert(s.past.length<=39);
+const v={scale:.25,offsetX:20,offsetY:30},t={left:120,top:230,scaleX:.5,scaleY:.75};assert.deepEqual(D.toDocumentTransform(t,v),{left:400,top:800,scaleX:2,scaleY:3});assert.deepEqual(D.toViewportTransform(D.toDocumentTransform(t,v),v),t);
+console.log('PASS document history, tokens, original, operation replacement, coordinates');

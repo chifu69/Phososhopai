@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.40.2';
+const VERSION='15.41.0';
 const $=id=>document.getElementById(id);
 
 function boot(){
@@ -28,7 +28,7 @@ function boot(){
     const ctx=c.getContext('2d');
     let recovered=false;
     if(obj.clipPath&&typeof obj.clipPath.getElement==='function'){
-      try{const el=obj.clipPath.getElement();if(el){ctx.drawImage(el,0,0,w,h);recovered=true}}catch(_){/* fall through to blank */}
+      try{const el=obj.clipPath.getElement();if(el){const clip=obj.clipPath,m=clip.calcTransformMatrix();ctx.save();ctx.transform(...m);ctx.drawImage(el,-clip.width/2,-clip.height/2,clip.width,clip.height);ctx.restore();recovered=true}}catch(_){/* fall through to blank */}
     }
     if(!recovered){ctx.fillStyle='#fff';ctx.fillRect(0,0,w,h)} // fully opaque = fully visible
     obj.__maskCanvas=c;

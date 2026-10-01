@@ -1,0 +1,1 @@
+const fs=require('node:fs'),{spawnSync}=require('node:child_process');let failed=false;for(const f of fs.readdirSync(__dirname).filter(f=>f.endsWith('.test.cjs')).sort()){const r=spawnSync(process.execPath,[__dirname+'/'+f],{stdio:'inherit',cwd:require('node:path').resolve(__dirname,'..')});if(r.status!==0)failed=true;}process.exitCode=failed?1:0;

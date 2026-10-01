@@ -286,6 +286,7 @@ EDIT STRENGTH: LOW. Resultado fotorealista, natural y lo más cercano posible a 
 }
 
 async function generateWardrobe(prompt){
+ const projectToken=window.PhotoProject?.token();
  const engine=window.PhotoWardrobeEngine;
  if(!engine)throw new Error('Wardrobe Engine 15.0 no está cargado.');
  useCanvas(true);
@@ -325,7 +326,8 @@ async function generateWardrobe(prompt){
   state.history.unshift({image:out.image,prompt,date:Date.now(),task:'wardrobe_only'});
   state.history=state.history.slice(0,8);
   save();renderHistory();
-  await app()?.applyProcessedImageDataUrl?.(out.image,true);
+  if(projectToken&&!PhotoProject.valid(projectToken))throw new Error('La foto cambió. El resultado quedó disponible en el historial IA.');
+  await app()?.applyProcessedImageDataUrl?.(out.image,true,null,{token:projectToken,label:'Vestuario IA'});
   toast('Cambio de ropa recibido del Alienware');
  }catch(e){
   if(progressTimer){clearInterval(progressTimer);progressTimer=null}
@@ -342,7 +344,7 @@ async function generateWardrobe(prompt){
  }
 }
 
-async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
+async function generate(){const projectToken=window.PhotoProject?.token();const prompt=$('ai-prompt').value.trim();if(!prompt)return toast('Escribe qué quieres hacer.');useCanvas(true);if(!state.main)return toast('Agrega una fotografía principal.');saveSettings();if(!state.settings.url){setStatus('error','Tarea preparada','Guarda la dirección del Alienware cuando estés en casa.',0);return toast('La tarea está lista, pero falta configurar el servidor.')}if(!state.online){await testConnection();if(!state.online){setStatus('error','Alienware no disponible','Enciende la PC y el servidor para enviar esta tarea.',0);return}}
  if(window.PhotoWardrobeEngine?.matches?.(state.mode,prompt)){await generateWardrobe(prompt);return}
  state.controller=new AbortController();$('ai-generate').disabled=true;$('ai-cancel-job').hidden=false;setStatus('processing','Enviando fotografías','Preparando la tarea para FLUX.2 Klein…',12);
  let progress=null;
@@ -361,7 +363,7 @@ async function generate(){const prompt=$('ai-prompt').value.trim();if(!prompt)re
   result=await compositeLockedRegion(result,task.originalSource,task.identityMask,{lightingStrength:.28});
  }
  const doneDetail=task.task==='portrait_id'?'Retrato/ID mejorado usando la fotografía completa; identidad, ropa y fondo protegidos.':task.task==='background_only'?'Fondo cambiado; la persona original fue preservada.':task.task==='wardrobe_only'?'Cambio de ropa procesado en el Alienware sobre la fotografía original.':task.task==='scene_and_wardrobe'?'Escenario y ropa adaptados; identidad protegida con recomposición por capas.':'El resultado se colocó en el lienzo.';
- setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();await app()?.applyProcessedImageDataUrl?.(result,true);toast('Edición recibida del Alienware sin borrar tus capas')
+ setStatus('done','Edición terminada',doneDetail,100);state.history.unshift({image:result,prompt,date:Date.now(),task:task.task});state.history=state.history.slice(0,8);save();renderHistory();if(projectToken&&!PhotoProject.valid(projectToken))throw new Error('La foto cambió. El resultado quedó disponible en el historial IA.');await app()?.applyProcessedImageDataUrl?.(result,true,null,{token:projectToken,label:'Estudio IA'});toast('Edición recibida del Alienware sin borrar tus capas')
  }catch(e){if(progress){clearInterval(progress);progress=null}if(e.name==='AbortError')setStatus('error','Tarea cancelada','No se aplicaron cambios.',0);else{setStatus('error','No se pudo completar',e.message||'Error desconocido.',0);toast(e.message||'Error del servidor')}}finally{if(progress){clearInterval(progress);progress=null}$('ai-generate').disabled=false;$('ai-cancel-job').hidden=true;state.controller=null}}
 function enterPortraitIdMode(){
  useCanvas(true);

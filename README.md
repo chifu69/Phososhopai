@@ -1,6 +1,6 @@
-# PHOTO IA 15.40.2 — Interfaz Studio
+# PHOTO IA 15.41.0 — Proyectos recuperables
 
-Interfaz Studio con lienzo ajustado al espacio visible y paneles que reservan sitio para la fotografía. Conserva las funciones de selección avanzada, curvas, máscaras y AI Fill de 15.40.0. Consulta `CHANGELOG-15.40.2.md`.
+Conserva el archivo original, exporta independientemente del tamaño de pantalla y recupera el último proyecto guardado en este dispositivo. Las mejoras y el historial mantienen los retoques anteriores. Consulta `CHANGELOG-15.41.0.md`.
 
 ## Antecedentes: PHOTO IA 15.40.0 — Advanced Selection
 

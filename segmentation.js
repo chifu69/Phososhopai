@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.40.2-natural-garment';
+const VERSION='15.41.0-natural-garment';
 const $=id=>document.getElementById(id);
 const api=()=>window.PhotoIA;
 const TASKS_VERSION='0.10.35';
@@ -552,7 +552,7 @@ async function runConnectionTests(){
   const results=[];
   results.push(await probeUrl('MediaPipe ESM',MEDIAPIPE_ESM));
   results.push(await probeUrl('MediaPipe Multiclase',MULTICLASS_MODEL));
-  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.40.2'));
+  results.push(await probeUrl('ONNX Runtime','./assets/vendor/ort.min.js?v=15.41.0'));
   results.push(await probeUrl('WASM loader',`${MEDIAPIPE_WASM}/vision_wasm_internal.js`));
   results.push(await probeUrl('WASM SIMD',`${MEDIAPIPE_WASM}/vision_wasm_internal.wasm`));
   results.push(await probeUrl('WASM sin SIMD',`${MEDIAPIPE_WASM}/vision_wasm_nosimd_internal.wasm`));
@@ -672,7 +672,7 @@ function terminateMLWorker(reason='reset'){
 function ensureMLWorker(){
   if(state.mlWorker)return state.mlWorker;
   if(!workerSupported())throw makeError('Este navegador no admite Web Workers.','WORKER_UNSUPPORTED');
-  const w=new Worker(`./segmentation-worker.js?v=15.40.2`); // classic worker: MediaPipe internally uses importScripts()
+  const w=new Worker(`./segmentation-worker.js?v=15.41.0`); // classic worker: MediaPipe internally uses importScripts()
   state.workerDiag={...state.workerDiag,worker:'STARTING',error:''};
   w.onmessage=e=>{
     const d=e.data||{};
@@ -1155,6 +1155,7 @@ async function segmentAtPoint(x,y){
         throw e;
       }
     }
+    if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');
     await setMask(mask,work.width,work.height,finalLabel);
     setStatus(`${finalLabel} seleccionado con ${engine}.`,'ready');api().toast(`${finalLabel} listo`);
     if(state.garmentTapMode){
@@ -1174,16 +1175,18 @@ function maskCanvas(mask,width,height,mode='overlay'){
 }
 function removeMaskOverlay(){const canvas=api()?.state?.canvas;if(!canvas)return;canvas.getObjects().filter(o=>o.layerType==='vision-mask').forEach(o=>canvas.remove(o));state.maskOverlay=null;canvas.requestRenderAll();api().renderLayers?.();}
 async function setMask(mask,width,height,label){
+  const documentToken=window.PhotoProject?.token();
   if(state.suspendedByWardrobe){removeMaskOverlay();state.mask=null;state.maskKind='';return;}
   removeMaskOverlay();state.mask={data:mask,width,height,label};state.maskKind=label;
   const url=maskCanvas(mask,width,height,'overlay').toDataURL('image/png');
   await timeout(new Promise((resolve,reject)=>{
     let done=false;
-    const finish=(err,img)=>{if(done)return;done=true;if(err)return reject(err);const photo=api().state.photo;
+    const finish=(err,img)=>{if(done)return;done=true;if(err)return reject(err);const photo=api().state.photo;if(!photo||(documentToken&&!PhotoProject.valid(documentToken)))return resolve();
       img.set({left:photo.left,top:photo.top,originX:'center',originY:'center',angle:photo.angle||0,flipX:!!photo.flipX,scaleX:photo.getScaledWidth()/width,scaleY:photo.getScaledHeight()/height,selectable:false,evented:false,excludeFromExport:true,opacity:.9});
       img.layerId=`mask-${Date.now()}`;img.layerName=`Máscara: ${label}`;img.layerType='vision-mask';api().state.canvas.add(img);api().state.canvas.bringToFront(img);state.maskOverlay=img;api().state.canvas.requestRenderAll();api().renderLayers?.();resolve();};
     try{fabric.Image.fromURL(url,img=>img?finish(null,img):finish(makeError('No pude mostrar la máscara.')));}catch(err){finish(err);}
   }),6000,'La máscara tardó demasiado en mostrarse. Intenta de nuevo.',state.operation);
+  if(documentToken&&!PhotoProject.valid(documentToken))return;
   updateUI();
   try{window.dispatchEvent(new CustomEvent('photoia:segmentation-mask-changed',{detail:{action:'set',label,width,height}}));}catch(_){ }
 }
@@ -1242,15 +1245,16 @@ function currentMaskStats(){
   return {label:label||state.maskKind||'Selección',area,coverage:area/(width*height),width,height};
 }
 async function createCutout(){
-  if(!state.mask||!state.workCanvas)return api()?.toast('Primero crea una máscara.');
+  const documentToken=window.PhotoProject?.token();
+  if(!state.mask||!api()?.state?.photo)return api()?.toast('Primero crea una máscara.');
   const operation=beginOperation('Quitando el fondo…');
   try{
-    const {data,width,height}=state.mask,src=state.workCanvas,out=document.createElement('canvas');out.width=width;out.height=height;
+    const {data,width,height}=state.mask,photo=api().state.photo,src=photo.getElement(),out=document.createElement('canvas');out.width=width;out.height=height;
     const ctx=out.getContext('2d',{willReadFrequently:true});ctx.drawImage(src,0,0,width,height);const pixels=ctx.getImageData(0,0,width,height);
     for(let i=0;i<data.length;i++){if(operation.cancelled)throw makeError('Proceso cancelado.','CANCELLED');pixels.data[i*4+3]=data[i]>=110?data[i]:0;}
     ctx.putImageData(pixels,0,0);const url=out.toDataURL('image/png');
     await new Promise((resolve,reject)=>fabric.Image.fromURL(url,img=>{
-      if(!img)return reject(makeError('No pude crear el recorte.'));const photo=api().state.photo;
+      if(!img)return reject(makeError('No pude crear el recorte.'));const photo=api().state.photo;if(!photo||(documentToken&&!PhotoProject.valid(documentToken)))return resolve();
       img.set({left:photo.left,top:photo.top,originX:'center',originY:'center',angle:photo.angle||0,flipX:!!photo.flipX,scaleX:photo.getScaledWidth()/width,scaleY:photo.getScaledHeight()/height,selectable:true,evented:true});
       img.layerId=api().nextLayerId();img.layerName=`${state.maskKind||'Objeto'} sin fondo`;img.layerType='segmented-cutout';photo.visible=false;removeMaskOverlay();api().state.canvas.add(img);api().state.canvas.setActiveObject(img);api().state.canvas.requestRenderAll();api().snapshot();api().renderLayers?.();resolve();
     },{crossOrigin:'anonymous'}));
@@ -1267,7 +1271,7 @@ let skinToneBaseImage=null;
 
 function currentPhotoElement(){
   const photo=api()?.state?.photo;
-  return photo?.getElement?.()||photo?._element||null;
+  return photo?._originalElement||photo?.getElement?.()||photo?._element||null;
 }
 async function beginSkinToneSession(){
   const el=currentPhotoElement();
@@ -1358,7 +1362,7 @@ async function previewSkinTone(amount){
  }
 }
 
-async function cancelSkinTonePreview(){
+async function cancelSkinTonePreview(){if(window.PhotoProject?.active){++skinPreviewSeq;await PhotoProject.cancelPreview();endSkinToneSession();return;}
  const seq=++skinPreviewSeq;
  try{
    if(skinToneBaseDataUrl)await api().applyProcessedImageDataUrl(skinToneBaseDataUrl,false,()=>seq===skinPreviewSeq,{preserveFilters:true});
@@ -1392,7 +1396,7 @@ let garmentColorBaseDataUrl='',garmentColorBaseImage=null,garmentPreviewSeq=0,ga
 async function beginGarmentColorSession(){
   garmentColorAnalysis=null;
   garmentColorSessionActive=true;
-  const photo=api()?.state?.photo,el=photo?.getElement?.()||photo?._element;
+  const photo=api()?.state?.photo,el=photo?._originalElement||photo?.getElement?.()||photo?._element;
   if(!el)throw makeError('No pude leer la fotografía actual.');
   const W=el.naturalWidth||el.width||photo.width||0,H=el.naturalHeight||el.height||photo.height||0;
   if(!W||!H)throw makeError('La fotografía no tiene resolución válida.');
@@ -1552,7 +1556,7 @@ function garmentColorDataUrl(hex,intensity,maxDim=0){
   ctx.putImageData(im,0,0);return c.toDataURL('image/png');
 }
 async function previewGarmentColor(hex,intensity){const seq=++garmentPreviewSeq;try{showMask(false);if(!garmentColorBaseImage)await beginGarmentColorSession();const url=garmentColorDataUrl(hex,intensity,900);if(seq!==garmentPreviewSeq)return;await api().applyProcessedImageDataUrl(url,false,()=>seq===garmentPreviewSeq,{preserveFilters:true})}catch(e){console.error(e);api()?.toast(friendlyError(e))}}
-async function cancelGarmentColorPreview(){const seq=++garmentPreviewSeq;try{if(garmentColorBaseDataUrl)await api().applyProcessedImageDataUrl(garmentColorBaseDataUrl,false,()=>seq===garmentPreviewSeq,{preserveFilters:true});if(state.mask)showMask(true)}finally{endGarmentColorSession()}}
+async function cancelGarmentColorPreview(){if(window.PhotoProject?.active){++garmentPreviewSeq;await PhotoProject.cancelPreview();endGarmentColorSession();return;}const seq=++garmentPreviewSeq;try{if(garmentColorBaseDataUrl)await api().applyProcessedImageDataUrl(garmentColorBaseDataUrl,false,()=>seq===garmentPreviewSeq,{preserveFilters:true});if(state.mask)showMask(true)}finally{endGarmentColorSession()}}
 async function applyGarmentColor(hex,intensity){
   const seq=++garmentPreviewSeq;
   try{
@@ -1572,7 +1576,7 @@ async function applyGarmentColor(hex,intensity){
 let hairColorBaseDataUrl='',hairColorBaseImage=null,hairPreviewSeq=0;
 
 async function beginHairColorSession(){
-  const photo=api()?.state?.photo,el=photo?.getElement?.()||photo?._element;
+  const photo=api()?.state?.photo,el=photo?._originalElement||photo?.getElement?.()||photo?._element;
   if(!el)throw makeError('No pude leer la fotografía actual.');
   const W=el.naturalWidth||el.width||photo.width||0,H=el.naturalHeight||el.height||photo.height||0;
   if(!W||!H)throw makeError('La fotografía no tiene resolución válida.');
@@ -1614,7 +1618,7 @@ function hairColorDataUrl(hex,intensity,maxDim=0){
 async function previewHairColor(hex,intensity){
   const seq=++hairPreviewSeq;try{showMask(false);if(!hairColorBaseImage)await beginHairColorSession();const url=hairColorDataUrl(hex,intensity,900);if(seq!==hairPreviewSeq)return;await api().applyProcessedImageDataUrl(url,false,()=>seq===hairPreviewSeq,{preserveFilters:true})}catch(e){console.error(e);api()?.toast(friendlyError(e))}
 }
-async function cancelHairColorPreview(){
+async function cancelHairColorPreview(){if(window.PhotoProject?.active){++hairPreviewSeq;await PhotoProject.cancelPreview();endHairColorSession();return;}
   const seq=++hairPreviewSeq;try{if(hairColorBaseDataUrl)await api().applyProcessedImageDataUrl(hairColorBaseDataUrl,false,()=>seq===hairPreviewSeq,{preserveFilters:true});if(state.mask)showMask(true)}finally{endHairColorSession()}
 }
 async function applyHairColor(hex,intensity){
@@ -1649,7 +1653,7 @@ function boot(){
   if($('segment-debug-download'))$('segment-debug-download').onclick=downloadDebug;
   if($('segment-debug-test'))$('segment-debug-test').onclick=runConnectionTests;
   if($('processing-cancel'))$('processing-cancel').onclick=()=>cancelCurrent(true);
-  api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(e.target?.photoRole==='main'&&!garmentColorSessionActive&&!skinToneBaseImage&&!hairColorBaseImage)clearMask();});
+  api().state.canvas.on('mouse:down',handleCanvasTap);api().state.canvas.on('object:added',e=>{if(!window.PhotoProject?.active&&e.target?.photoRole==='main'&&!garmentColorSessionActive&&!skinToneBaseImage&&!hairColorBaseImage)clearMask();});
   logDebug('ARRANQUE',environmentInfo());renderDebug();updateUI();setStatus('Motor de selección listo.');
   if(window.PhotoBrain?.register)window.PhotoBrain.register({name:'segmentation',score:t=>/segmenta|seleccion inteligente|toca.*objeto|quita.*fondo|elimina.*fondo|mascara|cancela.*segment/.test(t)?220:0,run:t=>command(t)});
 }
@@ -1677,6 +1681,7 @@ function resumeAfterWardrobe(){
 document.addEventListener('photoia:wardrobe-engine-enter',suspendForWardrobe);
 document.addEventListener('photoia:wardrobe-engine-leave',resumeAfterWardrobe);
 
+document.addEventListener('photoia:document-changed',()=>{try{cancelCurrent(false)}catch(_){}++skinPreviewSeq;++garmentPreviewSeq;++hairPreviewSeq;endSkinToneSession();endGarmentColorSession();endHairColorSession();clearMask();});
 window.PhotoSegmentation={version:VERSION,getPoseLandmarks,segmentPerson,segmentBust,segmentFace,segmentSkin,segmentHair,segmentClothing,segmentGarmentUpper,segmentGarmentLower,segmentGarmentDress,segmentGarmentShoes,beginTapMode,createCutout,isolateSelection,restoreBackground,refineCurrentMask,clearMask,showMask,showWorkerDiagnostics,cancel:()=>cancelCurrent(true),command,exportMaskDataUrl,exportSourceDataUrl,replaceMask,growCurrentMask,shrinkCurrentMask,softenCurrentMask,invertCurrentMask,keepLargestCurrentMask,currentMaskStats,get diagnostics(){return {...state.workerDiag}},get mask(){return state.mask},get maskKind(){return state.maskKind},isSkinMask,isGarmentMask,adjustSkinTone,previewSkinTone,cancelSkinTonePreview,beginSkinToneSession,beginGarmentColorSession,previewGarmentColor,cancelGarmentColorPreview,applyGarmentColor,beginGarmentTapMode,beginHairColorSession,previewHairColor,cancelHairColorPreview,applyHairColor};
 let started=false;function safeBoot(){if(started)return;if(window.PhotoIA?.state?.canvas){started=true;boot();}else setTimeout(safeBoot,120)}
 window.addEventListener('photoia-ready',safeBoot,{once:true});if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',safeBoot,{once:true});else safeBoot();

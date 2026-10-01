@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.40.2';
+const VERSION='15.41.0';
 
 // ---------------------------------------------------------------------------
 // Pure helpers. Kept DOM-free so regression tests can require this file.
@@ -204,7 +204,7 @@ function boot(){
     return dilateBinary(bin,w,h,Math.round((expand||0)*scale));
   }
   function getPhotoSourceCanvas(){
-    const p=api.state.photo,el=p?._element||p?.getElement?.()||p?._originalElement;if(!p||!el)throw new Error('No pude leer los píxeles de la fotografía.');
+    const p=api.state.photo,el=p?._originalElement||p?._element||p?.getElement?.();if(!p||!el)throw new Error('No pude leer los píxeles de la fotografía.');
     const c=document.createElement('canvas');c.width=sourceW;c.height=sourceH;const ctx=c.getContext('2d',{alpha:false,willReadFrequently:true});ctx.fillStyle='#fff';ctx.fillRect(0,0,c.width,c.height);ctx.drawImage(el,0,0,c.width,c.height);return c;
   }
   function imageDataToCanvas(imageData){const c=document.createElement('canvas');c.width=imageData.width;c.height=imageData.height;c.getContext('2d').putImageData(imageData,0,0);return c}
@@ -259,7 +259,7 @@ function boot(){
     if(!active||!api.state.photo)return;
     const alpha=getMaskAlpha(),raw=getMaskBounds(alpha,sourceW,sourceH);
     if(!raw){api.toast('Pinta primero el objeto que quieres quitar.');return}
-    const token=++inferenceToken;
+    const token=++inferenceToken,projectToken=window.PhotoProject?.token();
     const expand=Number($('aifill-expand')?.value||8),feather=Number($('aifill-feather')?.value||8);
     const context=Math.max(72,Math.min(260,Math.round(Math.max(raw.width,raw.height)*.65)+expand*2));
     const bounds=expandBounds(raw,context,sourceW,sourceH),scale=computeScale(bounds.width,bounds.height,768);
@@ -271,11 +271,11 @@ function boot(){
       const hole=cropMaskArray(alpha,bounds,scale,expand);
       setStatus('Ejecutando MI-GAN dentro del teléfono…','working');
       const result=await window.PhotoONNX.inpaint(cropData,hole);
-      if(token!==inferenceToken)return;
+      if(token!==inferenceToken||(projectToken&&!PhotoProject.valid(projectToken)))return;
       const blend=boxBlurMask(hole,crop.width,crop.height,Math.max(0,Math.round(feather*scale)));
       const merged=mergePatch(source,bounds,result,blend,crop.width,crop.height);
       removeOverlay();
-      await api.applyProcessedImageDataUrl(merged.toDataURL('image/png'),true,null,{preserveFilters:true});
+      await api.applyProcessedImageDataUrl(merged.toDataURL('image/png'),true,null,{preserveFilters:true,token:projectToken,label:'AI Fill'});
       clearCanvases();api.setCanvasMode?.('move',{openPanel:false,announce:false});
       setStatus('AI Fill aplicado localmente. Usa Undo si quieres comparar.','ready');api.toast('AI Fill local aplicado');
     }catch(err){

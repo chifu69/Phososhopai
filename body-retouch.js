@@ -8,7 +8,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function toast(t){api()?.toast?.(t)}
 function loadImage(src){return new Promise((resolve,reject)=>{const im=new Image();im.decoding='async';im.onload=()=>resolve(im);im.onerror=()=>reject(new Error('No pude leer la fotografía.'));im.src=src;});}
 function currentPhotoRaster(){
-  const photo=api()?.state?.photo,el=photo?.getElement?.()||photo?._element||photo?._originalElement;
+  const photo=api()?.state?.photo,el=photo?._originalElement||photo?.getElement?.()||photo?._element;
   if(!el)throw new Error('Abre una foto primero.');
   const w=el.naturalWidth||el.width||photo.width,h=el.naturalHeight||el.height||photo.height;
   const c=document.createElement('canvas');c.width=w;c.height=h;const ctx=c.getContext('2d',{alpha:false});ctx.drawImage(el,0,0,w,h);return c.toDataURL('image/png');
@@ -62,17 +62,17 @@ function warpAbdomen(image,points,strength=15,area='abdomen',maxDim=0){
 function values(){return{strength:Number($('body-slim-strength')?.value||15),area:$('body-slim-area')?.value||'abdomen'};}
 function setBusy(v,text=''){state.busy=v;['body-slim-preview','body-slim-apply','body-slim-cancel'].forEach(id=>{const b=$(id);if(b)b.disabled=v||!api()?.state?.photo});const status=$('body-slim-status');if(status&&text)status.textContent=text;}
 async function preview(){
-  const seq=++state.previewSeq;setBusy(true,'Detectando cintura y preparando vista previa…');
-  try{await ensureSession();const v=values(),url=warpAbdomen(state.baseImage,state.pose,v.strength,v.area,900);if(seq!==state.previewSeq)return;await api().applyProcessedImageDataUrl(url,false,()=>seq===state.previewSeq,{preserveFilters:true});const st=$('body-slim-status');if(st)st.textContent='Vista previa lista. Si se ve natural, pulsa Aplicar.';}
+  const seq=++state.previewSeq,projectToken=window.PhotoProject?.token();setBusy(true,'Detectando cintura y preparando vista previa…');
+  try{await ensureSession();const v=values(),url=warpAbdomen(state.baseImage,state.pose,v.strength,v.area,900);if(seq!==state.previewSeq)return;await api().applyProcessedImageDataUrl(url,false,()=>seq===state.previewSeq&&(!projectToken||PhotoProject.valid(projectToken)),{preserveFilters:true});const st=$('body-slim-status');if(st)st.textContent='Vista previa lista. Si se ve natural, pulsa Aplicar.';}
   catch(e){console.error(e);toast(e.message);const st=$('body-slim-status');if(st)st.textContent=e.message;}
   finally{setBusy(false);}
 }
-async function cancel(){
-  const seq=++state.previewSeq;try{if(state.baseUrl)await api().applyProcessedImageDataUrl(state.baseUrl,false,()=>seq===state.previewSeq,{preserveFilters:true});const st=$('body-slim-status');if(st)st.textContent='Vista previa cancelada.';}finally{resetSession();setBusy(false);}
+async function cancel(){if(window.PhotoProject?.active){++state.previewSeq;await PhotoProject.cancelPreview();resetSession();setBusy(false);return;}
+  const seq=++state.previewSeq;try{if(state.baseUrl)await api().applyProcessedImageDataUrl(state.baseUrl,false,()=>seq===state.previewSeq&&(!projectToken||PhotoProject.valid(projectToken)),{preserveFilters:true});const st=$('body-slim-status');if(st)st.textContent='Vista previa cancelada.';}finally{resetSession();setBusy(false);}
 }
 async function apply(){
-  const seq=++state.previewSeq;setBusy(true,'Aplicando retoque corporal sutil…');
-  try{await ensureSession();const v=values(),url=warpAbdomen(state.baseImage,state.pose,v.strength,v.area,0);if(seq!==state.previewSeq)return;const ok=await api().applyProcessedImageDataUrl(url,true,()=>seq===state.previewSeq,{preserveFilters:true});if(ok){toast('Abdomen ajustado de forma sutil');const st=$('body-slim-status');if(st)st.textContent='Retoque aplicado. Puedes usar Undo si quieres volver atrás.';}}
+  const seq=++state.previewSeq,projectToken=window.PhotoProject?.token();setBusy(true,'Aplicando retoque corporal sutil…');
+  try{await ensureSession();const v=values(),url=warpAbdomen(state.baseImage,state.pose,v.strength,v.area,0);if(seq!==state.previewSeq)return;const ok=await api().applyProcessedImageDataUrl(url,true,()=>seq===state.previewSeq&&(!projectToken||PhotoProject.valid(projectToken)),{preserveFilters:true});if(ok){toast('Abdomen ajustado de forma sutil');const st=$('body-slim-status');if(st)st.textContent='Retoque aplicado. Puedes usar Undo si quieres volver atrás.';}}
   catch(e){console.error(e);toast(e.message);const st=$('body-slim-status');if(st)st.textContent=e.message;}
   finally{resetSession();setBusy(false);}
 }
@@ -81,6 +81,7 @@ function sync(){const has=!!api()?.state?.photo;['body-slim-preview','body-slim-
 function boot(){
   const slider=$('body-slim-strength'),out=$('body-slim-strength-value');if(slider&&out){const u=()=>out.textContent=`${slider.value}%`;slider.oninput=u;u();}
   $('body-slim-preview')?.addEventListener('click',preview);$('body-slim-apply')?.addEventListener('click',apply);$('body-slim-cancel')?.addEventListener('click',cancel);
+  document.addEventListener('photoia:document-changed',()=>{++state.previewSeq;resetSession()});
   document.addEventListener('photoia:image-loaded',()=>{resetSession();sync()});document.addEventListener('photoia:image-cleared',()=>{resetSession();sync()});sync();
   window.PhotoBodyRetouch={version:VERSION,preview,apply,cancel,reset:resetSession};
 }

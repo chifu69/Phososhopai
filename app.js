@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.40.2';
+const VERSION='15.41.0';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -59,7 +59,8 @@ function fitCanvas(){
    fitPhoto();
    // Keep editable layers registered to the photograph when the phone rotates or the viewport changes.
    const ratio=(state.photo.scaleX||1)/Math.max(.0001,oldPhotoScale);
-   if(Number.isFinite(ratio)&&oldW>0&&oldH>0&&(Math.abs(w-oldW)>.5||Math.abs(h-oldH)>.5)){
+   if(Number.isFinite(ratio)&&oldW>0&&oldH>0&&(Math.abs(w-oldW)>.5||Math.abs(h-oldH)>.5||Math.abs(ratio-1)>1e-8)){
+     state.canvas.getObjects().forEach(o=>{const clip=o.clipPath;if(clip?.absolutePositioned){clip.set({left:w/2+(clip.left-oldW/2)*ratio,top:h/2+(clip.top-oldH/2)*ratio,scaleX:(clip.scaleX||1)*ratio,scaleY:(clip.scaleY||1)*ratio});clip.setCoords();o.dirty=true}});
      extras.forEach(o=>{
        const ox=(Number(o.left)||0)-oldW/2,oy=(Number(o.top)||0)-oldH/2;
        o.set({left:w/2+ox*ratio,top:h/2+oy*ratio,scaleX:(o.scaleX||1)*ratio,scaleY:(o.scaleY||1)*ratio});
@@ -83,7 +84,7 @@ function fitPhoto(){
  p.set({left:state.canvas.width/2,top:state.canvas.height/2,originX:'center',originY:'center'});
  p.setCoords();
 }
-function snapshot(){if(!state.photo||state.resizing||state.compare)return;const json=state.canvas.toJSON(['photoRole','layerId','layerName','layerType','userLocked','shapeSettings','photoAdjustments']);const prev=state.history[state.history.length-1];if(prev&&JSON.stringify(prev)===JSON.stringify(json)){updateHistoryButtons();renderLayers();return}state.history.push(json);if(state.history.length>40)state.history.shift();state.future=[];updateHistoryButtons();renderLayers()}
+function snapshot(){if(window.PhotoProject?.active){if(!state.resizing&&!state.compare)PhotoProject.snapshot();return;}if(!state.photo||state.resizing||state.compare)return;const json=state.canvas.toJSON(['photoRole','layerId','layerName','layerType','userLocked','shapeSettings','photoAdjustments']);const prev=state.history[state.history.length-1];if(prev&&JSON.stringify(prev)===JSON.stringify(json)){updateHistoryButtons();renderLayers();return}state.history.push(json);if(state.history.length>40)state.history.shift();state.future=[];updateHistoryButtons();renderLayers()}
 function updateHistoryButtons(){$('undo-btn').disabled=state.history.length<2;$('redo-btn').disabled=!state.future.length}
 function rehydratePhotoAdjustments(){
  if(!state.photo)return;
@@ -94,9 +95,10 @@ function rehydratePhotoAdjustments(){
  sliders.forEach(id=>{if(!(id in a))return;const v=Number(a[id])||0;const el=$(id),out=$(`${id}-out`);if(el)el.value=String(v);if(out)out.textContent=String(v)});
 }
 function restoreJSON(json){state.canvas.loadFromJSON(json,()=>{state.photo=state.canvas.getObjects().find(o=>o.photoRole==='main')||null;rehydratePhotoAdjustments();state.canvas.requestRenderAll();updateHistoryButtons();renderLayers();document.dispatchEvent(new CustomEvent('photoia:photo-replaced',{detail:{preserveFilters:true}}))})}
-function undo(){if(state.history.length<2)return;state.future.push(state.history.pop());restoreJSON(state.history[state.history.length-1])}
-function redo(){if(!state.future.length)return;const next=state.future.pop();state.history.push(next);restoreJSON(next)}
+function undo(){if(window.PhotoProject?.active)return PhotoProject.restore(null,'undo');if(state.history.length<2)return;state.future.push(state.history.pop());restoreJSON(state.history[state.history.length-1])}
+function redo(){if(window.PhotoProject?.active)return PhotoProject.restore(null,'redo');if(!state.future.length)return;const next=state.future.pop();state.history.push(next);restoreJSON(next)}
 function restoreHistoryIndex(index){
+ if(window.PhotoProject?.active)return PhotoProject.restore(index);
  const i=Math.max(0,Math.min(state.history.length-1,Number(index)||0));if(!state.history.length)return;
  const selected=state.history[i],after=state.history.slice(i+1);
  state.history=state.history.slice(0,i+1);state.future=after.reverse();restoreJSON(selected);updateHistoryButtons();
@@ -112,8 +114,10 @@ async function fileToImage(file){
  } finally {setTimeout(()=>URL.revokeObjectURL(url),2000)}
 }
 async function loadFile(file){
+ if(!file)return;
  processing(true,'Abriendo fotografía…');
  try{
+   if(window.PhotoProject){if(!file.type.startsWith('image/'))throw new Error('Selecciona una imagen.');await PhotoProject.importFile(file);toast('Foto abierta; original conservado');return;}
    const img=await fileToImage(file);
    const max=2000;const ratio=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
    const off=document.createElement('canvas');off.width=Math.max(1,Math.round(img.naturalWidth*ratio));off.height=Math.max(1,Math.round(img.naturalHeight*ratio));
@@ -130,6 +134,7 @@ async function loadFile(file){
 }
 function fabricImageFromURL(url){return new Promise((resolve,reject)=>fabric.Image.fromURL(url,img=>img?resolve(img):reject(new Error('Fabric no cargó la imagen')),{crossOrigin:'anonymous'}))}
 async function setMainImage(dataUrl,name='image.jpg'){
+ if(window.PhotoProject){const response=await fetch(dataUrl),blob=await response.blob();return PhotoProject.importFile(new File([blob],name,{type:blob.type}));}
  const img=await fabricImageFromURL(dataUrl);
  state.canvas.clear();img.photoRole='main';img.layerId='layer-photo';img.layerName='Fotografía';img.layerType='photo';img.photoAdjustments={};img.set({selectable:false,evented:false,objectCaching:false,opacity:1,visible:true});img.globalCompositeOperation='source-over';state.photo=img;state.canvas.add(img);state.canvas.sendToBack(img);fitCanvas();
  $('empty-state').hidden=true;$('project-title').textContent=name;$('image-info').textContent=`${img.width} × ${img.height}px`;setEnabled(true);resetSliderUI();state.history=[];state.future=[];snapshot();normalizePhotoVisualState();document.dispatchEvent(new CustomEvent('photoia:image-loaded',{detail:{name,width:img.width,height:img.height}}));
@@ -171,6 +176,7 @@ function normalizePhotoVisualState(){
 function clearCurrentPhoto(){
  if(!state.photo)return;
  if(!confirm('¿Borrar la foto actual y comenzar una nueva edición?'))return;
+ window.PhotoProject?.clear();
  state.canvas.clear();state.photo=null;state.originalDataUrl='';state.originalMime='image/jpeg';state.originalName='';state.history=[];state.future=[];
  resetSliderUI();setEnabled(false);$('empty-state').hidden=false;$('project-title').textContent='Nueva edición';$('image-info').textContent='Sin imagen';
  $('file-input').value='';$('camera-input').value='';
@@ -221,6 +227,7 @@ function applyAdaptiveAdjustments(values={}, commit=true){
 }
 
 async function applySmartPixelRecipe(recipe={}, commit=true,guard=null){
+ if(commit&&window.PhotoProject?.active){if(guard&&!guard())return false;return PhotoProject.commitOperation({kind:'smart',params:{recipe,engine:'local'}},PhotoProject.token());}
  if(!state.photo||!state.originalDataUrl)throw new Error('Abre una foto primero.');
  processing(true,'Aplicando mejora profesional…');
  try{
@@ -301,6 +308,7 @@ async function applySmartPixelRecipe(recipe={}, commit=true,guard=null){
 
 
 async function applyProcessedImageDataUrl(dataUrl,commit=true,guard=null,options={}){
+ const projectToken=options.token||window.PhotoProject?.token();
  if(!state.photo)throw new Error('Abre una foto primero.');
  const old=state.photo;
  const preserveFilters=!!options?.preserveFilters;
@@ -308,9 +316,9 @@ async function applyProcessedImageDataUrl(dataUrl,commit=true,guard=null,options
  const keptAdjustments=preserveFilters?{...(old.photoAdjustments||{})}:{};
  const displayedW=Math.max(1,old.getScaledWidth?.()||old.width*(old.scaleX||1));
  const displayedH=Math.max(1,old.getScaledHeight?.()||old.height*(old.scaleY||1));
- const props={left:old.left,top:old.top,angle:old.angle,flipX:old.flipX,flipY:old.flipY,originX:old.originX,originY:old.originY};
+ const props={left:old.left,top:old.top,angle:old.angle,flipX:old.flipX,flipY:old.flipY,originX:old.originX,originY:old.originY,clipPath:old.clipPath};
  const next=await fabricImageFromURL(dataUrl);
- if(guard&&!guard())return false;
+ if((guard&&!guard())||(projectToken&&!PhotoProject.valid(projectToken)))return false;
  const nextScaleX=displayedW/Math.max(1,next.width),nextScaleY=displayedH/Math.max(1,next.height);
  next.photoRole='main';next.layerId='layer-photo';next.layerName='Fotografía';next.layerType='photo';next.photoAdjustments=keptAdjustments;
  next.filters=keptFilters;
@@ -318,7 +326,11 @@ async function applyProcessedImageDataUrl(dataUrl,commit=true,guard=null,options
  if(preserveFilters&&next.filters.length)next.applyFilters();
  state.canvas.remove(old);state.photo=next;state.canvas.add(next);state.canvas.sendToBack(next);next.setCoords();
  if(preserveFilters)rehydratePhotoAdjustments();else resetSliderUI();
- normalizePhotoVisualState();state.canvas.requestRenderAll();if(commit)snapshot();
+ normalizePhotoVisualState();state.canvas.requestRenderAll();
+ if(window.PhotoProject?.active){
+  if(commit){const raster=document.createElement('canvas');raster.width=next.width;raster.height=next.height;raster.getContext('2d').drawImage(next._originalElement,0,0);PhotoProject.recordRaster(raster.toDataURL('image/png'),{width:next.width,height:next.height,preserveFilters,label:options.label||'Retoque local / IA',inputToken:projectToken});}
+  else PhotoProject.markPreview(true);
+ }else if(commit)snapshot();
  // Lets tools that keep their own UI state in sync with state.photo (e.g. the
  // curves editor) know the underlying fabric object instance was swapped,
  // whether or not its filters/adjustments carried over.
@@ -327,6 +339,7 @@ async function applyProcessedImageDataUrl(dataUrl,commit=true,guard=null,options
 }
 
 async function applyPreset(name){
+ if(window.PhotoProject?.active){await PhotoProject.commitOperation({kind:'preset',params:{name}},PhotoProject.token());return;}
  if(!state.photo||!state.originalDataUrl)return;
  processing(true,'Aplicando mejora…');
  try{
@@ -459,6 +472,7 @@ function rotate(deg){
  const cx=state.canvas.width/2,cy=state.canvas.height/2,rad=deg*Math.PI/180,cs=Math.cos(rad),sn=Math.sin(rad);
  state.canvas.getObjects().filter(o=>o.photoRole!=='preview-overlay').forEach(o=>{
    const x=(Number(o.left)||cx)-cx,y=(Number(o.top)||cy)-cy;
+   const clip=o.clipPath;if(clip?.absolutePositioned){const px=clip.left-cx,py=clip.top-cy;clip.set({left:cx+px*cs-py*sn,top:cy+px*sn+py*cs,angle:(clip.angle||0)+deg});clip.setCoords();o.dirty=true}
    o.set({left:cx+x*cs-y*sn,top:cy+x*sn+y*cs,angle:(Number(o.angle)||0)+deg});o.setCoords();
  });
  fitCanvas();snapshot();
@@ -483,7 +497,15 @@ function renderExportDataUrl({photoOnly=false,format=null,quality=null}={}){
 }
 function exportDataUrl(){return renderExportDataUrl({photoOnly:false})}
 function exportPhotoDataUrl(){return renderExportDataUrl({photoOnly:true,format:'image/png',quality:1})}
-function download(){const url=exportDataUrl();const a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${$('format').value.split('/')[1].replace('jpeg','jpg')}`;a.click();toast('Imagen preparada para guardar')}
+async function downloadDocument(){
+ const d=PhotoProject.getDocument(),info=PhotoRenderer.info(d),sizeChoice=$('export-size')?.value||'original';
+ let size='original';if(sizeChoice!=='original'){const k=Math.min(1,Number(sizeChoice)/Math.max(info.width,info.height));size={width:Math.round(info.width*k),height:Math.round(info.height*k)}}
+ processing(true,'Preparando exportación…');try{const result=await PhotoProject.exportDocument({format:$('format').value,quality:Number($('quality').value)/100,size});
+ const url=URL.createObjectURL(result.blob),a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${result.blob.type.split('/')[1].replace('jpeg','jpg')}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);toast(`Imagen preparada: ${result.width} × ${result.height}`);
+ }catch(e){toast(e.code==='EXPORT_TOO_LARGE'?'No hay memoria suficiente. Elige 2000 px o 1200 px.':'No se pudo exportar. Tu proyecto se conserva.');console.error(e)}finally{processing(false)}
+}
+async function downloadOriginal(){const d=PhotoProject.getDocument();if(!d)return;const a=await PhotoProject.resolveAsset(d.source.assetId),url=URL.createObjectURL(a.blob),link=document.createElement('a');link.href=url;link.download=d.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}
+async function download(){if(window.PhotoProject?.active){return downloadDocument();}const url=exportDataUrl();const a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${$('format').value.split('/')[1].replace('jpeg','jpg')}`;a.click();toast('Imagen preparada para guardar')}
 async function compare(showOriginal){
  if(!state.photo)return;
  if(showOriginal){
@@ -500,11 +522,11 @@ async function compare(showOriginal){
    (state.compareVisibility||[]).forEach(([o,v])=>o.visible=v);state.compareVisibility=null;state.canvas.requestRenderAll();
  }
 }
-function reset(){if(!state.originalDataUrl||!state.photo)return;processing(true,'Restableciendo…');applyProcessedImageDataUrl(state.originalDataUrl,true).finally(()=>{processing(false);toast('Fotografía restablecida; tus capas se conservaron')})}
+function reset(){if(window.PhotoProject?.active)return PhotoProject.reset();if(!state.originalDataUrl||!state.photo)return;processing(true,'Restableciendo…');applyProcessedImageDataUrl(state.originalDataUrl,true).finally(()=>{processing(false);toast('Fotografía restablecida; tus capas se conservaron')})}
 
-function openCrop(ratio=NaN){if(!state.photo)return;if(!window.Cropper){toast('La herramienta de recorte todavía no está disponible. Revisa la conexión y vuelve a intentar.');return}const editable=state.canvas.getObjects().filter(o=>o!==state.photo&&o.photoRole!=='preview-overlay'&&!o.excludeFromExport);if(editable.length){toast('Recorte protegido: elimina o exporta las capas antes de recortar para no aplanarlas.');return}const modal=$('crop-modal');$('crop-image').src=exportPhotoDataUrl();modal.hidden=false;setTimeout(()=>{state.cropper?.destroy();state.cropper=new Cropper($('crop-image'),{viewMode:1,autoCropArea:1,responsive:true,background:false,aspectRatio:ratio})},50)}
+function openCrop(ratio=NaN){if(!state.photo)return;if(!window.Cropper){toast('La herramienta de recorte todavía no está disponible. Revisa la conexión y vuelve a intentar.');return}const editable=state.canvas.getObjects().filter(o=>o!==state.photo&&o.photoRole!=='preview-overlay'&&!o.excludeFromExport);if(editable.length&&!window.PhotoProject?.active){toast('Recorte protegido: elimina o exporta las capas antes de recortar para no aplanarlas.');return}const modal=$('crop-modal');$('crop-image').src=exportPhotoDataUrl();modal.hidden=false;setTimeout(()=>{state.cropper?.destroy();state.cropper=new Cropper($('crop-image'),{viewMode:1,autoCropArea:1,responsive:true,background:false,aspectRatio:ratio})},50)}
 function closeCrop(){state.cropper?.destroy();state.cropper=null;$('crop-modal').hidden=true}
-async function applyCrop(){if(!state.cropper)return;processing(true,'Aplicando recorte…');try{const c=state.cropper.getCroppedCanvas({maxWidth:2000,maxHeight:2000,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});const data=state.originalMime==='image/png'?c.toDataURL('image/png'):c.toDataURL('image/jpeg',.96);closeCrop();state.originalDataUrl=data;await setMainImage(data,$('project-title').textContent);toast('Recorte aplicado')}finally{processing(false)}}
+async function applyCrop(){if(!state.cropper)return;processing(true,'Aplicando recorte…');try{const c=state.cropper.getCroppedCanvas({maxWidth:2000,maxHeight:2000,imageSmoothingEnabled:true,imageSmoothingQuality:'high'});if(window.PhotoProject?.active){const crop=state.cropper.getData(true),img=state.cropper.getImageData();const operation={kind:'crop',params:{x:crop.x/img.naturalWidth,y:crop.y/img.naturalHeight,width:crop.width/img.naturalWidth,height:crop.height/img.naturalHeight}};closeCrop();await PhotoProject.commitOperation(operation,PhotoProject.token());toast('Recorte reversible aplicado');return;}const data=state.originalMime==='image/png'?c.toDataURL('image/png'):c.toDataURL('image/jpeg',.96);closeCrop();state.originalDataUrl=data;await setMainImage(data,$('project-title').textContent);toast('Recorte aplicado')}finally{processing(false)}}
 
 let initAttempts=0;
 function init(){
@@ -512,6 +534,7 @@ function init(){
  $('processing').hidden=true;
  document.body.classList.remove('modal-open');
  if(!window.fabric){if(initAttempts++<40){setTimeout(init,200);return}toast('No se pudo cargar el editor de capas. Conéctate una vez a Internet y vuelve a abrir PHOTO IA.');return}
+ fabric.Object.NUM_FRACTION_DIGITS=8;
  state.canvas=new fabric.Canvas('editor-canvas',{selection:true,preserveObjectStacking:true});fitCanvas();window.addEventListener('resize',()=>setTimeout(fitCanvas,120));
  // CSS panels and browser bars resize the wrapper without a window resize.
  // Fit after layout settles, using its actual content box rather than photo ratio.
@@ -542,11 +565,13 @@ function init(){
  document.addEventListener('dragover',e=>e.preventDefault());document.addEventListener('drop',e=>{e.preventDefault();const f=e.dataTransfer.files?.[0];if(f)loadFile(f)});
  if('serviceWorker' in navigator && window.isSecureContext){navigator.serviceWorker.register('./sw.js?v='+VERSION,{updateViaCache:'none'}).then(r=>r.update()).catch(console.warn);}
  window.dispatchEvent(new CustomEvent('photoia-ready'));
+ window.PhotoProject?.offerRecovery();
 }
 window.addEventListener('opencv-script-loaded',()=>{const wait=()=>{if(window.cv&&cv.Mat){state.cvReady=true;$('engine-badge').textContent='Fabric + OpenCV listo';$('engine-badge').classList.add('ready')}else setTimeout(wait,250)};wait()});
 
 window.PhotoIA={
   get state(){return state},
+  getDocument:()=>window.PhotoProject?.getDocument(),getDocumentToken:()=>window.PhotoProject?.token(),resolveAsset:id=>PhotoProject.resolveAsset(id),commitOperation:(op,t)=>PhotoProject.commitOperation(op,t),exportDocument:options=>PhotoProject.exportDocument(options),downloadOriginal,rehydratePhotoAdjustments,
   snapshot,toast,processing,nextLayerId,renderLayers,fitCanvas,fitPhoto,restoreJSON,restoreHistoryIndex,undo,redo,reset,download,
   setEnabled,selectedLayer,layerControlsEnabled,applyPreset,applySlider,applyAdaptiveAdjustments,applySmartPixelRecipe,applyProcessedImageDataUrl,normalizePhotoVisualState,clearCurrentPhoto,rotate,flip,openCrop,addText,exportDataUrl,exportPhotoDataUrl,getPhotoAnalysisCanvas,getOriginalAnalysisCanvas,setMainImage,loadFile,executeLegacyCommand:executeCommand,
   // Exposed so curves-tool.js can compose its LUT-based filter into the same

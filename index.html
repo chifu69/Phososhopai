@@ -7,11 +7,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="PHOTO IA">
-  <meta name="description" content="PHOTO IA 15.40.2 con Selección Avanzada, AI Fill local, Curvas, Máscara, Smart y retoque fotográfico privado.">
+  <meta name="description" content="PHOTO IA 15.41.0 con Selección Avanzada, AI Fill local, Curvas, Máscara, Smart y retoque fotográfico privado.">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="./assets/vendor/cropper.min.css?v=15.40.2" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css'">
-  <link rel="stylesheet" href="styles.css?v=15.40.2">
-  <title>PHOTO IA 15.40.2 — Advanced Selection</title>
+  <link rel="stylesheet" href="./assets/vendor/cropper.min.css?v=15.41.0" onerror="this.onerror=null;this.href='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css'">
+  <link rel="stylesheet" href="styles.css?v=15.41.0">
+  <title>PHOTO IA 15.41.0 — Advanced Selection</title>
 </head>
 <body>
 <div class="app-shell">
@@ -87,7 +87,7 @@
           <button id="body-slim-apply" class="primary" type="button" disabled>✨ Aplicar</button>
           <button id="body-slim-cancel" class="secondary" type="button" disabled>Cancelar</button>
         </div>
-        <p id="body-slim-status" class="portrait-retouch-note">El ajuste es deliberadamente moderado para conservar proporciones y reducir deformación del fondo.</p>
+        <p class="project-note" data-raster-resolution>Este retoque usa hasta 2000 px. Se conserva el original.</p><p id="body-slim-status" class="portrait-retouch-note">El ajuste es deliberadamente moderado para conservar proporciones y reducir deformación del fondo.</p>
       </div>
       <div id="smart-analysis-result" class="smart-analysis-result"><p>Abre una foto y pulsa <strong>Analizar fotografía</strong>.</p></div>
       <div class="smart-mode-grid" aria-label="Modos adaptativos locales">
@@ -103,7 +103,8 @@
     </section>
 
     <section class="panel workspace">
-      <div class="canvas-toolbar"><div><p class="eyebrow">LIENZO PROFESIONAL</p><h2 id="project-title">Nueva edición</h2></div><div class="canvas-actions"><button id="new-photo-btn" class="secondary danger" disabled>Nueva foto</button><button id="compare-btn" class="secondary" disabled>Antes / Después</button></div></div>
+      <div id="project-recovery" class="project-recovery" hidden><strong>Hay un proyecto guardado en este dispositivo</strong><button data-resume type="button" class="primary">Continuar edición</button><button data-dismiss type="button" class="secondary">Ahora no</button></div>
+      <div class="canvas-toolbar"><div><p class="eyebrow">LIENZO PROFESIONAL</p><h2 id="project-title">Nueva edición</h2><span id="project-save-status" role="status">Sin proyecto</span></div><div class="canvas-actions"><button id="new-photo-btn" class="secondary danger" disabled>Nueva foto</button><button id="compare-btn" class="secondary" disabled>Antes / Después</button></div></div>
       <div id="mode-toolbar" class="mode-toolbar" aria-label="Herramientas del lienzo">
         <button class="mode-tool active" data-canvas-mode="move" type="button" disabled><span>✋</span><small>Mover</small></button>
         <button class="mode-tool" data-canvas-mode="draw" type="button" disabled><span>🖌</span><small>Dibujar</small></button>
@@ -349,7 +350,7 @@
           <label>Suavizar unión<input id="aifill-feather" type="range" disabled min="0" max="24" value="8"><output id="aifill-feather-out">8 px</output></label>
         </div>
         <div class="button-row creative-buttons aifill-actions">
-          <button id="aifill-apply" class="primary" type="button" disabled>✨ Aplicar AI Fill local</button>
+          <p class="project-note" data-raster-resolution>Este retoque usa hasta 2000 px. Se conserva el original.</p><button id="aifill-apply" class="primary" type="button" disabled>✨ Aplicar AI Fill local</button>
           <button id="aifill-cancel" class="secondary" type="button" disabled>Cancelar</button>
         </div>
         <p id="aifill-status" class="aifill-status">Todo el procesamiento de AI Fill ocurre localmente en este dispositivo.</p>
@@ -398,7 +399,7 @@
       </div>
 
       <div class="ai-generate-row">
-        <button id="ai-generate" class="primary wide" type="button">Generar en Alienware</button>
+        <p class="project-note">La resolución final dependerá del resultado del servidor. Tu original se conserva.</p><button id="ai-generate" class="primary wide" type="button">Generar en Alienware</button>
         <button id="ai-cancel-job" class="secondary danger" type="button" hidden>Cancelar tarea</button>
       </div>
       <div id="ai-job-status" class="ai-job-status idle">
@@ -505,10 +506,14 @@
     <section class="panel export">
       <div class="section-heading"><div><p class="eyebrow">GUARDAR</p><h2>Exportar fotografía</h2></div></div>
       <div class="export-grid"><label>Formato<select id="format"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></label><label>Calidad<input id="quality" type="range" min="60" max="100" value="92"></label></div>
+      <label class="export-size-label">Tamaño<select id="export-size"><option value="original">Máxima resolución disponible</option><option value="2000">Hasta 2000 px</option><option value="1200">Hasta 1200 px</option></select></label>
+      <p id="raster-resolution" class="project-note">Los retoques de píxeles e IA pueden limitar la resolución final; el original se conserva.</p>
+      <p id="export-resolution" class="project-note">Abre una fotografía</p>
+      <button type="button" class="secondary wide" onclick="PhotoIA.downloadOriginal()">Guardar original sin editar</button>
       <button id="download-btn" class="primary wide" disabled>Guardar imagen</button>
     </section>
   </main>
-  <footer>PHOTO IA 15.40.2 • Advanced Selection + AI Fill</footer>
+  <footer>PHOTO IA 15.41.0 • Advanced Selection + AI Fill</footer>
 </div>
 
 <div id="local-install" class="local-install" hidden>
@@ -526,35 +531,40 @@
 <div id="crop-modal" class="crop-modal" hidden>
   <div class="crop-card"><div class="modal-head"><h2>Recorte profesional</h2><button id="crop-close" class="icon-btn">×</button></div><div class="crop-stage"><img id="crop-image" alt="Imagen para recortar"></div><div class="crop-ratios"><button data-ratio="NaN">Libre</button><button data-ratio="1">1:1</button><button data-ratio="0.8">4:5</button><button data-ratio="1.7777778">16:9</button></div><button id="crop-apply" class="primary wide">Aplicar recorte</button></div>
 </div>
-<div id="pwa-version-badge" class="pwa-version-badge" aria-label="Versión de PHOTO IA">PHOTO IA v15.40.2 · Advanced Selection</div>
+<div id="pwa-version-badge" class="pwa-version-badge" aria-label="Versión de PHOTO IA">PHOTO IA v15.41.0 · Advanced Selection</div>
 <div id="processing" class="processing" hidden><span></span><b>Procesando…</b><button id="processing-cancel" class="processing-cancel" hidden>Cancelar</button></div>
 <div id="toast" class="toast" role="status"></div>
 
-  <script src="ui-layout.js?v=15.40.2"></script>
-<script src="./assets/vendor/fabric.min.js?v=15.40.2" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js'"></script>
-<script src="./assets/vendor/cropper.min.js?v=15.40.2" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js'"></script>
-<script src="app.js?v=15.40.2"></script>
-<script src="creative-tools.js?v=15.40.2"></script>
-<script src="curves-tool.js?v=15.40.2"></script>
-<script src="mask-tool.js?v=15.40.2"></script>
-<script src="brain.js?v=15.40.2"></script>
-<script src="opencv-engine.js?v=15.40.2"></script>
-<script src="smart-core.js?v=15.40.2"></script>
-<script src="connection-router.js?v=15.40.2"></script>
-<script src="wardrobe-engine.js?v=15.40.2"></script>
-<script src="ai-studio.js?v=15.40.2"></script>
-<script src="./assets/vendor/tf.min.js?v=15.40.2" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js'"></script>
-<script src="./assets/vendor/coco-ssd.min.js?v=15.40.2" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'"></script>
-<script src="vision.js?v=15.40.2"></script>
-<script src="onnx-engine.js?v=15.40.2"></script>
-<script src="content-aware-ai.js?v=15.40.2"></script>
-<script src="segmentation.js?v=15.40.2"></script>
-<script src="smart-select.js?v=15.40.2"></script>
-<script src="body-retouch.js?v=15.40.2"></script>
-<script async src="./assets/vendor/opencv.js?v=15.40.2" onload="window.dispatchEvent(new Event('opencv-script-loaded'))" onerror="this.onerror=null;this.src='https://docs.opencv.org/4.x/opencv.js'"></script>
+  <script src="ui-layout.js?v=15.41.0"></script>
+<script src="./assets/vendor/fabric.min.js?v=15.41.0" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js'"></script>
+<script src="./assets/vendor/cropper.min.js?v=15.41.0" onerror="this.onerror=null;this.src='https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.js'"></script>
+<script src="photo-document.js?v=15.41.0"></script>
+<script src="photo-renderer.js?v=15.41.0"></script>
+<script src="photo-operation-adapters.js?v=15.41.0"></script>
+<script src="project-store.js?v=15.41.0"></script>
+<script src="photo-project.js?v=15.41.0"></script>
+<script src="app.js?v=15.41.0"></script>
+<script src="creative-tools.js?v=15.41.0"></script>
+<script src="curves-tool.js?v=15.41.0"></script>
+<script src="mask-tool.js?v=15.41.0"></script>
+<script src="brain.js?v=15.41.0"></script>
+<script src="opencv-engine.js?v=15.41.0"></script>
+<script src="smart-core.js?v=15.41.0"></script>
+<script src="connection-router.js?v=15.41.0"></script>
+<script src="wardrobe-engine.js?v=15.41.0"></script>
+<script src="ai-studio.js?v=15.41.0"></script>
+<script src="./assets/vendor/tf.min.js?v=15.41.0" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js'"></script>
+<script src="./assets/vendor/coco-ssd.min.js?v=15.41.0" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd@2.2.3/dist/coco-ssd.min.js'"></script>
+<script src="vision.js?v=15.41.0"></script>
+<script src="onnx-engine.js?v=15.41.0"></script>
+<script src="content-aware-ai.js?v=15.41.0"></script>
+<script src="segmentation.js?v=15.41.0"></script>
+<script src="smart-select.js?v=15.41.0"></script>
+<script src="body-retouch.js?v=15.41.0"></script>
+<script async src="./assets/vendor/opencv.js?v=15.41.0" onload="window.dispatchEvent(new Event('opencv-script-loaded'))" onerror="this.onerror=null;this.src='https://docs.opencv.org/4.x/opencv.js'"></script>
 <script>
 (() => {
-  const VERSION='15.40.2';
+  const VERSION='15.41.0';
   const box=document.getElementById('local-install');
   const bar=document.getElementById('local-install-bar');
   const percent=document.getElementById('local-install-percent');
