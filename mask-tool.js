@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.41.0';
+const VERSION='15.42.0';
 const $=id=>document.getElementById(id);
 
 function boot(){

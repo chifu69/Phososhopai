@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const VERSION='1.1.1-ort-web-migan-ios';
-const SCRIPT='./assets/vendor/ort.min.js?v=15.41.0';
+const SCRIPT='./assets/vendor/ort.min.js?v=15.42.0';
 const ORT_DIST='https://cdn.jsdelivr.net/npm/onnxruntime-web@1.23.0/dist/';
 const REMOTE=ORT_DIST+'ort.min.js';
 const ORT_MJS=ORT_DIST+'ort-wasm-simd-threaded.mjs';

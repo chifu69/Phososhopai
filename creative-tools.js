@@ -10,6 +10,7 @@ const onReady=()=>{
   const decorate=(obj,name,type)=>{obj.layerId=api.nextLayerId();obj.layerName=name;obj.layerType=type;return obj};
 
   const modeHelp={
+    'local-retouch':'Retoque local: pinta sobre la foto y pulsa Aplicar o Cancelar.',
     move:'Modo Mover: toca un objeto para seleccionarlo, moverlo, rotarlo o cambiar su tamaño.',
     draw:'Modo Dibujar: usa el dedo sobre la foto. Pulsa Mover cuando termines.',
     erase:'Modo Borrar: toca un trazo para eliminarlo. Las fotos, textos y stickers están protegidos.',
@@ -26,7 +27,7 @@ const onReady=()=>{
     document.body.classList.toggle('drawing-active',mode==='draw');
     canvas.selection=mode==='move';
     canvas.skipTargetFind=!['move','erase'].includes(mode);
-    canvas.defaultCursor=mode==='erase'?'not-allowed':(['draw','mask','aifill'].includes(mode))?'crosshair':'default';
+    canvas.defaultCursor=mode==='erase'?'not-allowed':(['draw','mask','aifill','local-retouch'].includes(mode))?'crosshair':'default';
     canvas.hoverCursor=mode==='erase'?'not-allowed':'move';
     // Mask mode paints directly on a per-object mask canvas via pointer
     // events (see mask-tool.js), not through fabric object selection, so it
@@ -46,7 +47,7 @@ const onReady=()=>{
       const tab=tabMap[mode]&&document.querySelector(`[data-tool-tab="${tabMap[mode]}"]`);
       if(tab)tab.click();
     }
-    if(announce)api.toast(modeHelp[mode].split(':')[0]);
+    if(announce)api.toast((modeHelp[mode]||'Herramienta').split(':')[0]);
     document.dispatchEvent(new CustomEvent('photoia:canvas-mode-changed',{detail:{mode}}));
   }
   document.querySelectorAll('[data-canvas-mode]').forEach(btn=>btn.addEventListener('click',()=>setCanvasMode(btn.dataset.canvasMode)));

@@ -1,0 +1,2 @@
+const {withEditor,importPhoto,assert}=require('./helpers.cjs');
+withEditor(async p=>{await importPhoto(p,640,480);await p.evaluate(()=>PhotoLocalRetouch.open('local-adjust'));await p.evaluate(()=>PhotoIA.setCanvasMode('draw',{openPanel:false,announce:false}));assert.equal(await p.evaluate(()=>document.body.dataset.canvasMode),'draw');assert.equal(await p.evaluate(()=>PhotoLocalRetouch.active),false);console.log('PASS switching from retouch preserves requested drawing mode');}).catch(e=>{console.error(e);process.exitCode=1});

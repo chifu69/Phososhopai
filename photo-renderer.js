@@ -14,6 +14,11 @@ async function renderBase(doc,resolveAsset,{maxDimension=Infinity,signal}={}){
  let c=await fromAsset(lastRaster<0?doc.source.assetId:operations[lastRaster].assetId,resolveAsset,inputMax);
  try{for(const op of pending){check(signal);const h=handlers.get(op.kind);if(!h)throw error('UNSUPPORTED_OPERATION');const next=await h.render(c,op,{resolveAsset,signal,maxDimension:inputMax,doc});if(next!==c){c.width=c.height=1;c=next}}return c}catch(e){c.width=c.height=1;throw e}
 }
+async function renderPhotoPixels(doc,resolveAsset,{maxDimension=2000}={}){
+ const base=await renderBase(doc,resolveAsset,{maxDimension}),filters=doc.view?.objects?.find(o=>o.photoRole==='main')?.filters;
+ if(!filters?.length)return base;
+ try{return await handlers.get('filters').render(base,{params:{filters}})}finally{base.width=base.height=1}
+}
 function bounds(doc){const size=doc.size,main=doc.view?.objects?.find(o=>o.photoRole==='main'),angle=((main?.angle||0)%360+360)%360,rad=angle*Math.PI/180;return {width:Math.round(Math.abs(Math.cos(rad))*size.width+Math.abs(Math.sin(rad))*size.height),height:Math.round(Math.abs(Math.sin(rad))*size.width+Math.abs(Math.cos(rad))*size.height)}}
 function info(doc){const out=bounds(doc),limitedBy=doc.operations.filter(o=>o.enabled&&o.kind==='raster-result').map(o=>o.params?.label||'Retoque de píxeles');return {...out,limitedBy,source:doc.source};}
 function loadScene(c,json){return new Promise((r,j)=>{try{c.loadFromJSON(json,()=>r())}catch(e){j(e)}})}
@@ -41,5 +46,5 @@ async function renderExport(doc,resolveAsset,{format='image/png',quality=.96,siz
 async function renderPreview(doc,resolveAsset,{maxDimension=2000,signal}={}){const b=bounds(doc),s=Math.min(1,maxDimension/Math.max(b.width,b.height));return renderExport(doc,resolveAsset,{size:{width:b.width*s,height:b.height*s},signal,photoOnly:true})}
 register('raster-result',{render:async(c,o,ctx)=>fromAsset(o.assetId,ctx.resolveAsset,ctx.maxDimension)});
 register('crop',{render:async(c,o)=>{const {x,y,width,height}=o.params,out=canvas(c.width*width,c.height*height);out.getContext('2d').drawImage(c,x*c.width,y*c.height,width*c.width,height*c.height,0,0,out.width,out.height);return out}});
-window.PhotoRenderer={register,renderBase,renderExport,renderPreview,decodeSource,canvas,blob,info,error,loadScene};
+window.PhotoRenderer={register,renderBase,renderPhotoPixels,renderExport,renderPreview,decodeSource,canvas,blob,info,error,loadScene};
 })();

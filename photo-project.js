@@ -2,8 +2,8 @@
 (() => {
 'use strict';
 let session=null,assets=new Map(),dataAssets=new Map(),restoring=false,previewing=false,loadSequence=0,saveTimer=0,saveQueue=Promise.resolve(),storePromise=null;
-let activeRenders=0;
-const layerURLs=new Map();
+let activeRenders=0,epoch=0;
+const layerURLs=new Map(),deletingProjects=new Set();
 function layerURL(asset){if(!layerURLs.has(asset.id))layerURLs.set(asset.id,URL.createObjectURL(asset.blob));return layerURLs.get(asset.id)}
 const D=()=>PhotoDocument,R=()=>PhotoRenderer,api=()=>PhotoIA,clone=x=>JSON.parse(JSON.stringify(x));
 const id=()=>crypto.randomUUID();
@@ -12,8 +12,8 @@ function resolveAsset(key){const a=assets.get(key);return a?Promise.resolve(a):P
 function addBlob(blob,width,height){const asset={id:id(),blob,mime:blob.type,width,height};assets.set(asset.id,asset);return asset}
 function addDataURL(url,width,height){if(dataAssets.has(url))return dataAssets.get(url);const parts=url.split(','),mime=/data:([^;]+)/.exec(parts[0])?.[1]||'image/png',bytes=Uint8Array.from(atob(parts[1]),c=>c.charCodeAt(0)),a=addBlob(new Blob([bytes],{type:mime}),width,height);dataAssets.set(url,a.id);return a.id}
 function getDocument(){return session?clone(session.current):null}
-function token(){return session?D().token(session):null}
-function valid(t){return !!session&&t?.documentId===session.current.id&&t.revision===session.current.revision}
+function token(){return session?{...D().token(session),epoch}:null}
+function valid(t){return !!session&&t?.documentId===session.current.id&&t.revision===session.current.revision&&t.epoch===epoch}
 function syncHistory(){const s=api().state;s.history=session?[...session.past,session.current]:[];s.future=session?session.future:[];api().renderLayers();updateExportInfo();document.getElementById('undo-btn').disabled=!session?.past.length;document.getElementById('redo-btn').disabled=!session?.future.length}
 function updateExportInfo(){
  const e=document.getElementById('export-resolution'),notice=document.getElementById('raster-resolution');if(!session){if(e)e.textContent='Abre una fotografía';return}
@@ -67,11 +67,12 @@ async function hydrate(candidate=session,guard=()=>session===candidate){
  }finally{activeRenders--;restoring=false;stage?.dispose();urls.forEach(u=>URL.revokeObjectURL(u));if(base)base.width=base.height=1}
 }
 async function originalPreview(d=getDocument()){const c=await R().renderBase({...d,operations:[]},resolveAsset,{maxDimension:2000});try{return c.toDataURL('image/png')}finally{c.width=c.height=1}}
+async function prepareSwitch(){window.PhotoLocalRetouch?.cancel();if(previewing)await cancelPreview();snapshot();await saveNow({strict:true});}
 async function importFile(file){
- const seq=++loadSequence,decoded=await R().decodeSource(file);
- try{if(seq!==loadSequence)return false;const a=addBlob(file,decoded.width,decoded.height),next=D().create({assetId:a.id,mime:file.type,width:decoded.width,height:decoded.height},file.name||'Fotografía');
+ const seq=++loadSequence;++epoch;await prepareSwitch();if(seq!==loadSequence)return false;const decoded=await R().decodeSource(file);
+ try{if(seq!==loadSequence)return false;const a=addBlob(file,decoded.width,decoded.height),next=D().create({assetId:a.id,mime:file.type,width:decoded.width,height:decoded.height,fileName:file.name||'Fotografia.png'},file.name||'Fotografía');
   if(!await hydrate(next,()=>seq===loadSequence))return false;
-  session.current.view=capture();syncHistory();scheduleSave();document.getElementById('project-recovery').hidden=true;document.dispatchEvent(new CustomEvent('photoia:image-loaded',{detail:{name:file.name,width:decoded.width,height:decoded.height}}));return true;
+  session.current.view=capture();syncHistory();const importedId=session.current.id;if(await saveNow()){if(seq===loadSequence)await(await store()).activate(importedId)}if(seq!==loadSequence)return false;document.getElementById('project-recovery').hidden=true;document.dispatchEvent(new CustomEvent('photoia:image-loaded',{detail:{name:file.name,width:decoded.width,height:decoded.height}}));return true;
  }finally{decoded.dispose()}
 }
 async function restore(index,kind){
@@ -116,9 +117,51 @@ async function committedPreview({smartInput=false}={}){if(!session)return null;s
 function store(){if(!storePromise)storePromise=PhotoProjectStore.open().catch(e=>{storePromise=null;throw e});return storePromise}
 function pruneAssets(){if(!session||activeRenders)return;const retained=new Set(D().assetIds(session));for(const key of assets.keys())if(!retained.has(key)){assets.delete(key);if(layerURLs.has(key)){URL.revokeObjectURL(layerURLs.get(key));layerURLs.delete(key)}}for(const [url,key]of dataAssets)if(!retained.has(key))dataAssets.delete(url)}
 function scheduleSave(){clearTimeout(saveTimer);status('Guardando…');saveTimer=setTimeout(()=>saveNow(),500)}
-function saveNow(){clearTimeout(saveTimer);if(!session)return Promise.resolve();const captured=clone(session),list=D().assetIds(captured).map(k=>assets.get(k)),t=token();saveQueue=saveQueue.catch(()=>{}).then(async()=>{try{await(await store()).save(captured,list);if(valid(t)){status('Guardado en este dispositivo');pruneAssets()}}catch(e){if(valid(t))status('No se pudo guardar. Conserva una copia.');console.warn('[Project save]',e)}});return saveQueue}
-async function offerRecovery(){try{const loaded=await(await store()).loadLatest();if(!loaded||session)return;const box=document.getElementById('project-recovery');if(!box)return;box.hidden=false;document.dispatchEvent(new CustomEvent('photoia:project-status'));box.querySelector('[data-resume]').onclick=async()=>{if(session){box.hidden=true;return}const seq=++loadSequence;loaded.assets.forEach(a=>assets.set(a.id,a));if(!await hydrate(loaded.session,()=>!session&&seq===loadSequence))return;box.hidden=true;status('Proyecto recuperado');document.dispatchEvent(new CustomEvent('photoia:image-loaded'))};box.querySelector('[data-dismiss]').onclick=()=>{box.hidden=true;document.dispatchEvent(new CustomEvent('photoia:project-status'))}}catch(e){status('Recuperación no disponible');console.warn(e)}}
-function clear(){loadSequence++;session=null;previewing=false;clearTimeout(saveTimer);status('Sin proyecto')}
+function saveNow({strict=false}={}){
+ clearTimeout(saveTimer);if(!session)return Promise.resolve(true);
+ if(deletingProjects.has(session.current.id))return strict?Promise.reject(R().error('MISSING_PROJECT')):Promise.resolve(false);
+ const captured=clone(session),list=D().assetIds(captured).map(k=>assets.get(k)),t=token(),assetMap=new Map(list.filter(Boolean).map(a=>[a.id,a]));
+ const job=saveQueue.catch(()=>{}).then(async()=>{
+  let thumbnail;try{const info=R().info(captured.current),scale=Math.min(1,320/Math.max(info.width,info.height));thumbnail=(await R().renderExport(captured.current,id=>Promise.resolve(assetMap.get(id)),{size:{width:info.width*scale,height:info.height*scale}})).blob}catch(e){console.warn('[Project thumbnail]',e)}
+  await(await store()).save(captured,list,{thumbnail});if(valid(t)){status('Guardado en este dispositivo');pruneAssets()}document.dispatchEvent(new CustomEvent('photoia:gallery-changed'));return true;
+ });
+ saveQueue=job.catch(()=>{});
+ return job.catch(e=>{if(valid(t))status('No se pudo guardar. Reintenta o exporta una copia.');console.warn('[Project save]',e);if(strict)throw e;return false});
+}
+async function listProjects(){return(await store()).list()}
+async function openProject(id){
+ const seq=++loadSequence;++epoch;await prepareSwitch();if(seq!==loadSequence)return false;
+ const saved=await(await store()).load(id);if(!saved)throw R().error('MISSING_PROJECT');if(seq!==loadSequence)return false;
+ saved.assets.forEach(a=>assets.set(a.id,a));if(!await hydrate(saved.session,()=>seq===loadSequence))return false;
+ await(await store()).activate(id);if(seq!==loadSequence)return false;document.getElementById('project-recovery').hidden=true;status('Proyecto abierto');document.dispatchEvent(new CustomEvent('photoia:image-loaded'));return true;
+}
+async function renameProject(id,name){
+ await saveNow({strict:true});await(await store()).rename(id,name);
+ if(session?.current.id===id){++epoch;for(const d of [session.current,...session.past,...session.future]){d.source.fileName??=d.name;d.name=String(name).trim()}document.getElementById('project-title').textContent=session.current.name;syncHistory()}
+ document.dispatchEvent(new CustomEvent('photoia:gallery-changed'));
+}
+async function deleteProject(id){
+ deletingProjects.add(id);clearTimeout(saveTimer);
+ const removal=saveQueue.catch(()=>{}).then(async()=>{await(await store()).remove(id)});
+ saveQueue=removal.catch(()=>{});
+ try{
+  await removal;
+  const recovery=document.getElementById('project-recovery');if(recovery?.dataset.projectId===id)recovery.hidden=true;
+  if(session?.current.id===id)await api().clearCurrentPhoto({confirmed:true});else if(session)scheduleSave();
+  document.dispatchEvent(new CustomEvent('photoia:gallery-changed'));
+ }catch(e){deletingProjects.delete(id);if(session)scheduleSave();throw e}
+}
+async function offerRecovery(){try{
+ const loaded=await(await store()).loadLatest();if(!loaded||session)return;const box=document.getElementById('project-recovery');if(!box)return;
+ const projectId=loaded.session.current.id;box.dataset.projectId=projectId;box.hidden=false;document.dispatchEvent(new CustomEvent('photoia:project-status'));
+ box.querySelector('[data-resume]').onclick=async()=>{
+  if(session){box.hidden=true;return}
+  try{if(await openProject(projectId)){box.hidden=true;status('Proyecto recuperado')}}catch(e){box.hidden=true;status(e.code==='MISSING_PROJECT'?'El proyecto ya no está disponible.':'No se pudo recuperar. Abre Mis proyectos para reintentar.')}
+ };
+ box.querySelector('[data-dismiss]').onclick=()=>{box.hidden=true;document.dispatchEvent(new CustomEvent('photoia:project-status'))};
+ }catch(e){status('Recuperación no disponible');console.warn(e)}}
+
+function clear(){loadSequence++;epoch++;window.PhotoLocalRetouch?.cancel();session=null;previewing=false;clearTimeout(saveTimer);status('Sin proyecto')}
 async function reset(){if(!session)return;const before=session,view=capture(),old=before.current.size,size={width:before.current.source.width,height:before.current.source.height};for(const o of view.objects){if(o.clipPath?.absolutePositioned){o.clipPath.left*=size.width/old.width;o.clipPath.top*=size.height/old.height;o.clipPath.scaleX*=size.width/old.width;o.clipPath.scaleY*=size.height/old.height}o.left*=size.width/old.width;o.top*=size.height/old.height;o.scaleX*=size.width/old.width;o.scaleY*=size.height/old.height;if(o.photoRole==='main')Object.assign(o,{filters:[],photoAdjustments:{},angle:0,flipX:false,flipY:false,visible:true,opacity:1,clipPath:null})}const next=D().commit(before,token(),{operations:[],view,selection:null,size});if(await hydrate(next,()=>session===before)){session.current.view=capture();scheduleSave()}}
-window.PhotoProject={getDocument,token,valid,resolveAsset,importFile,snapshot,restore,markPreview,cancelPreview,recordRaster,commitOperation,exportDocument,committedPreview,saveNow,offerRecovery,clear,reset,get restoring(){return restoring},get active(){return !!session},get previewing(){return previewing}};
+window.PhotoProject={getDocument,token,valid,resolveAsset,importFile,snapshot,restore,markPreview,cancelPreview,recordRaster,commitOperation,exportDocument,committedPreview,saveNow,offerRecovery,clear,reset,listProjects,openProject,renameProject,deleteProject,prepareSwitch,get restoring(){return restoring},get active(){return !!session},get previewing(){return previewing}};
 })();

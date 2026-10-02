@@ -1,6 +1,11 @@
 (() => {
 'use strict';
 const R=PhotoRenderer;
+for(const kind of ['local-adjust','local-repair'])R.register(kind,{render:async(c,o,ctx)=>{
+ const recipe=o.params.recipe;let selection;
+ if(recipe.selection){const a=await ctx.resolveAsset(recipe.selection.assetId);selection={...recipe.selection,data:new Uint8Array(await a.blob.arrayBuffer())}}
+ const x=c.getContext('2d',{willReadFrequently:true}),input=x.getImageData(0,0,c.width,c.height),output=PhotoLocalRetouchCore.render(input,recipe,selection);x.putImageData(new ImageData(output.data,output.width,output.height),0,0);return c;
+}});
 R.register('filters',{render:async(c,o)=>{const filters=await new Promise(r=>fabric.util.enlivenObjects(o.params.filters,r,'fabric.Image.filters')),out=R.canvas(c.width,c.height);new fabric.Canvas2dFilterBackend().applyFilters(filters,c,c.width,c.height,out);return out}});
 R.register('preset',{render:async(c,o)=>{const F=fabric.Image.filters,filters=[],name=o.params.name;
  if(name==='bw')filters.push(new F.Grayscale());

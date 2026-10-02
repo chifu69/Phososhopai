@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const VERSION='15.41.0';
+const VERSION='15.42.0';
 const $=id=>document.getElementById(id);
 const controls=[...document.querySelectorAll('button[disabled],input[disabled]')];
 const sliders=['brightness','contrast','saturation','temperature','sharpness','blur'];
@@ -173,9 +173,9 @@ function normalizePhotoVisualState(){
  state.canvas?.getObjects().forEach(o=>{if(o.photoRole==='preview-overlay')state.canvas.remove(o)});
  state.photo.dirty=true;state.canvas.requestRenderAll();
 }
-function clearCurrentPhoto(){
+async function clearCurrentPhoto({confirmed=false}={}){
  if(!state.photo)return;
- if(!confirm('¿Borrar la foto actual y comenzar una nueva edición?'))return;
+ if(!confirmed){if(!confirm('¿Guardar este proyecto y comenzar una nueva edición?'))return;try{await window.PhotoProject?.prepareSwitch()}catch(e){toast('No se pudo guardar. Reintenta o exporta una copia.');return}}
  window.PhotoProject?.clear();
  state.canvas.clear();state.photo=null;state.originalDataUrl='';state.originalMime='image/jpeg';state.originalName='';state.history=[];state.future=[];
  resetSliderUI();setEnabled(false);$('empty-state').hidden=false;$('project-title').textContent='Nueva edición';$('image-info').textContent='Sin imagen';
@@ -504,7 +504,7 @@ async function downloadDocument(){
  const url=URL.createObjectURL(result.blob),a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${result.blob.type.split('/')[1].replace('jpeg','jpg')}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),30000);toast(`Imagen preparada: ${result.width} × ${result.height}`);
  }catch(e){toast(e.code==='EXPORT_TOO_LARGE'?'No hay memoria suficiente. Elige 2000 px o 1200 px.':'No se pudo exportar. Tu proyecto se conserva.');console.error(e)}finally{processing(false)}
 }
-async function downloadOriginal(){const d=PhotoProject.getDocument();if(!d)return;const a=await PhotoProject.resolveAsset(d.source.assetId),url=URL.createObjectURL(a.blob),link=document.createElement('a');link.href=url;link.download=d.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}
+async function downloadOriginal(){const d=PhotoProject.getDocument();if(!d)return;const a=await PhotoProject.resolveAsset(d.source.assetId),url=URL.createObjectURL(a.blob),link=document.createElement('a');link.href=url;link.download=d.source.fileName||d.name;link.click();setTimeout(()=>URL.revokeObjectURL(url),30000)}
 async function download(){if(window.PhotoProject?.active){return downloadDocument();}const url=exportDataUrl();const a=document.createElement('a');a.href=url;a.download=`PHOTO-IA-${Date.now()}.${$('format').value.split('/')[1].replace('jpeg','jpg')}`;a.click();toast('Imagen preparada para guardar')}
 async function compare(showOriginal){
  if(!state.photo)return;
