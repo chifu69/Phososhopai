@@ -1,2 +1,6 @@
 # Local execution ledger, not application code.
 .superpowers/
+# Reproducible Rust build output and local Wasm tools.
+integrations/photocraft/bridge/target/
+next/engine/
+.tools/

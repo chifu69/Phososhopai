@@ -23,3 +23,11 @@ Consulta `CHANGELOG-15.40.0.md`.
 - Los trazos se guardan como operaciones y se reproducen a resolución nativa. Cancelar no confirma el retoque; Aplicar permite deshacer/rehacer. No se envían fotos a servidores para estas herramientas.
 
 La validación automatizada usa Chrome con tamaños de teléfono, paisaje y escritorio. No sustituye una prueba en Safari de un iPhone físico.
+
+## Nuevo estudio PhotoCraft — base de desarrollo
+
+El diseño aprobado para iPhone/navegador tiene una primera base separada en `/next/`. Usa el motor **real PhotoCraft** compilado a WebAssembly en un Worker: JPEG/PNG, luz, capas vacías y visibilidad, undo/redo, recuperación de un proyecto, original independiente y exportación PNG. Las herramientas IA y la galería antigua todavía no están migradas. La app 15.42 y sus datos siguen intactos.
+
+Compila siguiendo `integrations/photocraft/UPSTREAM.md`, sirve la raíz con `python3 scripts/serve-photocraft.py` y abre `http://localhost:8776/next/`. Los artefactos Wasm se generan y no están incluidos en Git. La instalación Rust debe satisfacer el mínimo 1.95 de PhotoCraft.
+
+Pruebas: `node --test tests/photocraft-protocol.test.cjs`, `cargo test --locked --manifest-path integrations/photocraft/bridge/Cargo.toml` y, tras compilar, `node tests/photocraft-browser/run.cjs` (requiere Playwright/Chrome; admite `PLAYWRIGHT_MODULE` y `CHROME_PATH`). La suite nueva está separada de las regresiones de la app estable y falla explícitamente si faltan artefactos. Consulta `docs/photocraft-web-validation.md` para límites y resultados. Safari en iPhone físico aún pendiente.
