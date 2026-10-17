@@ -1,0 +1,78 @@
+name: Build PhotoCraft and deploy PHOTO IA
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: photoia-pages
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install pinned Rust and WebAssembly target
+        run: |
+          rustup toolchain install 1.98.1 --profile minimal --target wasm32-unknown-unknown
+          rustup override set 1.98.1
+          rustc --version
+      - name: Install matching wasm-bindgen
+        run: cargo install wasm-bindgen-cli --version 0.2.129 --locked
+      - name: Build real PhotoCraft engine and copy notices
+        run: bash scripts/build-photocraft.sh
+      - name: Rust tests with locked dependencies
+        run: cargo test --locked --manifest-path integrations/photocraft/bridge/Cargo.toml
+      - name: JavaScript regression tests
+        run: node tests/run.cjs
+      - name: Install browser test dependencies
+        run: |
+          npm install --prefix /tmp/photoia-test --no-save playwright@1.56.1 fabric@5.3.0
+          /tmp/photoia-test/node_modules/.bin/playwright install --with-deps chromium
+      - name: Browser tests for stable editor and real Wasm studio
+        env:
+          PLAYWRIGHT_MODULE: /tmp/photoia-test/node_modules/playwright
+          FABRIC_TEST_PATH: /tmp/photoia-test/node_modules/fabric/dist/fabric.min.js
+        run: |
+          export CHROME_PATH="$(node -e "console.log(require(process.env.PLAYWRIGHT_MODULE).chromium.executablePath())")"
+          node tests/browser/run.cjs
+          node tests/photocraft-browser/run.cjs
+      - name: Prepare complete Pages package
+        run: |
+          mkdir -p _site
+          git archive HEAD | tar -x -C _site
+          cp -R next/engine _site/next/
+          rm -rf _site/.github _site/integrations _site/tests _site/scripts
+          touch _site/.nojekyll
+          test -s _site/index.html
+          test -s _site/next/index.html
+          test -s _site/next/engine/photoia_photocraft_bridge.js
+          test -s _site/next/engine/photoia_photocraft_bridge_bg.wasm
+          test -s _site/next/engine/NOTICE
+          test -s _site/next/engine/ATTRIBUTION.md
+          test -s _site/next/engine/dependency-licenses.json
+          test -s _site/next/engine/licenses/LICENSE-MIT
+          test -s _site/next/engine/licenses/LICENSE-APACHE
+          node -e "const fs=require('fs');new WebAssembly.Module(fs.readFileSync('_site/next/engine/photoia_photocraft_bridge_bg.wasm'))"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
+      - name: Publish both editors
+        id: deployment
+        uses: actions/deploy-pages@v4
