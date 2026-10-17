@@ -40,3 +40,21 @@ La revisión independiente detectó que Luz actuaba sobre una capa vacía sin ef
 ## Pendiente para promover a iPhone
 
 Probar Safari en dispositivo físico identificado: instalación/carga fría, fotografías reales 12 MP, presión de memoria, orientación/gestos, cierre/reapertura y exportación al carrete. Medir presupuesto real y optimizar composición/descarga antes de migrar todas las herramientas. No se dispone de esa evidencia en esta sesión.
+
+## Estudio 0.2 — montaje, 17 de octubre de 2026
+
+Montaje manual de fotos propias: máscara ovalada o poligonal, suavizado y trazos ocultar/recuperar; posición, escala, rotación, reflejo, opacidad, exposición y temperatura. La inserción se confirma en un paso nativo de historial. Las capas son objetos inteligentes PhotoCraft con una fuente `.pcraft` incrustada: conserva el raster original y la máscara, y permite regenerar el montaje sin remuestreo acumulativo. Los parámetros de edición se guardan en un bloque de capa preservado por el formato nativo. La composición, selección, máscaras, transformaciones, filtros, historial y formato pertenecen a PhotoCraft; JavaScript aporta la interfaz y los gestos.
+
+La interfaz usa superficies planas carbón y acento azul, menús funcionales, miniaturas de capas, visibilidad, orden y eliminación. Los paneles reservan espacio y se desplazan internamente en iPhone; no flotan sobre la foto. Los módulos y Wasm de `/next/` llevan versión `0.2.0`. El service worker de PHOTO IA excluye ese directorio para no contaminar el shell estable/offline; la versión de la app estable continúa siendo 15.42.0.
+
+Verificación realizada:
+
+- Rust: 9 pruebas (4 existentes + 5 de montaje), incluyendo píxeles ajenos al recorte, máscara oval/polígono, feather, ocultar/recuperar, ajuste/alfa, transformación sin degradación acumulativa, preview/export, cancelación, undo/redo, fuente editable tras recarga, orden/borrado y rechazo de presupuesto agregado.
+- Navegador real con Wasm: 8 escenarios completos; flujo de montaje, máscara al recuperar el mismo punto, escala/giro/reflejo, arrastre en coordenadas del documento, cancelación, guardado/reapertura, fuente editable, cuatro tamaños de ventana, errores de entrada/motor/cuota y aislamiento de IndexedDB.
+- Protocolo: 3 pruebas; caché: nueva prueba que reproduce y evita la interceptación de `/next/` por el worker antiguo.
+- Regresiones PHOTO IA: suite Node y 18 escenarios de navegador aprobados (ropa, Smart, retoques, galería, historial y persistencia).
+- Revisión independiente del cambio: encontró restauración omitida en el mismo punto y falta de presupuesto agregado; ambos reproducidos en pruebas fallidas y corregidos.
+
+Memoria del montaje: fixture base 1200×1000 + fuente 1000×1000; 12 previews con máscara y giro distintos. Antes de la corrección, la memoria lineal Wasm creció 85.56 MiB entre la segunda y última muestra. Después: máximo observado **59.25 MiB**, crecimiento **0 MiB**, tiempo por preview aproximadamente **408–495 ms** en Chrome headless/Mac ARM64. Se evita el caché global de variantes del motor de escritorio usando directamente sus mismas funciones nativas de composición, transformación y filtros para el candidato temporal. No es una medida de memoria total del navegador, pico de exportación, fotografías reales ni Safari.
+
+El adaptador rechaza antes de decodificar cuando la estimación de fuentes/capas existentes y buffers de trabajo supera 16 millones de píxeles equivalentes; vuelve a validar la colocación transformada y comprueba memoria de documento/historial. El límite es conservador: dos fotos grandes pueden requerir copias de trabajo más pequeñas. No se reduce silenciosamente ningún original. La publicación del código no publica automáticamente los binarios: ejecutar `scripts/build-photocraft.sh` e incluir `next/engine/` y sus avisos/licencias en el despliegue. Safari físico sigue pendiente antes de sustituir la app estable.

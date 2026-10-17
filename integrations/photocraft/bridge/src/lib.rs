@@ -1,4 +1,5 @@
 //! Narrow, in-memory PHOTO IA bridge to the real PhotoCraft engine.
+mod montage;
 use photocraft_engine::Session;
 use serde_json::{Value, json};
 use std::io::Cursor;
@@ -30,6 +31,7 @@ fn failed(e: impl std::fmt::Display) -> String {
 pub struct Engine {
     session: Session,
     revision: u32,
+    montage: Option<montage::Montage>,
 }
 impl Engine {
     fn install(&mut self, doc: photocraft_doc::Document) -> Result<()> {
@@ -40,6 +42,7 @@ impl Engine {
             d.history.max_states = 15;
             d.history.max_bytes = 128 * 1024 * 1024;
         }
+        self.montage = None;
         self.session = candidate;
         self.revision = 1;
         Ok(())
@@ -79,12 +82,15 @@ impl Engine {
     pub fn inspect(&self) -> Result<Value> {
         let st = self.session.active().ok_or("INVALID_INPUT: no document")?;
         let d = &st.doc;
-        let layers:Vec<_>=d.walk().iter().map(|(_,_,l)|json!({"id":l.id.0.to_string(),"name":l.name,"visible":l.visible,"opacity":l.opacity})).collect();
+        let layers:Vec<_>=d.walk().iter().map(|(_,_,l)|json!({"id":l.id.0.to_string(),"name":l.name,"visible":l.visible,"opacity":l.opacity,"montage":montage::settings(l).is_some(),"masked":l.mask.is_some()||montage::settings(l).is_some()})).collect();
         Ok(
             json!({"id":d.id.0.to_string(),"revision":self.revision,"width":d.size.width,"height":d.size.height,"layers":layers,"canUndo":st.history.can_undo(),"canRedo":st.history.can_redo(),"pixelBytes":st.memory_bytes(),"activeLayer":st.active_layer.map(|id|id.0.to_string()),"canAdjust":st.active_layer.and_then(|id|d.layer(id)).and_then(|l|l.surface()).is_some_and(|p|!p.content_bounds().is_empty())}),
         )
     }
     pub fn execute(&mut self, action: &str, p: Value) -> Result<Value> {
+        if self.montage.is_some() {
+            return Err("INVALID_INPUT: finish montage first".into());
+        }
         let (cmd, params) = match action {
             "exposure" => {
                 let ev = p["ev"]
@@ -117,6 +123,18 @@ impl Engine {
                     .ok_or("INVALID_INPUT")?;
                 let visible = p["visible"].as_bool().ok_or("INVALID_INPUT")?;
                 ("layer.setProps", json!({"layer":id,"visible":visible}))
+            }
+            "deleteLayer" => ("layer.delete", json!({})),
+            "moveLayer" => {
+                let target = p["target"]
+                    .as_str()
+                    .and_then(|s| s.parse::<u64>().ok())
+                    .ok_or("INVALID_INPUT")?;
+                let position = p["position"]
+                    .as_str()
+                    .filter(|s| matches!(*s, "above" | "below"))
+                    .ok_or("INVALID_INPUT")?;
+                ("layer.moveTo", json!({"target":target,"position":position}))
             }
             "undo" => ("edit.undo", json!({})),
             "redo" => ("edit.redo", json!({})),
@@ -212,10 +230,64 @@ impl Bridge {
             })
             .map_err(|e| JsValue::from_str(&e))
     }
+    pub fn layer_thumbnail(&self, id: &str) -> std::result::Result<Vec<u8>, JsValue> {
+        let result = (|| -> Result<(u32, u32, Vec<u8>)> {
+            let st = self.engine.session.active().ok_or("INVALID_INPUT")?;
+            let id = photocraft_doc::LayerId(id.parse().map_err(failed)?);
+            let mut doc = st.doc.as_ref().clone();
+            let mut layer = doc.layer(id).cloned().ok_or("INVALID_INPUT")?;
+            layer.visible = true;
+            doc.layers = vec![layer];
+            let im = photocraft_compose::thumbnail(&doc, 64);
+            Ok((im.width, im.height, im.pixels))
+        })();
+        pack(result)
+    }
+    pub fn begin_montage(&mut self, bytes: &[u8]) -> std::result::Result<String, JsValue> {
+        self.engine
+            .begin_montage(bytes)
+            .map(|v| v.to_string())
+            .map_err(|e| JsValue::from_str(&e))
+    }
+    pub fn edit_montage(&mut self) -> std::result::Result<String, JsValue> {
+        self.engine
+            .edit_montage()
+            .map(|v| v.to_string())
+            .map_err(|e| JsValue::from_str(&e))
+    }
+    pub fn cancel_montage(&mut self) {
+        self.engine.cancel_montage();
+    }
+    pub fn montage_source(&self) -> std::result::Result<Vec<u8>, JsValue> {
+        pack(self.engine.montage_source())
+    }
+    pub fn preview_montage(&self, params: &str) -> std::result::Result<Vec<u8>, JsValue> {
+        let p = serde_json::from_str(params).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        pack(self.engine.preview_montage(p))
+    }
+    pub fn commit_montage(&mut self, params: &str) -> std::result::Result<String, JsValue> {
+        let p = serde_json::from_str(params).map_err(|e| JsValue::from_str(&e.to_string()))?;
+        self.engine
+            .commit_montage(p)
+            .map(|v| v.to_string())
+            .map_err(|e| JsValue::from_str(&e))
+    }
     pub fn serialize(&self) -> std::result::Result<Vec<u8>, JsValue> {
         self.engine.serialize().map_err(|e| JsValue::from_str(&e))
     }
     pub fn export_png(&self) -> std::result::Result<Vec<u8>, JsValue> {
         self.engine.export_png().map_err(|e| JsValue::from_str(&e))
     }
+}
+
+fn pack(frame: Result<(u32, u32, Vec<u8>)>) -> std::result::Result<Vec<u8>, JsValue> {
+    frame
+        .map(|(w, h, p)| {
+            let mut b = Vec::with_capacity(p.len() + 8);
+            b.extend(w.to_le_bytes());
+            b.extend(h.to_le_bytes());
+            b.extend(p);
+            b
+        })
+        .map_err(|e| JsValue::from_str(&e))
 }

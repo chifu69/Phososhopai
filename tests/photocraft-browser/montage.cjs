@@ -1,0 +1,41 @@
+const {withApp,openPhoto,fixture,assert}=require('./helpers.cjs');
+withApp(async p=>{
+ await openPhoto(p,320,240);
+ await p.locator('#montage-button').click({timeout:3000});
+ const bytes=await fixture(p,160,160);
+ await p.locator('#head-file').setInputFiles({name:'head.png',mimeType:'image/png',buffer:bytes});
+ await p.waitForFunction(()=>document.body.dataset.montage==='source');
+ const revision=await p.locator('body').getAttribute('data-revision');
+ await p.locator('#place-head').click();
+ await p.waitForFunction(()=>document.body.dataset.montage==='place');
+ await p.locator('#montage-scale').fill('0.8');
+ await p.locator('#cancel-montage').click();
+ await p.waitForFunction(()=>document.body.dataset.montage==='');
+ assert.equal(await p.locator('body').getAttribute('data-revision'),revision);
+ await p.locator('#montage-button').click();
+ await p.locator('#head-file').setInputFiles({name:'head.png',mimeType:'image/png',buffer:bytes});
+ await p.waitForFunction(()=>document.body.dataset.montage==='source');
+ await p.locator('#selection-mode').selectOption('hide');await p.locator('#source-canvas').click({position:{x:40,y:40}});
+ await p.locator('#selection-mode').selectOption('restore');await p.locator('#source-canvas').click({position:{x:40,y:40}});
+ await p.locator('#place-head').click();
+ await p.locator('#montage-scale').fill('0.8');await p.locator('#montage-angle').fill('30');await p.locator('#montage-flip').check();
+ await p.waitForFunction(()=>!document.getElementById('apply-montage').disabled);
+ const box=await p.locator('#photo-canvas').boundingBox(),delta=12*320/box.width;
+ await p.mouse.move(box.x+box.width/2,box.y+box.height/2);await p.mouse.down();await p.mouse.move(box.x+box.width/2+12,box.y+box.height/2,{steps:4});await p.mouse.up();
+ await p.locator('#apply-montage').click();
+ await p.waitForFunction(()=>document.body.dataset.montage==='');
+ await p.locator('#layers-button').click();assert.equal(await p.locator('.layer-row').count(),2);
+ await p.locator('#save-project').click();await p.waitForFunction(()=>document.getElementById('save-status').textContent==='Guardado en este dispositivo');await p.reload();await p.locator('#resume-project').click();
+ await p.waitForFunction(()=>document.body.dataset.document==='ready');
+ const settings=await p.evaluate(async()=>{const {loadLatest}=await import('/next/project-store.js'),{EngineClient}=await import('/next/engine-client.js');const c=new EngineClient();await c.start();try{await c.openProject((await loadLatest()).engineBytes);const m=await c.request('editMontage');return m.params}catch(e){throw e}finally{c.dispose()}});
+ assert.equal(settings.angle,30);assert.equal(settings.scale,0.8);assert.equal(settings.flip,true);assert(Math.abs(settings.x-(160+delta))<0.1,'drag uses document coordinates at fitted scale');const strokes=settings.strokes;
+ assert.equal(strokes.length,2,'changing hide/recover preserves prior mask strokes');assert.equal(strokes[0].restore,false);assert.equal(strokes[1].restore,true);
+ await p.locator('#edit-montage').click();await p.waitForFunction(()=>document.body.dataset.montage==='source');
+ for(const [width,height] of [[320,740],[390,844],[844,390],[1440,1000]]){
+  await p.setViewportSize({width,height});await p.waitForTimeout(80);
+  const layout=await p.evaluate(()=>{const c=document.getElementById('source-canvas').getBoundingClientRect(),panel=document.getElementById('montage-panel').getBoundingClientRect();return {inside:c.left>=0&&c.top>=0&&c.right<=innerWidth&&c.bottom<=innerHeight,overlap:Math.min(c.right,panel.right)>Math.max(c.left,panel.left)+1&&Math.min(c.bottom,panel.bottom)>Math.max(c.top,panel.top)+1,overflow:document.documentElement.scrollWidth>innerWidth}});
+  assert(layout.inside&&!layout.overlap&&!layout.overflow,JSON.stringify({width,layout}));
+ }
+ await p.setViewportSize({width:390,height:844});await p.screenshot({path:'/tmp/photoia-montage-mobile.png'});
+ await p.locator('#cancel-montage').click();console.log('PASS own-photo montage, cancellation, persistence, source re-edit and responsive panels');
+}).catch(e=>{console.error(e);process.exitCode=1});

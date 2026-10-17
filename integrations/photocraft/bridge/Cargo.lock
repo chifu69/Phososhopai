@@ -1978,13 +1978,15 @@ dependencies = [
 
 [[package]]
 name = "photoia-photocraft-bridge"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "image",
+ "photocraft-algo",
  "photocraft-compose",
  "photocraft-doc",
  "photocraft-engine",
  "photocraft-format",
+ "photocraft-geom",
  "photocraft-io",
  "serde_json",
  "wasm-bindgen",

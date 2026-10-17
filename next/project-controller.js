@@ -1,6 +1,6 @@
-import {EngineClient} from './engine-client.js';
-import {save,loadLatest} from './project-store.js';
-import {failure} from './protocol.js';
+import {EngineClient} from './engine-client.js?v=0.2.0';
+import {save,loadLatest} from './project-store.js?v=0.2.0';
+import {failure} from './protocol.js?v=0.2.0';
 export class ProjectController extends EventTarget{
  constructor(){super();this.client=new EngineClient();this.info=null;this.original=null;this.previewVersion=0;this.saveQueue=Promise.resolve()}
  emit(type,detail){this.dispatchEvent(new CustomEvent(type,{detail}))}

@@ -1,6 +1,6 @@
-import {ACTIONS,failure} from './protocol.js';
+import {ACTIONS,failure} from './protocol.js?v=0.2.0';
 export class EngineClient{
- constructor(factory=()=>new Worker(new URL('./engine-worker.js',import.meta.url),{type:'module'})){this.factory=factory;this.epoch=0;this.revision=0;this.nextId=0;this.pending=new Map();this.tail=Promise.resolve();this.available=false}
+ constructor(factory=()=>new Worker(new URL('./engine-worker.js?v=0.2.0',import.meta.url),{type:'module'})){this.factory=factory;this.epoch=0;this.revision=0;this.nextId=0;this.pending=new Map();this.tail=Promise.resolve();this.available=false}
  start(){
   if(this.ready)return this.ready;
   this.ready=new Promise((resolve,reject)=>{this.readyReject=reject;this.worker=this.factory();this.bootTimer=setTimeout(()=>this.fail(),60000);

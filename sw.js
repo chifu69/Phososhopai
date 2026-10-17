@@ -1,4 +1,4 @@
-const CACHE='photo-ia-15-42-0-retouch';
+const CACHE='photo-ia-15-42-0-studio-0-2-0';
 const VERSION='15.42.0';
 const CORE=[
  './local-retouch-core.js?v=15.42.0','./local-retouch.js?v=15.42.0','./project-gallery.js?v=15.42.0',
@@ -80,6 +80,9 @@ self.addEventListener('message',e=>{
 self.addEventListener('fetch',e=>{
  if(e.request.method!=='GET') return;
  const url=new URL(e.request.url);
+ // The development studio owns its versioned assets; never replace the stable offline shell.
+ const studioPath=new URL('next/',self.registration.scope).pathname;
+ if(url.origin===location.origin&&url.pathname.startsWith(studioPath)) return;
  const remoteAsset=ASSETS.find(a=>a.remote===e.request.url);
  if(remoteAsset){
   e.respondWith((async()=>{

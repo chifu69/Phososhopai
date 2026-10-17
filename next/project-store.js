@@ -1,4 +1,4 @@
-import {failure} from './protocol.js';
+import {failure} from './protocol.js?v=0.2.0';
 const DB='photo-ia-photocraft-dev';
 const normalize=e=>failure(e?.name==='QuotaExceededError'?'STORAGE_FULL':'STORAGE_UNAVAILABLE',e?.message);
 function open(){return new Promise((resolve,reject)=>{let req;try{req=indexedDB.open(DB,1)}catch(e){reject(normalize(e));return}let abandoned=false;req.onupgradeneeded=()=>req.result.createObjectStore('snapshots');req.onerror=()=>reject(normalize(req.error));req.onblocked=()=>{abandoned=true;reject(failure('STORAGE_UNAVAILABLE'))};req.onsuccess=()=>{if(abandoned){req.result.close();return}req.result.onversionchange=()=>req.result.close();resolve(req.result)}})}

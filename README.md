@@ -24,9 +24,9 @@ Consulta `CHANGELOG-15.40.0.md`.
 
 La validación automatizada usa Chrome con tamaños de teléfono, paisaje y escritorio. No sustituye una prueba en Safari de un iPhone físico.
 
-## Nuevo estudio PhotoCraft — base de desarrollo
+## Nuevo estudio PhotoCraft 0.2 — montaje con tus fotos
 
-El diseño aprobado para iPhone/navegador tiene una primera base separada en `/next/`. Usa el motor **real PhotoCraft** compilado a WebAssembly en un Worker: JPEG/PNG, luz, capas vacías y visibilidad, undo/redo, recuperación de un proyecto, original independiente y exportación PNG. Las herramientas IA y la galería antigua todavía no están migradas. La app 15.42 y sus datos siguen intactos.
+El nuevo editor en `/next/` usa el motor **real PhotoCraft** compilado a WebAssembly en un Worker. Abre la foto del cuerpo, pulsa **Montaje** y elige la foto de la cabeza. Recorta con óvalo o contorno, afina con ocultar/recuperar y coloca con arrastre, escala, giro y reflejo. Ajusta opacidad, luz y temperatura antes de aplicar. **Transformar** vuelve a abrir la fuente original de la capa seleccionada. Incluye miniaturas, orden y borrado de capas, deshacer/rehacer, recuperación de proyecto y exportación PNG. La interfaz de paneles grises y acento azul adapta PhotoCraft al teléfono, sin cubrir la foto. Las herramientas IA y la galería antigua todavía no están migradas. La app 15.42 y sus datos siguen intactos.
 
 Compila siguiendo `integrations/photocraft/UPSTREAM.md`, sirve la raíz con `python3 scripts/serve-photocraft.py` y abre `http://localhost:8776/next/`. Los artefactos Wasm se generan y no están incluidos en Git. La instalación Rust debe satisfacer el mínimo 1.95 de PhotoCraft.
 

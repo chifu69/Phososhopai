@@ -1,6 +1,6 @@
 [package]
 name = "photoia-photocraft-bridge"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.95"
 publish = false
@@ -17,6 +17,10 @@ photocraft-doc = { git = "https://github.com/storytold/photocraft", rev = "4e7a1
 photocraft-compose = { git = "https://github.com/storytold/photocraft", rev = "4e7a17cd5d5723313f459753663d0d155f047e19" }
 photocraft-io = { git = "https://github.com/storytold/photocraft", rev = "4e7a17cd5d5723313f459753663d0d155f047e19" }
 photocraft-format = { git = "https://github.com/storytold/photocraft", rev = "4e7a17cd5d5723313f459753663d0d155f047e19" }
+
+photocraft-geom = { git = "https://github.com/storytold/photocraft", rev = "4e7a17cd5d5723313f459753663d0d155f047e19" }
+
+photocraft-algo = { git = "https://github.com/storytold/photocraft", rev = "4e7a17cd5d5723313f459753663d0d155f047e19" }
 
 [profile.release]
 opt-level = "s"

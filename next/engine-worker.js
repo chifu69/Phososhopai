@@ -1,6 +1,6 @@
-import {validRequest} from './protocol.js';
+import {validRequest} from './protocol.js?v=0.2.0';
 let engine,epoch=0,revision=0,wasm;
-try{const mod=await import('./engine/photoia_photocraft_bridge.js');wasm=await mod.default();engine=new mod.Bridge();postMessage({type:'ready'})}catch(e){postMessage({type:'fatal',message:String(e)})}
+try{const mod=await import('./engine/photoia_photocraft_bridge.js?v=0.2.0');wasm=await mod.default({module_or_path:new URL('./engine/photoia_photocraft_bridge_bg.wasm?v=0.2.0',import.meta.url)});engine=new mod.Bridge();postMessage({type:'ready'})}catch(e){postMessage({type:'fatal',message:String(e)})}
 self.onmessage=({data:m})=>{
  if(!validRequest(m))return;
  const opening=m.action==='openImage'||m.action==='openProject';
@@ -10,7 +10,16 @@ self.onmessage=({data:m})=>{
   let result,transfer=[];
   if(opening){const b=m.payload?.bytes;if(!(b instanceof ArrayBuffer)||b.byteLength>64*1024*1024)throw Error('LIMIT_EXCEEDED');result=JSON.parse(engine[m.action==='openImage'?'open_image':'open_project'](new Uint8Array(b)));revision=result.revision}
   else if(m.action==='inspect')result=JSON.parse(engine.inspect());
-  else if(m.action==='renderPreview'){
+  else if(m.action==='beginMontage'){
+   const b=m.payload?.bytes;if(!(b instanceof ArrayBuffer)||b.byteLength>64*1024*1024)throw Error('LIMIT_EXCEEDED');result=JSON.parse(engine.begin_montage(new Uint8Array(b)));
+  }else if(m.action==='editMontage')result=JSON.parse(engine.edit_montage());
+  else if(m.action==='cancelMontage'){engine.cancel_montage();result=null}
+  else if(m.action==='commitMontage'){result=JSON.parse(engine.commit_montage(JSON.stringify(m.payload)));revision=result.revision}
+  else if(['montageSource','previewMontage','layerThumbnail'].includes(m.action)){
+   const packed=m.action==='montageSource'?engine.montage_source():m.action==='layerThumbnail'?engine.layer_thumbnail(m.payload.layer):engine.preview_montage(JSON.stringify(m.payload));
+   const header=new DataView(packed.buffer,packed.byteOffset,8),rgba=packed.slice(8).buffer;
+   result={width:header.getUint32(0,true),height:header.getUint32(4,true),rgba,wasmBytes:wasm.memory.buffer.byteLength};transfer=[rgba];
+  }else if(m.action==='renderPreview'){
    const packed=engine.preview(m.payload?.ev??undefined),header=new DataView(packed.buffer,packed.byteOffset,8),rgba=packed.slice(8).buffer;
    result={width:header.getUint32(0,true),height:header.getUint32(4,true),rgba,wasmBytes:wasm.memory.buffer.byteLength};transfer=[rgba];
   }else if(m.action==='serialize'||m.action==='exportImage'){
