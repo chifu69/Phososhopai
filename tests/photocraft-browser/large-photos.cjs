@@ -1,0 +1,21 @@
+const {withApp,openPhoto,fixture,assert}=require('./helpers.cjs');
+withApp(async p=>{
+ const body=await openPhoto(p,4032,3024),head=await fixture(p,4032,3024);
+ await p.locator('#montage-button').click();
+ await p.locator('#head-file').setInputFiles({name:'original-head.png',mimeType:'image/png',buffer:head});
+ await p.waitForFunction(()=>document.body.dataset.montage==='source',null,{timeout:10000});
+ await p.locator('#place-head').click();
+ await p.locator('#apply-montage').click();
+ await p.waitForFunction(()=>document.body.dataset.montage==='');
+ await p.locator('#save-project').click();
+ await p.waitForFunction(()=>document.getElementById('save-status').textContent==='Guardado en este dispositivo');
+ const saved=await p.evaluate(async()=>{const s=await(await import('/next/project-store.js')).loadLatest();return {width:s.metadata.width,height:s.metadata.height,working:s.metadata.workingCopy,body:[...new Uint8Array(await s.original.arrayBuffer())],heads:await Promise.all(Object.values(s.montageOriginals).map(async b=>[...new Uint8Array(await b.arrayBuffer())]))}});
+ assert(saved.width*saved.height<=4000000);assert(saved.working);assert.deepEqual(saved.body,[...body]);assert.deepEqual(saved.heads,[[...head]]);
+ await p.reload();await p.locator('#resume-project').click();await p.waitForFunction(()=>document.querySelectorAll('.layer-row').length===2);
+ assert((await p.locator('#document-name').textContent()).includes('Copia'));
+ for(const [width,height] of [[320,740],[390,844],[844,390],[1440,1000]]){await p.setViewportSize({width,height});await p.waitForTimeout(150);assert(await p.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),'large-photo layout overflow')}await p.setViewportSize({width:390,height:844});
+ const dl=p.waitForEvent('download');await p.locator('[data-menu=file-menu]').click();await p.locator('#montage-original-download').click();const download=await dl;assert.deepEqual(require('fs').readFileSync(await download.path()),head);
+ await p.locator('#edit-montage').click();await p.waitForFunction(()=>document.body.dataset.montage==='source');await p.locator('#cancel-montage').click();
+ const png=p.waitForEvent('download');await p.locator('#export-photo').click();const exported=require('fs').readFileSync(await(await png).path());assert.equal(exported.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
+ console.log('PASS two 12MP photos: montage, recovery, editable source, both exact originals and PNG export');
+}).catch(e=>{console.error(e);process.exitCode=1});
